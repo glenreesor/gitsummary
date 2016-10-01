@@ -16,16 +16,26 @@ import os
 import subprocess
 import sys
 
-COLOR_CURRENT_BRANCH          = '\033[01;35m'            ## Magenta
-COLOR_DETACHED_HEAD_STATE     = '\033[01;37m'            ## Bold White
-COLOR_ERROR                   = '\033[00;31m'            ## Red
-COLOR_FILE_MODIFIED           = '\033[00;31m'            ## Red
-COLOR_FILE_STAGED             = '\033[00;32m'            ## Green
-COLOR_FILE_UNTRACKED          = '\033[00;33m'            ## Yellow
-COLOR_IMPORTANT_BRANCH        = '\033[05;35m\033[01;35m' ## Flashing magenta
-COLOR_NORMAL                  = '\033[00;37m'            ## White
-COLOR_STASH_NAME              = '\033[00;32m'            ## Green
-COLOR_UNMERGED_BRANCH_NAME    = '\033[01;37m'            ## Bold White
+ANSI_NORMAL   = '0'
+ANSI_BOLD     = '1'
+ANSI_FLASHING = '5'
+
+ANSI_GREEN    = '32'
+ANSI_MAGENTA  = '35'
+ANSI_RED      = '31'
+ANSI_WHITE    = '37'
+ANSI_YELLOW   = '33'
+
+COLOR_CURRENT_BRANCH       = '\033[' + ANSI_MAGENTA + 'm'
+COLOR_DETACHED_HEAD_STATE  = '\033[' + ANSI_BOLD + 'm'
+COLOR_ERROR                = '\033[' + ANSI_RED + 'm'
+COLOR_FILE_MODIFIED        = '\033[' + ANSI_RED + 'm'
+COLOR_FILE_STAGED          = '\033[' + ANSI_GREEN + 'm'
+COLOR_FILE_UNTRACKED       = '\033[' + ANSI_YELLOW  + 'm'
+COLOR_IMPORTANT_BRANCH     = '\033[' + ANSI_BOLD + ';' + ANSI_FLASHING + ';' + ANSI_MAGENTA + 'm'
+COLOR_NORMAL               = '\033[' + ANSI_NORMAL + 'm'
+COLOR_STASH_NAME           = '\033[' + ANSI_GREEN + 'm'
+COLOR_UNMERGED_BRANCH_NAME = '\033[' + ANSI_BOLD + 'm'
 
 ##----------------------------------------------------------------------------
 ## Global vars
