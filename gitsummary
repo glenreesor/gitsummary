@@ -247,7 +247,7 @@ def processCommandLineArgs(args):
             optionLong = False
 
         elif args[i] == '--version':
-            print(args[0] + ' - 2016-09-15 2:00pm')
+            print(args[0] + ' - Version 1.0')
             sys.exit()
 
         elif args[i] == '--help':
