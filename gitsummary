@@ -54,6 +54,70 @@ optionLog = False
 localBranches = []
 originBranches = []
 
+class Repository:
+    """
+    A class used to represent the git repository contained in the current
+    working directory
+    """
+
+    def __init__(self):
+        """ Initialize git info corresponding to current directory """
+
+        self.branchNames = []
+        self.currentBranchName = None
+        self.detachedHeadState = False
+
+        self._populateBranchInfo()
+
+    def getBranchNames(self):
+        """
+        Return a List of the (local) branches
+
+        :returns: list
+        """
+
+        return self.branchNames
+
+    def getCurrentBranchName(self):
+        """
+        Return the name of the current branch
+
+        :returns: str
+        """
+
+        return self.currentBranchName
+
+    def isDetachedHeadState(self):
+        """
+        Return whether the git repository is in "detached head state"
+
+        :returns: bool
+        """
+
+        return self.detachedHeadState
+
+    def _populateBranchInfo(self):
+        """
+        Populate the information about this repository's branches.
+
+        This is intended to be called only by __init__()
+        """
+
+        branches = subprocess.check_output(
+            ['git', 'branch', '--list'],
+            universal_newlines = True
+        ).splitlines()
+
+        for branch in branches:
+            branchName = branch[2:]
+            self.detachedHeadState = (branchName.startswith('(detached'))
+
+            if not self.detachedHeadState and branch[0] == '*':
+                self.currentBranchName = branchName
+
+            if not self.detachedHeadState:
+                self.branchNames.append(branchName)
+
 ##----------------------------------------------------------------------------
 ## main()
 ##      Drive the whole process
@@ -99,21 +163,11 @@ def getAllBranchInfo():
     ##------------------------------------------------------------------------
     ## localBranches and currentBranch
     ##------------------------------------------------------------------------
-    gitBranchOutput = subprocess.check_output(
-        ['git', 'branch', '--list'],
-        universal_newlines = True
-    )
+    repo = Repository()
 
-    for branchName in gitBranchOutput.splitlines():
-
-        ## If we're not currently at the head of a branch, output shows:
-        ## '* (detached from  xyz)'
-        if branchName[2] == '(':
-            detachedHeadState = True
-        else:
-            if branchName[0] == '*':
-                currentBranch = branchName[2:]
-            localBranches.append(branchName[2:])
+    detachedHeadState = repo.isDetachedHeadState()
+    localBranches.extend(repo.getBranchNames())
+    currentBranchName = repo.getCurrentBranchName()
 
     ##------------------------------------------------------------------------
     ## originBranches
