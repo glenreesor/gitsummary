@@ -59,7 +59,7 @@ class Branch:
     A class used to represent one branch
     """
 
-    def __init__(self, name, remoteTrackingBranchName, isCurrent, mergeTargets):
+    def __init__(self, name, remoteTrackingBranchName, isCurrent, mergeTarget):
         """
         Initialize branch info
         Args
@@ -67,20 +67,22 @@ class Branch:
             remoteTrackingBranchName: str:  The name of the corresponding
                                             remote tracking branch, possibly None
             isCurrent:                bool: Whether this is the current branch
-            mergeTargets:             list: Strings of branch names
+            mergeTarget:              str:  The name of the branch this one branch
+                                            will merge to
         """
 
         self.name = name
         self.remoteTrackingBranchName = remoteTrackingBranchName
         self.isCurrent = isCurrent
+        self.mergeTarget = mergeTarget
 
-        ## Determine this branch's merge target
-        if (name in mergeTargets['noTarget']):
-            self.mergeTarget = None
-        elif (name in mergeTargets['targets']):
-            self.mergeTarget = mergeTargets['targets'][name]
-        else:
-            self.mergeTarget = mergeTargets['default']
+    def getMergeTarget(self):
+        """
+        Get the name of the branch that this will eventually be merged to
+        :returns: str
+        """
+
+        return self.mergeTarget
 
     def getName(self):
         """
@@ -129,6 +131,18 @@ class Repository:
 
         self._populateBranchInfo()
 
+    def getBranch(self, branchName):
+        """
+        Return the Branch object whose name is branchName
+        :returns: Branch The Branch object
+        """
+
+        for branch in self.branches:
+            if branch.getName() == branchName:
+                return branch
+
+        return None
+
     def getBranches(self):
         """
         Return a List of the (local) branches
@@ -136,6 +150,30 @@ class Repository:
         """
 
         return self.branches
+
+    def getBranchHierarchy(self):
+        """
+        Return a list of Branch objects in the following order:
+            - Branches with no merge target
+            - Branches whose merge targets have been specified
+            - Other branches
+        :returns: list of Branch objects
+        """
+
+        branchList = self.MERGE_TARGETS['noTarget']
+        branchList += self.MERGE_TARGETS['targets'].keys()
+
+        for branch in self.branchNames:
+            if branch not in branchList:
+                branchList.append(branch)
+
+        returnVal = []
+        for branchName in branchList:
+            branch = self.getBranch(branchName)
+            if branch != None:
+                returnVal.append(branch)
+
+        return returnVal
 
     def getBranchNames(self):
         """
@@ -153,13 +191,20 @@ class Repository:
 
         return self.currentBranch
 
-    def getMergeTargets(self):
+    def getMergeTarget(self, branchName):
         """
-        Return the MERGE_TARGETS object that defines which branches
-        get merged to
+        Return the name of the branch that branchName will merge to
+        :returns: str
         """
 
-        return self.MERGE_TARGETS
+        if (branchName in self.MERGE_TARGETS['noTarget']):
+            returnVal = None
+        elif (branchName in self.MERGE_TARGETS['targets']):
+            returnVal = self.MERGE_TARGETS['targets'][branchName]
+        else:
+            returnVal = self.MERGE_TARGETS['default']
+
+        return returnVal
 
     def isDetachedHeadState(self):
         """
@@ -221,7 +266,7 @@ class Repository:
                     branchName,
                     remoteTrackingBranchName,
                     isCurrentBranch,
-                    self.MERGE_TARGETS
+                    self.getMergeTarget(branchName)
                 )
 
                 ## Assign some stuff that can only be done after branch object
@@ -449,7 +494,7 @@ def processCommandLineArgs(args):
 ##
 ##          A list of commits that are ahead/behind of this branch's origin
 ##----------------------------------------------------------------------------
-def showBranchSummaryShort(branchName):
+def showBranchSummaryShort(branch):
     global currentBranch
     global devBranchPresent
     global localBranches
@@ -459,7 +504,8 @@ def showBranchSummaryShort(branchName):
     INDENT = '        '
     COMMIT_LENGTH = 79 - len(INDENT)
 
-    localCompareto = getLocalCompareTo(branchName)
+    branchName = branch.getName()
+    mergeTarget = branch.getMergeTarget()
 
     ##--------------------------------------------------------------------
     ## Figure out if we have a corresponding branch in origin
@@ -479,20 +525,20 @@ def showBranchSummaryShort(branchName):
         commitsAheadOfOrigin = getCommitList('+ ', branchName, 'origin/' + branchName)
 
     ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of dev/master
+    ## Get commits ahead/behind of merge target
     ##--------------------------------------------------------------------
-    commitsBehindDevMaster = []
-    commitsAheadOfDevMaster = []
+    commitsBehindMergeTarget = []
+    commitsAheadOfMergeTarget = []
 
-    if localCompareto != '':
-        commitsBehindDevMaster = getCommitList('- ', localCompareto, branchName)
-        commitsAheadOfDevMaster = getCommitList('+ ', branchName, localCompareto)
+    if mergeTarget != None:
+        commitsBehindMergeTarget = getCommitList('- ', mergeTarget, branchName)
+        commitsAheadOfMergeTarget = getCommitList('+ ', branchName, mergeTarget)
 
     ##--------------------------------------------------------------------
     ## Combine our lists by column
     ##--------------------------------------------------------------------
     commitsRelativeToOrigin = commitsBehindOrigin + commitsAheadOfOrigin
-    commitsRelativeToDevMaster = commitsBehindDevMaster + commitsAheadOfDevMaster
+    commitsRelativeToMergeTarget = commitsBehindMergeTarget + commitsAheadOfMergeTarget
 
     ##--------------------------------------------------------------------
     ## Formatted Branch Name
@@ -505,14 +551,14 @@ def showBranchSummaryShort(branchName):
             currentBranchIndicator = COLOR_IMPORTANT_BRANCH + '*' + COLOR_NORMAL
 
     ##--------------------------------------------------------------------
-    ## Ahead / behind of dev/master
+    ## Ahead / behind of merge target
     ##--------------------------------------------------------------------
     ahead = '-----'
-    if len(commitsAheadOfDevMaster) != 0:
+    if len(commitsAheadOfMergeTarget) != 0:
         ahead = 'Ahead'
 
     behind = '------'
-    if len(commitsBehindDevMaster) != 0:
+    if len(commitsBehindMergeTarget) != 0:
         behind = 'Behind'
 
     ##--------------------------------------------------------------------
@@ -523,7 +569,7 @@ def showBranchSummaryShort(branchName):
 
     outputString = currentBranchIndicator + ' '
 
-    if len(commitsAheadOfDevMaster) != 0:
+    if len(commitsAheadOfMergeTarget) != 0:
         outputString += COLOR_UNMERGED_BRANCH_NAME
         outputString += padOrTruncate(branchName, BRANCH_NAME_LENGTH) + ' '
         outputString += COLOR_NORMAL
@@ -533,7 +579,9 @@ def showBranchSummaryShort(branchName):
 
     outputString += padOrTruncate(ahead, 7) + ' '
     outputString += padOrTruncate(behind, 7) + ' '
-    outputString += localCompareto
+
+    if mergeTarget != None:
+        outputString += mergeTarget
 
     print(outputString)
 
@@ -790,20 +838,6 @@ def showRepositorySummary():
     print()
 
     ##-------------------------------------------------------------------------
-    ## Show "special" branches first, unless a specific branch has been selected
-    ##-------------------------------------------------------------------------
-    if not optionCurrentBranch and optionBranch == '':
-        mergeTargets = repository.getMergeTargets()
-        specialBranches = mergeTargets['noTarget']
-        specialBranches += mergeTargets['targets'].keys()
-
-        for branch in specialBranches:
-            if optionLong:
-                showBranchSummaryFull(branch)
-            else:
-                showBranchSummaryShort(branch)
-
-    ##-------------------------------------------------------------------------
     ## One of:
     ##      - current branch (--current)
     ##      - manually selected branch (--branch xyz)
@@ -813,21 +847,20 @@ def showRepositorySummary():
         if optionLong:
             showBranchSummaryFull(repository.getCurrentBranch().getName())
         else:
-            showBranchSummaryShort(repository.getCurrentBranch().getName())
+            showBranchSummaryShort(repository.getCurrentBranch())
 
     elif optionBranch != '':
         if optionLong:
             showBranchSummaryFull(optionBranch)
         else:
-            showBranchSummaryShort(optionBranch)
+            showBranchSummaryShort(repository.getBranch(optionBranch))
 
     else:
-        for branchName in repository.getBranchNames():
-            if branchName not in specialBranches:
-                if optionLong:
-                    showBranchSummaryFull(branchName)
-                else:
-                    showBranchSummaryShort(branchName)
+        for branch in repository.getBranchHierarchy():
+            if optionLong:
+                showBranchSummaryFull(branch.name)
+            else:
+                showBranchSummaryShort(branch)
 
 ##----------------------------------------------------------------------------
 ## showStashSummary()
