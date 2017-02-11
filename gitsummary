@@ -52,7 +52,7 @@ class Branch:
 
     def __init__(self, name, remoteTrackingBranchName, isCurrent, mergeTargetName):
         """
-        Initialize branch info
+        Initialize this Branch
         Args
             name:                     str:  The name of the branch
             remoteTrackingBranchName: str:  The name of the corresponding
@@ -205,9 +205,13 @@ class Repository:
         self.branchNames = []
         self.currentBranch= None
         self.detachedHeadState = False
+        self.filesModified = []
+        self.filesStaged = []
+        self.filesUntracked = []
         self.stashes = []
 
         self._populateBranchInfo()
+        self._populateFilesInfo()
         self._populateStashInfo()
 
     def getBranch(self, branchName):
@@ -261,6 +265,30 @@ class Repository:
         """
 
         return self.currentBranch
+
+    def getFilesModified(self):
+        """
+        Get a list of this repository's modified files
+        :returns: list of str
+        """
+
+        return self.filesModified
+
+    def getFilesStaged(self):
+        """
+        Get a list of this repository's staged files
+        :returns: list of str
+        """
+
+        return self.filesStaged
+
+    def getFilesUntracked(self):
+        """
+        Get a list of this repository's untracked files
+        :returns: list of str
+        """
+
+        return self.filesUntracked
 
     def getMergeTargetName(self, branchName):
         """
@@ -355,6 +383,38 @@ class Repository:
                 if isCurrentBranch:
                     self.currentBranch = newBranch
 
+    def _populateFilesInfo(self):
+        """
+        Populate the information about this repository's files
+        (staged, modified, and untracked).
+        This is intended to be called only by __init__()
+        """
+
+        gitStatusOutput = subprocess.check_output(
+            ['git', 'status', '--porcelain'],
+            universal_newlines = True
+        ).splitlines()
+
+        for line in gitStatusOutput:
+            indexStatus = line[0]
+            workingTreeStatus = line[1]
+            fileName = line[3:]
+
+            newRepositoryFile = RepositoryFile(
+                fileName,
+                indexStatus,
+                workingTreeStatus
+            )
+
+            if indexStatus != ' ' and indexStatus != '?':
+                self.filesStaged.append(newRepositoryFile)
+
+            if workingTreeStatus != ' ' and workingTreeStatus != '?':
+                self.filesModified.append(newRepositoryFile)
+
+            if indexStatus == '?':
+                self.filesUntracked.append(newRepositoryFile)
+
     def _populateStashInfo(self):
         """
         Populate the information about this repository's stashes.
@@ -370,6 +430,48 @@ class Repository:
             nameEnd = stashLine.find(':')
             newStash = Stash(stashLine[:nameEnd], stashLine[nameEnd+2:])
             self.stashes.append(newStash)
+
+class RepositoryFile:
+    """
+    A class used to represent a staged, modified, or untracked file in
+    the current git repository
+    """
+
+    def __init__(self, name, indexStatus, workingTreeStatus):
+        """
+        Initialize this RepositoryFile
+        Args
+            name:             str: The name of this file
+            indexStatus       str: The one-character index status of this file
+            workingTreeStatus str: The one-character working tree status of this file
+        """
+        self.name = name
+        self.indexStatus = indexStatus
+        self.workingTreeStatus = workingTreeStatus
+
+    def getIndexStatus(self):
+        """
+        Get the one-character index status of this file
+        :returns: str
+        """
+
+        return self.indexStatus
+
+    def getName(self):
+        """
+        Get the fully qualified name of this file
+        :returns: str
+        """
+
+        return self.name
+
+    def getWorkingTreeStatus(self):
+        """
+        Get the one-character working tree status of this file
+        :returns: str
+        """
+
+        return self.workingTreeStatus
 
 class Stash:
     """
@@ -406,8 +508,8 @@ def main():
     ensureGitTrackedFolder()
 
     repository = Repository()
-    ## Now show everything
-    showFilesSummary()
+
+    showFilesSummary(repository)
     showStashSummary(repository)
     showRepositorySummary(repository)
 
@@ -739,64 +841,28 @@ def showBranchSummaryFull(branch):
 ##          Unstaged changes
 ##          Untracked files
 ##----------------------------------------------------------------------------
-def showFilesSummary():
+def showFilesSummary(repository):
     INDENT = '           '
 
-    gitStatusOutput = subprocess.check_output(
-        ['git', 'status', '--porcelain'],
-        universal_newlines = True
-    )
-    gitStatusLines = gitStatusOutput.splitlines()
-
-    ## Keep a count of files outputted to make sure we get them all
-    printedFiles = 0
-
-    ##------------------------------------------------------------------------
-    ## Staged files
-    ##------------------------------------------------------------------------
     print('Staged')
-    for line in gitStatusLines:
-        indexStatus = line[0]
-        fileName = line[3:]
+    for repoFile in repository.getFilesStaged():
+        print(COLOR_FILE_STAGED, end='')
+        print(INDENT + repoFile.getIndexStatus() + ' ' + repoFile.getName())
+        print(COLOR_NORMAL, end='')
 
-        if indexStatus != ' ' and indexStatus != '?':
-            print(COLOR_FILE_STAGED, end='')
-            print(INDENT + indexStatus + ' ' + fileName)
-            print(COLOR_NORMAL, end='')
-
-            printedFiles += 1
-
-    ##------------------------------------------------------------------------
-    ## Modified
-    ##------------------------------------------------------------------------
     print()
     print('Modified')
-    for line in gitStatusLines:
-        workingTreeStatus = line[1]
-        fileName = line[3:]
+    for repoFile in repository.getFilesModified():
+        print(COLOR_FILE_MODIFIED, end='')
+        print(INDENT + repoFile.getWorkingTreeStatus() + ' ' + repoFile.getName())
+        print(COLOR_NORMAL, end='')
 
-        if workingTreeStatus != ' ' and workingTreeStatus != '?':
-            print(COLOR_FILE_MODIFIED, end='')
-            print(INDENT + workingTreeStatus + ' ' + fileName)
-            print(COLOR_NORMAL, end='')
-
-            printedFiles += 1
-
-    ##------------------------------------------------------------------------
-    ## Untracked files
-    ##------------------------------------------------------------------------
     print()
     print('Untracked')
-    for line in gitStatusLines:
-        indexStatus = line[0]
-        fileName = line[3:]
-
-        if indexStatus == '?':
-            print(COLOR_FILE_UNTRACKED, end='')
-            print(INDENT + fileName)
-            print(COLOR_NORMAL, end='')
-
-            printedFiles += 1
+    for repoFile in repository.getFilesUntracked():
+        print(COLOR_FILE_UNTRACKED, end='')
+        print(INDENT + repoFile.getName())
+        print(COLOR_NORMAL, end='')
 
 ##----------------------------------------------------------------------------
 ## showRepositorySummary()
