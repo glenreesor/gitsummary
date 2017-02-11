@@ -42,16 +42,11 @@ COLOR_UNMERGED_BRANCH_NAME = '\033[' + ANSI_BOLD + 'm'
 ##----------------------------------------------------------------------------
 currentBranch = ''
 
-devBranchPresent = False
-detachedHeadState = False
-masterBranchPresent = False
-
 optionBranch = ''
 optionCurrentBranch = False
 optionLocalCompareTo = ''
 optionLog = False
 
-localBranches = []
 originBranches = []
 
 class Branch:
@@ -310,21 +305,16 @@ def ensureGitTrackedFolder():
 ## getAllBranchInfo()
 ##      Get the following information that is required later
 ##          - Name of current branch      (global currentBranch)
-##          - List of all local branches  (global localBranches)
 ##          - List of all origin branches (global originBranches)
 ##----------------------------------------------------------------------------
 def getAllBranchInfo():
     global currentBranch
-    global detachedHeadState
-    global localBranches
 
     ##------------------------------------------------------------------------
     ## localBranches and currentBranch
     ##------------------------------------------------------------------------
     repo = Repository()
 
-    detachedHeadState = repo.isDetachedHeadState()
-    localBranches.extend(repo.getBranchNames())
     currentBranchName = repo.getCurrentBranch().getName()
 
     ##------------------------------------------------------------------------
@@ -368,42 +358,6 @@ def getCommitList(prefix, inBranch, notInBranch):
         commitList.append(prefix + commitTitle)
 
     return commitList
-
-##----------------------------------------------------------------------------
-##  getLocalCompareTo()
-##      Return the local branch that should be compared to when --long has
-##      been specified.
-##
-##      If user hasn't specified the branch using --compareto, then:
-##          return one of 'dev', 'master', '' which will be used for comparing
-##          the specified branch to.
-##
-##          The value returned is determined by the existence of those branches
-##          (in that order), as opposed to which branch the specified branch was
-##          branched off of.
-##----------------------------------------------------------------------------
-def getLocalCompareTo(branchName):
-    if optionLocalCompareTo != '':
-        localCompareTo = optionLocalCompareTo
-
-    elif branchName != 'dev' and branchName != 'master':
-        if devBranchPresent:
-            localCompareTo = 'dev'
-        elif masterBranchPresent:
-            localCompareTo = 'master'
-        else:
-            localCompareTo = ''
-
-    elif branchName == 'dev':
-        if masterBranchPresent:
-            localCompareTo = 'master'
-        else:
-            localCompareTo = ''
-
-    else:  ## master branch
-        localCompareTo = ''
-
-    return localCompareTo
 
 ##----------------------------------------------------------------------------
 ## padOrTruncate(text, length)
@@ -496,9 +450,6 @@ def processCommandLineArgs(args):
 ##----------------------------------------------------------------------------
 def showBranchSummaryShort(branch):
     global currentBranch
-    global devBranchPresent
-    global localBranches
-    global masterBranchPresent
 
     BRANCH_NAME_LENGTH = 54
     INDENT = '        '
@@ -611,9 +562,6 @@ def showBranchSummaryShort(branch):
 ##----------------------------------------------------------------------------
 def showBranchSummaryFull(branch):
     global currentBranch
-    global devBranchPresent
-    global localBranches
-    global masterBranchPresent
 
     INDENT = '        '
     COMMIT_LENGTH = 60
@@ -794,26 +742,10 @@ def showFilesSummary():
 ##----------------------------------------------------------------------------
 def showRepositorySummary():
     global currentBranch
-    global devBranchPresent
-    global detachedHeadState
-    global localBranches
-    global masterBranchPresent
     global optionCurrentBranch
     global optionLong
 
     repository = Repository()
-
-    ##-------------------------------------------------------------------------
-    ## Figure out if dev and/or master branches are present
-    ##-------------------------------------------------------------------------
-    devBranchPresent = False
-    masterBranchPresent = False
-
-    if localBranches.count('dev') != 0:
-        devBranchPresent = True
-
-    if localBranches.count('master') != 0:
-        masterBranchPresent = True
 
     ##-------------------------------------------------------------------------
     ## We may be in detached head state
