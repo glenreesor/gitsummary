@@ -50,7 +50,7 @@ class Branch:
     A class used to represent one branch
     """
 
-    def __init__(self, name, remoteTrackingBranchName, isCurrent, mergeTarget):
+    def __init__(self, name, remoteTrackingBranchName, isCurrent, mergeTargetName):
         """
         Initialize branch info
         Args
@@ -58,22 +58,67 @@ class Branch:
             remoteTrackingBranchName: str:  The name of the corresponding
                                             remote tracking branch, possibly None
             isCurrent:                bool: Whether this is the current branch
-            mergeTarget:              str:  The name of the branch this one branch
+            mergeTargetName:          str:  The name of the branch this one branch
                                             will merge to
         """
 
         self.name = name
         self.remoteTrackingBranchName = remoteTrackingBranchName
         self.isCurrent = isCurrent
-        self.mergeTarget = mergeTarget
+        self.mergeTargetName = mergeTargetName
 
-    def getMergeTarget(self):
+    def getCommitsNotIn(self, branchName):
+        """
+        Get a list of Commit objects for the commits that are in the current
+        branch, but not in the specified branch
+        :returns: list of Commit objects
+        """
+
+        commitHashes = subprocess.check_output(
+            [
+                'git',
+                'rev-list',
+                self.name,
+                '^' + branchName
+            ],
+            universal_newlines = True
+        ).splitlines()
+
+        commits = []
+        for hash in commitHashes:
+            commits.append(Commit(hash))
+
+        return commits
+
+    def getCommitsOnlyIn(self, branchName):
+        """
+        Get a list of Commit objects for the commits that are in the specified
+        branch, but not in the current branch
+        :returns: list of Commit objects
+        """
+
+        commitHashes = subprocess.check_output(
+            [
+                'git',
+                'rev-list',
+                branchName,
+                '^' + self.name
+            ],
+            universal_newlines = True
+        ).splitlines()
+
+        commits = []
+        for hash in commitHashes:
+            commits.append(Commit(hash))
+
+        return commits
+    def getMergeTargetName(self):
         """
         Get the name of the branch that this will eventually be merged to
         :returns: str
         """
 
-        return self.mergeTarget
+        return self.mergeTargetName
 
     def getName(self):
         """
@@ -97,6 +142,46 @@ class Branch:
         :returns: bool
         """
         return self.isCurrent
+
+class Commit:
+    """
+    A class used to represent a commit
+    """
+
+    def __init__(self, hash):
+        """
+        Initialize the commit
+        Args
+            hash: str: The hash for this particular commit
+        """
+
+        self.hash = hash
+        self._setDescription()
+
+    def getDescription(self):
+        """
+        Return the description for this commit
+        :returns: str
+        """
+
+        return self.description
+
+    def _setDescription(self):
+        """
+        Set self.description. This is intended to be called only by __init__()
+        """
+        gitShowOutput = subprocess.check_output(
+            [
+                'git',
+                'show',
+                self.hash,
+                '--pretty=oneline'
+            ],
+            universal_newlines = True
+        ).splitlines()
+
+        descriptionStart = gitShowOutput[0].find(' ') + 1
+        self.description = gitShowOutput[0][descriptionStart:]
 
 class Repository:
     """
@@ -182,7 +267,7 @@ class Repository:
 
         return self.currentBranch
 
-    def getMergeTarget(self, branchName):
+    def getMergeTargetName(self, branchName):
         """
         Return the name of the branch that branchName will merge to
         :returns: str
@@ -257,7 +342,7 @@ class Repository:
                     branchName,
                     remoteTrackingBranchName,
                     isCurrentBranch,
-                    self.getMergeTarget(branchName)
+                    self.getMergeTargetName(branchName)
                 )
 
                 ## Assign some stuff that can only be done after branch object
@@ -293,35 +378,6 @@ def ensureGitTrackedFolder():
     except:
         print("This isn't a git tracked folder.")
         exit()
-
-##----------------------------------------------------------------------------
-## getCommitList()
-##      Return a list of commit titles that are:
-##          - In branch inBranch
-##          - Not in branch notInBranch
-##
-##      Each commit will have the specified prefix (typically '- ' or '+ ')
-##----------------------------------------------------------------------------
-def getCommitList(prefix, inBranch, notInBranch):
-    commitList = []
-
-    unformattedList = subprocess.check_output(
-        [
-            'git',
-            'rev-list',
-            '--pretty=oneline',
-            inBranch,
-            '^' + notInBranch
-        ],
-        universal_newlines = True
-    ).splitlines()
-
-    ## Remove hash strings
-    for commit in unformattedList:
-        commitTitle = commit[commit.index(' ') + 1:]
-        commitList.append(prefix + commitTitle)
-
-    return commitList
 
 ##----------------------------------------------------------------------------
 ## padOrTruncate(text, length)
@@ -418,12 +474,12 @@ def showBranchSummaryShort(branch):
     COMMIT_LENGTH = 79 - len(INDENT)
 
     branchName = branch.getName()
-    mergeTarget = branch.getMergeTarget()
+    mergeTargetName = branch.getMergeTargetName()
 
     ##--------------------------------------------------------------------
     ## Figure out if we have a corresponding branch in origin
     ##--------------------------------------------------------------------
-    hasCorrespondingOrigin = (branch.getRemoteTrackingBranchName() != None)
+    remoteTrackingBranchName = branch.getRemoteTrackingBranchName()
 
     ##--------------------------------------------------------------------
     ## Get commits ahead/behind of origin
@@ -431,9 +487,12 @@ def showBranchSummaryShort(branch):
     commitsBehindOrigin = []
     commitsAheadOfOrigin = []
 
-    if hasCorrespondingOrigin:
-        commitsBehindOrigin = getCommitList('- ', 'origin/' + branchName, branchName)
-        commitsAheadOfOrigin = getCommitList('+ ', branchName, 'origin/' + branchName)
+    if remoteTrackingBranchName != None:
+        for commit in branch.getCommitsNotIn(remoteTrackingBranchName):
+            commitsAheadOfOrigin.append('+ ' + commit.getDescription())
+
+        for commit in branch.getCommitsOnlyIn(remoteTrackingBranchName):
+            commitsBehindOrigin.append('- ' + commit.getDescription())
 
     ##--------------------------------------------------------------------
     ## Get commits ahead/behind of merge target
@@ -441,9 +500,12 @@ def showBranchSummaryShort(branch):
     commitsBehindMergeTarget = []
     commitsAheadOfMergeTarget = []
 
-    if mergeTarget != None:
-        commitsBehindMergeTarget = getCommitList('- ', mergeTarget, branchName)
-        commitsAheadOfMergeTarget = getCommitList('+ ', branchName, mergeTarget)
+    if mergeTargetName != None:
+        for commit in branch.getCommitsNotIn(mergeTargetName):
+            commitsAheadOfMergeTarget.append('+ ' + commit.getDescription())
+
+        for commit in branch.getCommitsOnlyIn(mergeTargetName):
+            commitsBehindMergeTarget.append('- ' + commit.getDescription())
 
     ##--------------------------------------------------------------------
     ## Combine our lists by column
@@ -491,8 +553,8 @@ def showBranchSummaryShort(branch):
     outputString += padOrTruncate(ahead, 7) + ' '
     outputString += padOrTruncate(behind, 7) + ' '
 
-    if mergeTarget != None:
-        outputString += mergeTarget
+    if mergeTargetName != None:
+        outputString += mergeTargetName
 
     print(outputString)
 
@@ -525,12 +587,12 @@ def showBranchSummaryFull(branch):
     COMMIT_LENGTH = 60
 
     branchName = branch.getName()
-    mergeTarget = branch.getMergeTarget()
+    mergeTargetName = branch.getMergeTargetName()
 
     ##--------------------------------------------------------------------
     ## Figure out if we have a corresponding branch in origin
     ##--------------------------------------------------------------------
-    hasCorrespondingOrigin = (branch.getRemoteTrackingBranchName() != None)
+    remoteTrackingBranchName = branch.getRemoteTrackingBranchName()
 
     ##--------------------------------------------------------------------
     ## Get commits ahead/behind of origin
@@ -538,9 +600,18 @@ def showBranchSummaryFull(branch):
     commitsBehindOrigin = []
     commitsAheadOfOrigin = []
 
-    if hasCorrespondingOrigin:
-        commitsBehindOrigin = getCommitList('- ', 'origin/' + branchName, branchName)
-        commitsAheadOfOrigin = getCommitList('+ ', branchName, 'origin/' + branchName)
+    ##--------------------------------------------------------------------
+    ## Get commits ahead/behind of origin
+    ##--------------------------------------------------------------------
+    commitsBehindOrigin = []
+    commitsAheadOfOrigin = []
+
+    if remoteTrackingBranchName != None:
+        for commit in branch.getCommitsNotIn(remoteTrackingBranchName):
+            commitsAheadOfOrigin.append('+ ' + commit.getDescription())
+
+        for commit in branch.getCommitsOnlyIn(remoteTrackingBranchName):
+            commitsBehindOrigin.append('- ' + commit.getDescription())
 
     ##--------------------------------------------------------------------
     ## Get commits ahead/behind of merge target
@@ -548,9 +619,12 @@ def showBranchSummaryFull(branch):
     commitsBehindMergeTarget = []
     commitsAheadOfMergeTarget = []
 
-    if mergeTarget != None:
-        commitsBehindMergeTarget = getCommitList('- ', mergeTarget, branchName)
-        commitsAheadOfMergeTarget = getCommitList('+ ', branchName, mergeTarget)
+    if mergeTargetName != None:
+        for commit in branch.getCommitsNotIn(mergeTargetName):
+            commitsAheadOfMergeTarget.append('+ ' + commit.getDescription())
+
+        for commit in branch.getCommitsOnlyIn(mergeTargetName):
+            commitsBehindMergeTarget.append('- ' + commit.getDescription())
 
     ##--------------------------------------------------------------------
     ## Combine our lists by column
@@ -581,7 +655,7 @@ def showBranchSummaryFull(branch):
         outputLine = INDENT
         outputLine += padOrTruncate('Relative to Origin', COMMIT_LENGTH) + '  '
         outputLine += padOrTruncate(
-            'Relative to ' + mergeTarget,
+            'Relative to ' + mergeTargetName,
             COMMIT_LENGTH
         )
         print(outputLine)
