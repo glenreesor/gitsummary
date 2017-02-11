@@ -609,7 +609,7 @@ def showBranchSummaryShort(branch):
 ##          One column listing commits ahead/behind of this branch's origin
 ##          One column listing commits ahead/behind of dev/master
 ##----------------------------------------------------------------------------
-def showBranchSummaryFull(branchName):
+def showBranchSummaryFull(branch):
     global currentBranch
     global devBranchPresent
     global localBranches
@@ -618,7 +618,8 @@ def showBranchSummaryFull(branchName):
     INDENT = '        '
     COMMIT_LENGTH = 60
 
-    localCompareto = getLocalCompareTo(branchName)
+    branchName = branch.getName()
+    mergeTarget = branch.getMergeTarget()
 
     ##--------------------------------------------------------------------
     ## Figure out if we have a corresponding branch in origin
@@ -638,20 +639,20 @@ def showBranchSummaryFull(branchName):
         commitsAheadOfOrigin = getCommitList('+ ', branchName, 'origin/' + branchName)
 
     ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of dev/master
+    ## Get commits ahead/behind of merge target
     ##--------------------------------------------------------------------
-    commitsBehindDevMaster = []
-    commitsAheadOfDevMaster = []
+    commitsBehindMergeTarget = []
+    commitsAheadOfMergeTarget = []
 
-    if localCompareto != '':
-        commitsBehindDevMaster = getCommitList('- ', localCompareto, branchName)
-        commitsAheadOfDevMaster = getCommitList('+ ', branchName, localCompareto)
+    if mergeTarget != None:
+        commitsBehindMergeTarget = getCommitList('- ', mergeTarget, branchName)
+        commitsAheadOfMergeTarget = getCommitList('+ ', branchName, mergeTarget)
 
     ##--------------------------------------------------------------------
     ## Combine our lists by column
     ##--------------------------------------------------------------------
     commitsRelativeToOrigin = commitsBehindOrigin + commitsAheadOfOrigin
-    commitsRelativeToDevMaster = commitsBehindDevMaster + commitsAheadOfDevMaster
+    commitsRelativeToMergeTarget = commitsBehindMergeTarget + commitsAheadOfMergeTarget
 
     ##--------------------------------------------------------------------
     ## Formatted Branch Name
@@ -661,7 +662,7 @@ def showBranchSummaryFull(branchName):
         currentBranchIndicator = COLOR_CURRENT_BRANCH + '*' + COLOR_NORMAL
 
     formattedBranchName = branchName
-    if len(commitsAheadOfDevMaster) != 0:
+    if len(commitsAheadOfMergeTarget) != 0:
         formattedBranchName =COLOR_UNMERGED_BRANCH_NAME + branchName + COLOR_NORMAL
 
     ##--------------------------------------------------------------------
@@ -670,22 +671,22 @@ def showBranchSummaryFull(branchName):
     print(currentBranchIndicator + ' ' + formattedBranchName)
 
     ##--------------------------------------------------------------------
-    ## Commits differing between origin and/or dev/master
+    ## Commits differing between origin and/or mergeTarget
     ##--------------------------------------------------------------------
-    if len(commitsRelativeToOrigin) > 0 or len(commitsRelativeToDevMaster) > 0:
+    if len(commitsRelativeToOrigin) > 0 or len(commitsRelativeToMergeTarget) > 0:
         outputLine = INDENT
         outputLine += padOrTruncate('Relative to Origin', COMMIT_LENGTH) + '  '
         outputLine += padOrTruncate(
-            'Relative to ' + localCompareto,
+            'Relative to ' + mergeTarget,
             COMMIT_LENGTH
         )
         print(outputLine)
 
         indexOrigin = 0
-        indexDevMaster = 0
+        indexMergeTarget = 0
 
         while (indexOrigin < len(commitsRelativeToOrigin) or
-               indexDevMaster < len(commitsRelativeToDevMaster)):
+               indexMergeTarget < len(commitsRelativeToMergeTarget)):
 
             outputLine = INDENT
             if indexOrigin < len(commitsRelativeToOrigin):
@@ -697,13 +698,13 @@ def showBranchSummaryFull(branchName):
             else:
                 outputLine += padOrTruncate('', COMMIT_LENGTH)
 
-            if indexDevMaster < len(commitsRelativeToDevMaster):
+            if indexMergeTarget < len(commitsRelativeToMergeTarget):
                 outputLine += '  '
                 outputLine += padOrTruncate(
-                    commitsRelativeToDevMaster[indexDevMaster],
+                    commitsRelativeToMergeTarget[indexMergeTarget],
                     COMMIT_LENGTH
                 )
-                indexDevMaster += 1
+                indexMergeTarget += 1
 
             print(outputLine)
 
@@ -845,20 +846,20 @@ def showRepositorySummary():
     ##-------------------------------------------------------------------------
     if optionCurrentBranch:
         if optionLong:
-            showBranchSummaryFull(repository.getCurrentBranch().getName())
+            showBranchSummaryFull(repository.getCurrentBranch())
         else:
             showBranchSummaryShort(repository.getCurrentBranch())
 
     elif optionBranch != '':
         if optionLong:
-            showBranchSummaryFull(optionBranch)
+            showBranchSummaryFull(repository.getBranch(optionBranch))
         else:
             showBranchSummaryShort(repository.getBranch(optionBranch))
 
     else:
         for branch in repository.getBranchHierarchy():
             if optionLong:
-                showBranchSummaryFull(branch.name)
+                showBranchSummaryFull(branch)
             else:
                 showBranchSummaryShort(branch)
 
