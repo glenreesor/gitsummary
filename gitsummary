@@ -50,21 +50,24 @@ class Branch:
     A class used to represent one branch
     """
 
-    def __init__(self, name, remoteTrackingBranchName, isCurrent, mergeTargetName):
+    def __init__(self, name, important, current, remoteTrackingBranchName, mergeTargetName):
         """
         Initialize this Branch
         Args
             name:                     str:  The name of the branch
+            important:                bool: Whether this branch is "important"
+                                            and needs to be flagged in output
+            current:                  bool: Whether this is the current branch
             remoteTrackingBranchName: str:  The name of the corresponding
                                             remote tracking branch, possibly None
-            isCurrent:                bool: Whether this is the current branch
             mergeTargetName:          str:  The name of the branch this one branch
                                             will merge to
         """
 
         self.name = name
+        self.important = important
+        self.current = current
         self.remoteTrackingBranchName = remoteTrackingBranchName
-        self.isCurrent = isCurrent
         self.mergeTargetName = mergeTargetName
 
     def getCommitsNotIn(self, branchName):
@@ -136,12 +139,20 @@ class Branch:
 
         return self.remoteTrackingBranchName
 
-    def isCurrentBranch(self):
+    def isCurrent(self):
         """
         Return this is the current branch
         :returns: bool
         """
-        return self.isCurrent
+
+        return self.current
+
+    def isImportant(self):
+        """
+        Return this is an "important" branch
+        :returns: bool
+        """
+        return self.important
 
 class Commit:
     """
@@ -193,6 +204,10 @@ class Repository:
     def __init__(self):
         """ Initialize git info corresponding to current directory """
 
+        ## "Important" branches that should be flagged in output
+        self.IMPORTANT_BRANCHES = ['dev', 'master']
+
+        ## A mapping of branches to their corresponding merge targets
         self.MERGE_TARGETS = {
             'default': 'dev',
             'noTarget': ['master'],
@@ -200,6 +215,7 @@ class Repository:
                 'dev': 'master'
             }
         }
+
 
         self.branches = []
         self.branchNames = []
@@ -382,10 +398,15 @@ class Repository:
                     remoteTrackingBranchName = None
 
                 ## Create the new branch object
+                isImportant = False
+                if branchName in self.IMPORTANT_BRANCHES:
+                    isImportant = True
+
                 newBranch = Branch(
                     branchName,
-                    remoteTrackingBranchName,
+                    isImportant,
                     isCurrentBranch,
+                    remoteTrackingBranchName,
                     self.getMergeTargetName(branchName)
                 )
 
@@ -663,11 +684,11 @@ def showBranchSummaryShort(branch):
     ## Formatted Branch Name
     ##--------------------------------------------------------------------
     currentBranchIndicator = ' '
-    if branch.isCurrentBranch():
-        if branchName != 'dev' and branchName != 'master':
-            currentBranchIndicator = COLOR_CURRENT_BRANCH + '*' + COLOR_NORMAL
-        else:
+    if branch.isCurrent():
+        if branch.isImportant():
             currentBranchIndicator = COLOR_IMPORTANT_BRANCH + '*' + COLOR_NORMAL
+        else:
+            currentBranchIndicator = COLOR_CURRENT_BRANCH + '*' + COLOR_NORMAL
 
     ##--------------------------------------------------------------------
     ## Ahead / behind of merge target
@@ -782,7 +803,7 @@ def showBranchSummaryFull(branch):
     ## Formatted Branch Name
     ##--------------------------------------------------------------------
     currentBranchIndicator = ' '
-    if branch.isCurrentBranch():
+    if branch.isCurrent():
         currentBranchIndicator = COLOR_CURRENT_BRANCH + '*' + COLOR_NORMAL
 
     formattedBranchName = branchName
