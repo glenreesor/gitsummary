@@ -40,14 +40,10 @@ COLOR_UNMERGED_BRANCH_NAME = '\033[' + ANSI_BOLD + 'm'
 ##----------------------------------------------------------------------------
 ## Global vars
 ##----------------------------------------------------------------------------
-currentBranch = ''
-
 optionBranch = ''
 optionCurrentBranch = False
 optionLocalCompareTo = ''
 optionLog = False
-
-originBranches = []
 
 class Branch:
     """
@@ -95,12 +91,12 @@ class Branch:
 
         return self.remoteTrackingBranchName
 
-    def isCurrent(self):
+    def isCurrentBranch(self):
         """
         Return this is the current branch
         :returns: bool
         """
-        return isCurrent
+        return self.isCurrent
 
 class Repository:
     """
@@ -279,9 +275,6 @@ def main():
     processCommandLineArgs(sys.argv)
     ensureGitTrackedFolder()
 
-    ## Get all required information
-    getAllBranchInfo()
-
     ## Now show everything
     showFilesSummary()
     showStashSummary()
@@ -300,35 +293,6 @@ def ensureGitTrackedFolder():
     except:
         print("This isn't a git tracked folder.")
         exit()
-
-##----------------------------------------------------------------------------
-## getAllBranchInfo()
-##      Get the following information that is required later
-##          - Name of current branch      (global currentBranch)
-##          - List of all origin branches (global originBranches)
-##----------------------------------------------------------------------------
-def getAllBranchInfo():
-    global currentBranch
-
-    ##------------------------------------------------------------------------
-    ## localBranches and currentBranch
-    ##------------------------------------------------------------------------
-    repo = Repository()
-
-    currentBranchName = repo.getCurrentBranch().getName()
-
-    ##------------------------------------------------------------------------
-    ## originBranches
-    ##------------------------------------------------------------------------
-    gitBranchOutput = subprocess.check_output(
-        ['git', 'branch', '--list', '--remote'],
-        universal_newlines = True
-    )
-
-    for branchName in gitBranchOutput.splitlines():
-        originBranchName = branchName[branchName.index('/')+1:]
-        if not originBranchName.startswith('HEAD'):
-            originBranches.append(originBranchName)
 
 ##----------------------------------------------------------------------------
 ## getCommitList()
@@ -449,8 +413,6 @@ def processCommandLineArgs(args):
 ##          A list of commits that are ahead/behind of this branch's origin
 ##----------------------------------------------------------------------------
 def showBranchSummaryShort(branch):
-    global currentBranch
-
     BRANCH_NAME_LENGTH = 54
     INDENT = '        '
     COMMIT_LENGTH = 79 - len(INDENT)
@@ -461,9 +423,7 @@ def showBranchSummaryShort(branch):
     ##--------------------------------------------------------------------
     ## Figure out if we have a corresponding branch in origin
     ##--------------------------------------------------------------------
-    hasCorrespondingOrigin = False
-    if originBranches.count(branchName) != 0:
-        hasCorrespondingOrigin = True
+    hasCorrespondingOrigin = (branch.getRemoteTrackingBranchName() != None)
 
     ##--------------------------------------------------------------------
     ## Get commits ahead/behind of origin
@@ -495,7 +455,7 @@ def showBranchSummaryShort(branch):
     ## Formatted Branch Name
     ##--------------------------------------------------------------------
     currentBranchIndicator = ' '
-    if branchName == currentBranch:
+    if branch.isCurrentBranch():
         if branchName != 'dev' and branchName != 'master':
             currentBranchIndicator = COLOR_CURRENT_BRANCH + '*' + COLOR_NORMAL
         else:
@@ -561,8 +521,6 @@ def showBranchSummaryShort(branch):
 ##          One column listing commits ahead/behind of dev/master
 ##----------------------------------------------------------------------------
 def showBranchSummaryFull(branch):
-    global currentBranch
-
     INDENT = '        '
     COMMIT_LENGTH = 60
 
@@ -572,9 +530,7 @@ def showBranchSummaryFull(branch):
     ##--------------------------------------------------------------------
     ## Figure out if we have a corresponding branch in origin
     ##--------------------------------------------------------------------
-    hasCorrespondingOrigin = False
-    if originBranches.count(branchName) != 0:
-        hasCorrespondingOrigin = True
+    hasCorrespondingOrigin = (branch.getRemoteTrackingBranchName() != None)
 
     ##--------------------------------------------------------------------
     ## Get commits ahead/behind of origin
@@ -606,7 +562,7 @@ def showBranchSummaryFull(branch):
     ## Formatted Branch Name
     ##--------------------------------------------------------------------
     currentBranchIndicator = ' '
-    if branchName == currentBranch:
+    if branch.isCurrentBranch():
         currentBranchIndicator = COLOR_CURRENT_BRANCH + '*' + COLOR_NORMAL
 
     formattedBranchName = branchName
@@ -741,7 +697,6 @@ def showFilesSummary():
 ##              - Commits differing between the above branch/repository
 ##----------------------------------------------------------------------------
 def showRepositorySummary():
-    global currentBranch
     global optionCurrentBranch
     global optionLong
 
