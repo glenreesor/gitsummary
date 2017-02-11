@@ -210,9 +210,22 @@ class Repository:
         self.filesUntracked = []
         self.stashes = []
 
+        self.ensureGitTrackedFolder()
         self._populateBranchInfo()
         self._populateFilesInfo()
         self._populateStashInfo()
+
+    def ensureGitTrackedFolder(self):
+        """ Ensure this is a git-tracked folder """
+
+        try:
+            gitOutput = subprocess.check_output(
+                ['git', 'status'],
+                stderr=subprocess.STDOUT
+            )
+        except:
+            print("This isn't a git tracked folder.")
+            exit()
 
     def getBranch(self, branchName):
         """
@@ -505,27 +518,12 @@ class Stash:
 ##----------------------------------------------------------------------------
 def main():
     processCommandLineArgs(sys.argv)
-    ensureGitTrackedFolder()
 
     repository = Repository()
 
     showFilesSummary(repository)
     showStashSummary(repository)
     showRepositorySummary(repository)
-
-##----------------------------------------------------------------------------
-## ensureGitTrackedFolder()
-##      Make sure we're in a git tracked folder. Exit it we're not
-##----------------------------------------------------------------------------
-def ensureGitTrackedFolder():
-    try:
-        gitOutput = subprocess.check_output(
-            ['git', 'status'],
-            stderr=subprocess.STDOUT
-        )
-    except:
-        print("This isn't a git tracked folder.")
-        exit()
 
 ##----------------------------------------------------------------------------
 ## padOrTruncate(text, length)
