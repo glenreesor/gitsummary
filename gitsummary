@@ -156,6 +156,7 @@ class Commit:
         """
 
         self.hash = hash
+        self.description = ''
         self._setDescription()
 
     def getDescription(self):
@@ -204,8 +205,10 @@ class Repository:
         self.branchNames = []
         self.currentBranch= None
         self.detachedHeadState = False
+        self.stashes = []
 
         self._populateBranchInfo()
+        self._populateStashInfo()
 
     def getBranch(self, branchName):
         """
@@ -251,14 +254,6 @@ class Repository:
 
         return returnVal
 
-    def getBranchNames(self):
-        """
-        Return a List of the (local) branch names
-        :returns: list of str objects
-        """
-
-        return self.branchNames
-
     def getCurrentBranch(self):
         """
         Return the current branch
@@ -281,6 +276,14 @@ class Repository:
             returnVal = self.MERGE_TARGETS['default']
 
         return returnVal
+
+    def getStashes(self):
+        """
+        Return a list of Stash objects
+        :returns: list of STash objects
+        """
+
+        return self.stashes
 
     def isDetachedHeadState(self):
         """
@@ -352,6 +355,48 @@ class Repository:
                 if isCurrentBranch:
                     self.currentBranch = newBranch
 
+    def _populateStashInfo(self):
+        """
+        Populate the information about this repository's stashes.
+        This is intended to be called only by __init__()
+        """
+
+        stashesOutput = subprocess.check_output(
+            ['git', 'stash', 'list'],
+            universal_newlines = True
+        ).splitlines()
+
+        for stashLine in stashesOutput:
+            nameEnd = stashLine.find(':')
+            newStash = Stash(stashLine[:nameEnd], stashLine[nameEnd+2:])
+            self.stashes.append(newStash)
+
+class Stash:
+    """
+    A class used to represent one stash
+    """
+
+    def __init__(self, name, description):
+        """ Initialize a stash """
+
+        self.name = name
+        self.description = description
+
+    def getDescription(self):
+        """
+        Return the description of this stash
+        :returns: str
+        """
+        return self.description
+
+    def getName(self):
+        """
+        Return the name of this stash
+        :returns: str
+        """
+
+        return self.name
+
 ##----------------------------------------------------------------------------
 ## main()
 ##      Drive the whole process
@@ -360,10 +405,11 @@ def main():
     processCommandLineArgs(sys.argv)
     ensureGitTrackedFolder()
 
+    repository = Repository()
     ## Now show everything
     showFilesSummary()
-    showStashSummary()
-    showRepositorySummary()
+    showStashSummary(repository)
+    showRepositorySummary(repository)
 
 ##----------------------------------------------------------------------------
 ## ensureGitTrackedFolder()
@@ -770,11 +816,9 @@ def showFilesSummary():
 ##          - Following lines:
 ##              - Commits differing between the above branch/repository
 ##----------------------------------------------------------------------------
-def showRepositorySummary():
+def showRepositorySummary(repository):
     global optionCurrentBranch
     global optionLong
-
-    repository = Repository()
 
     ##-------------------------------------------------------------------------
     ## We may be in detached head state
@@ -828,34 +872,23 @@ def showRepositorySummary():
 ## showStashSummary()
 ##      List all the stashes nicely
 ##----------------------------------------------------------------------------
-def showStashSummary():
+def showStashSummary(repository):
     INDENT1 = '    '
     INDENT2 = INDENT1 + '          '
-
-    gitStashOutput = subprocess.check_output(
-        ['git', 'stash', 'list'],
-        universal_newlines = True
-    )
-    gitStashLines = gitStashOutput.splitlines()
 
     print()
     print('Stashes')
 
     i = 0
 
-    for line in gitStashLines:
-        endOfName = line.index(':')
-
-        stashName = line[0:endOfName]
-        stashDescription = line[endOfName + 1:]
-
+    for stash in repository.getStashes():
         if i != 0:
             print()
 
         print(COLOR_STASH_NAME, end='')
-        print(INDENT1 + stashName)
+        print(INDENT1 + stash.getName())
         print(COLOR_NORMAL, end='')
-        print(padOrTruncate(INDENT2 + stashDescription, 79))
+        print(padOrTruncate(INDENT2 + stash.getDescription(), 79))
 
 ##----------------------------------------------------------------------------
 ##----------------------------------------------------------------------------
