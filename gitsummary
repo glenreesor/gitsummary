@@ -16,6 +16,16 @@ import os
 import subprocess
 import sys
 
+BLANKS = '                                                                    '
+
+TEXT_BOLD = 'bold'
+TEXT_FLASHING = 'flashing'
+TEXT_GREEN = 'green'
+TEXT_MAGENTA = 'magenta'
+TEXT_NORMAL = 'normal'
+TEXT_YELLOW = 'yellow'
+TEXT_RED = 'red'
+
 ANSI_NORMAL   = '0'
 ANSI_BOLD     = '1'
 ANSI_FLASHING = '5'
@@ -154,6 +164,53 @@ class Branch:
         """
         return self.important
 
+class CommandRepo:
+    """
+    A class used for the repo subcommand
+    """
+
+    def __init__(self, scriptName, args):
+        """
+        Initialize this CommandRepo
+        Args
+            scriptName: str:         The name used to invoke this script
+            args:       list of str: The user-specified command line args
+        """
+
+        self._processArgs(scriptName, args)
+        self.repository = Repository()
+
+    def _processArgs(self, scriptName, args):
+        """
+        Process the user-specified command line args
+        Args
+            args: list of str: The user-specified command line args
+        """
+
+        if len(args) > 0:
+            print('Usage: ' + scriptName + ' repo')
+
+    def run(self):
+        """ Print the output for the 'repo' command """
+
+        stashes = FormatterStashes(self.repository.getStashes())
+        stashes.show()
+
+        print()
+        files = FormatterFiles(
+            self.repository.getFilesStaged(),
+            self.repository.getFilesModified(),
+            self.repository.getFilesUntracked(),
+        )
+        files.show()
+
+        print()
+        branches = FormatterBranches(
+            self.repository.getBranchHierarchy(),
+            self.repository.getBranches()
+        )
+        branches.show()
+
 class Commit:
     """
     A class used to represent a commit
@@ -161,7 +218,7 @@ class Commit:
 
     def __init__(self, hash):
         """
-        Initialize the commit
+        Initialize this Commit
         Args
             hash: str: The hash for this particular commit
         """
@@ -194,6 +251,297 @@ class Commit:
 
         descriptionStart = gitShowOutput[0].find(' ') + 1
         self.description = gitShowOutput[0][descriptionStart:]
+
+class FormatterBranches:
+    """
+    A class used to format a repository branches
+    """
+
+    def __init__(self, branchHierarchy, branches):
+        """
+        Initialize this FormatterBranches
+        Args
+            branchHierarchy: list of Branch objects
+            branches:        list of Branch objects: The list of branches
+        """
+
+        self.CURRENT_BRANCH_INDICATOR = '* '
+        self.EMPTY_CURRENT_BRANCH_INDICATOR = '  '
+        self.branchHierarchy = branchHierarchy
+        self.branches = branches
+
+    def getFormattedAheadBehind(self, num):
+        """
+        Use special criteria to return a string representation of num
+        :returns: str: The number, or '' (if num is -1) or '-' (if num is 0)
+        """
+
+        if num == -1:
+            formattedNum = ''
+        elif num == 0:
+            formattedNum = '-'
+        else:
+            formattedNum = str(num)
+
+        return formattedNum
+
+    def show(self):
+        """ Print the list of branches in hierarchical order """
+
+        TITLE1 = '   Remote        Target   '
+        TITLE2 = 'Ahead Behind  Ahead Behind'
+
+        ##--------------------------------------------------------------------
+        ## Determine the length of the branch name field so we can fit the
+        ## remote and merge target information
+        ##--------------------------------------------------------------------
+        maxMergeTargetLen = 0
+        for branch in self.branches:
+            mergeTarget = branch.getMergeTargetName()
+            targetLength = 0 if mergeTarget == None else len(mergeTarget)
+            if targetLength > maxMergeTargetLen:
+                maxMergeTargetLen = targetLength
+
+        BRANCH_NAME_LEN = 79 - maxMergeTargetLen - 2 - len(TITLE1)
+        BRANCH_NAME_LEN -= len(self.CURRENT_BRANCH_INDICATOR)
+
+        ##--------------------------------------------------------------------
+        ## Print the two title lines for remote and merge target ahead/behind
+        ## info
+        ##--------------------------------------------------------------------
+        TITLE_PADDING = self.EMPTY_CURRENT_BRANCH_INDICATOR
+        TITLE_PADDING += padOrTruncate(BLANKS, BRANCH_NAME_LEN)
+        print(TITLE_PADDING + TITLE1)
+        print(TITLE_PADDING + TITLE2)
+
+        ##--------------------------------------------------------------------
+        ## Print the summary line for each branch, starting with the "important"
+        ## branches (i.e. in hierarchical order)
+        ##--------------------------------------------------------------------
+        for branch in self.branchHierarchy:
+            self._showShortSummary(BRANCH_NAME_LEN, branch)
+
+    def _showShortSummary(self, branchNameLen, branch):
+        """
+        Show a one-line summary for the specified branch
+        Args
+            branchNameLen : int:    The length for branch names
+            branch:         Branch: The Branch object to be printed
+        """
+
+        ##--------------------------------------------------------------------
+        ## Determine what the current branch indicator should be:
+        ##  - blank if not current branch
+        ##  - '*' if it's the current branch
+        ##  - flashing if it's important (i.e. dev or master)
+        ##--------------------------------------------------------------------
+        if branch.isCurrent():
+            currentBranchIndicator = formatText(
+                TEXT_MAGENTA,
+                self.CURRENT_BRANCH_INDICATOR
+            )
+            if branch.isImportant():
+                currentBranchIndicator = formatText(
+                    TEXT_FLASHING,
+                    currentBranchIndicator
+                )
+        else:
+            currentBranchIndicator = self.EMPTY_CURRENT_BRANCH_INDICATOR
+
+        ##--------------------------------------------------------------------
+        ## Get count of commits ahead/behind of remote tracking branch
+        ##--------------------------------------------------------------------
+        remote = branch.getRemoteTrackingBranchName()
+        numAheadRemote = -1
+        numBehindRemote = -1
+
+        if remote != None:
+            numAheadRemote = len(branch.getCommitsNotIn(remote))
+            numBehindRemote = len(branch.getCommitsOnlyIn(remote))
+
+        ##--------------------------------------------------------------------
+        ## Get count of commits ahead/behind of merge target
+        ##--------------------------------------------------------------------
+        mergeTarget = branch.getMergeTargetName()
+        numAheadTarget = -1
+        numBehindTarget = -1
+
+        if mergeTarget != None:
+            numAheadTarget = len(branch.getCommitsNotIn(mergeTarget))
+            numBehindTarget = len(branch.getCommitsOnlyIn(mergeTarget))
+
+        ##--------------------------------------------------------------------
+        ## Create a string of the branch name and remote ahead/behind info
+        ## so we can bold face it if required
+        ##--------------------------------------------------------------------
+        paddedBranchName = padOrTruncate(branch.getName(), branchNameLen)
+        branchAndRemote = paddedBranchName
+        branchAndRemote += ' '
+        branchAndRemote += centerText(
+            self.getFormattedAheadBehind(numAheadRemote),
+            5
+        )
+        branchAndRemote += ' '
+        branchAndRemote += centerText(
+            self.getFormattedAheadBehind(numBehindRemote),
+            6
+        )
+
+        ##--------------------------------------------------------------------
+        ## Bold face if the branch is out of sync with its remote
+        ##--------------------------------------------------------------------
+        if (numAheadRemote > 0 or numBehindRemote > 0):
+           branchAndRemote = formatText(TEXT_BOLD, branchAndRemote)
+
+        ##--------------------------------------------------------------------
+        ## Build up the rest of the output line
+        ##--------------------------------------------------------------------
+        output = currentBranchIndicator + branchAndRemote
+        output += '  '
+        output += centerText(
+            self.getFormattedAheadBehind(numAheadTarget),
+            5
+        )
+        output += ' '
+        output += centerText(
+            self.getFormattedAheadBehind(numBehindTarget),
+            6
+        )
+
+        if mergeTarget != None:
+            output += ' ' + mergeTarget
+
+        print(output)
+
+class FormatterFiles:
+    """
+    A class used to format a repository's staged, modified, and untracked files
+    """
+
+    def __init__(self, stagedFiles, modifiedFiles, untrackedFiles):
+        """
+        Initialize this FormatterFiles
+        Args
+            stagedFiles:    list of RepositoryFile objects: The list of staged
+                                                            files
+            modifiedFiles:  list of RepositoryFile objects: The list of modified
+                                                            files
+            untrackedFiles: list of RepositoryFile objects: The list of untracked
+                                                            files
+        """
+        self.stagedFiles = stagedFiles
+        self.modifiedFiles = modifiedFiles
+        self.untrackedFiles = untrackedFiles
+
+    def show(self):
+        """ Print a staged, modified, and untracked files """
+
+        TITLE_STAGED    = 'Staged   '
+        TITLE_MODIFIED  = 'Modified '
+        TITLE_UNTRACKED = 'Untracked'
+        self.INDENT = BLANKS[0:len(TITLE_UNTRACKED)]
+
+        ##--------------------------------------------------------------------
+        ## Staged Files
+        ##--------------------------------------------------------------------
+        lines = []
+        for oneFile in self.stagedFiles:
+            formattedLine = formatText(
+                TEXT_GREEN,
+                oneFile.getIndexStatus() + ' ' + oneFile.getName()
+            )
+
+            lines.append(formattedLine)
+
+        self.showBlock(TITLE_STAGED, lines)
+
+        ##--------------------------------------------------------------------
+        ## Modified Files
+        ##--------------------------------------------------------------------
+        lines = []
+        for oneFile in self.modifiedFiles:
+            formattedLine = formatText(
+                TEXT_RED,
+                oneFile.getWorkingTreeStatus() + ' ' + oneFile.getName()
+            )
+
+            lines.append(formattedLine)
+
+        print()
+        self.showBlock(TITLE_MODIFIED, lines)
+
+        ##--------------------------------------------------------------------
+        ## Untracked Files
+        ##--------------------------------------------------------------------
+        lines = []
+        for oneFile in self.untrackedFiles:
+            formattedLine = formatText(TEXT_YELLOW, '  ' + oneFile.getName())
+
+            lines.append(formattedLine)
+
+        print()
+        self.showBlock(TITLE_UNTRACKED, lines)
+
+    def showBlock(self, title, lines):
+        """
+        Print a block of lines with a title
+        Args
+            title: str:         The title for this block of lines
+            lines: list of str: The list of lines to be printed
+        """
+
+        first = True
+        for line in lines:
+            lead = title if first else self.INDENT
+            first = False
+
+            output = lead + ' ' + line
+            print(padOrTruncate(output, 79))
+
+        ## Show title even if no lines present
+        if first:
+            print(title)
+
+class FormatterStashes:
+    """
+    A class used to format a repository's staged, modified, and untracked files
+    """
+
+    def __init__(self, stashes):
+        """
+        Initialize this FormatterStashes
+        Args
+            stashes: list of Stash objects: The list of stashes to be printed
+        """
+
+        self.stashes = stashes
+
+    def show(self):
+        """ Print a list of stashes """
+
+        TITLE = 'Stashes    '
+        INDENT = BLANKS[0:len(TITLE)]
+
+        first = True
+        for stash in self.stashes:
+            lead = TITLE if first else INDENT
+            first = False
+
+            stashName = stash.getName()
+
+            output = lead + ' '
+            output += formatText(TEXT_GREEN, stashName)
+            output += ' '
+            output += padOrTruncate(
+                stash.getDescription(),
+                77 - len(lead + stashName)
+            )
+
+            print(output)
+
+        ## Show stashes title even if no stashes present
+        if first:
+            print(TITLE)
 
 class Repository:
     """
@@ -533,18 +881,52 @@ class Stash:
 
         return self.name
 
+def centerText(text, width):
+    padLength = round((width - len(text)) / 2)
+    centeredText = BLANKS[:padLength] + text
+
+    return padOrTruncate(centeredText, width)
+
+def formatText(style, text):
+    """
+    Print the specified text in the specified style
+    Args
+        style: str: One of the global TEXT_* constants
+        text:  str: The text to print
+    """
+
+    ESCAPE_MAPPING = {
+        TEXT_BOLD: '1',
+        TEXT_FLASHING: '5',
+        TEXT_GREEN: '32',
+        TEXT_MAGENTA: '35',
+        TEXT_NORMAL: '0',
+        TEXT_RED: '31',
+        TEXT_YELLOW: '33'
+    }
+
+    escapeStart = '\033[' + ESCAPE_MAPPING[style] + 'm'
+    escapeEnd = '\033[' + ESCAPE_MAPPING[TEXT_NORMAL] + 'm'
+
+    return escapeStart + text + escapeEnd
+
 ##----------------------------------------------------------------------------
 ## main()
 ##      Drive the whole process
 ##----------------------------------------------------------------------------
 def main():
-    processCommandLineArgs(sys.argv)
+    if (len(sys.argv) > 1 and sys.argv[1] == 'repo'):
+        cmdRepo = CommandRepo(sys.argv[0], sys.argv[2:])
+        cmdRepo.run()
 
-    repository = Repository()
+    else:
+        processCommandLineArgs(sys.argv)
 
-    showFilesSummary(repository)
-    showStashSummary(repository)
-    showRepositorySummary(repository)
+        repository = Repository()
+
+        showFilesSummary(repository)
+        showStashSummary(repository)
+        showRepositorySummary(repository)
 
 ##----------------------------------------------------------------------------
 ## padOrTruncate(text, length)
