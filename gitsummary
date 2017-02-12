@@ -490,16 +490,17 @@ class FormatterFiles:
             lines: list of str: The list of lines to be printed
         """
 
-        if len(lines) == 0:
-            print(title)
-        else:
-            first = True
-            for line in lines:
-                lead = title if first else self.INDENT
-                first = False
+        first = True
+        for line in lines:
+            lead = title if first else self.INDENT
+            first = False
 
-                output = lead + ' ' + line
-                print(padOrTruncate(output, 79))
+            output = lead + ' ' + line
+            print(padOrTruncate(output, 79))
+
+        ## Show title even if no lines present
+        if first:
+            print(title)
 
 class FormatterStashes:
     """
@@ -537,6 +538,10 @@ class FormatterStashes:
             )
 
             print(output)
+
+        ## Show stashes title even if no stashes present
+        if first:
+            print(TITLE)
 
 class Repository:
     """
