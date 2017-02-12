@@ -309,7 +309,8 @@ class FormatterBranches:
         ## Print the two title lines for remote and merge target ahead/behind
         ## info
         ##--------------------------------------------------------------------
-        TITLE_PADDING = self.EMPTY_CURRENT_BRANCH_INDICATOR + padOrTruncate(BLANKS, BRANCH_NAME_LEN)
+        TITLE_PADDING = self.EMPTY_CURRENT_BRANCH_INDICATOR
+        TITLE_PADDING += padOrTruncate(BLANKS, BRANCH_NAME_LEN)
         print(TITLE_PADDING + TITLE1)
         print(TITLE_PADDING + TITLE2)
 
@@ -335,9 +336,15 @@ class FormatterBranches:
         ##  - flashing if it's important (i.e. dev or master)
         ##--------------------------------------------------------------------
         if branch.isCurrent():
-            currentBranchIndicator = formatText(TEXT_MAGENTA, self.CURRENT_BRANCH_INDICATOR)
+            currentBranchIndicator = formatText(
+                TEXT_MAGENTA,
+                self.CURRENT_BRANCH_INDICATOR
+            )
             if branch.isImportant():
-                currentBranchIndicator = formatText(TEXT_FLASHING, currentBranchIndicator)
+                currentBranchIndicator = formatText(
+                    TEXT_FLASHING,
+                    currentBranchIndicator
+                )
         else:
             currentBranchIndicator = self.EMPTY_CURRENT_BRANCH_INDICATOR
 
@@ -369,8 +376,16 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         paddedBranchName = padOrTruncate(branch.getName(), branchNameLen)
         branchAndRemote = paddedBranchName
-        branchAndRemote += ' ' + centerText(self.getFormattedAheadBehind(numAheadRemote), 5)
-        branchAndRemote += ' ' + centerText(self.getFormattedAheadBehind(numBehindRemote), 6)
+        branchAndRemote += ' '
+        branchAndRemote += centerText(
+            self.getFormattedAheadBehind(numAheadRemote),
+            5
+        )
+        branchAndRemote += ' '
+        branchAndRemote += centerText(
+            self.getFormattedAheadBehind(numBehindRemote),
+            6
+        )
 
         ##--------------------------------------------------------------------
         ## Bold face if the branch is out of sync with its remote
@@ -382,8 +397,16 @@ class FormatterBranches:
         ## Build up the rest of the output line
         ##--------------------------------------------------------------------
         output = currentBranchIndicator + branchAndRemote
-        output += '  ' + centerText(self.getFormattedAheadBehind(numAheadTarget), 5)
-        output += ' ' + centerText(self.getFormattedAheadBehind(numBehindTarget), 6)
+        output += '  '
+        output += centerText(
+            self.getFormattedAheadBehind(numAheadTarget),
+            5
+        )
+        output += ' '
+        output += centerText(
+            self.getFormattedAheadBehind(numBehindTarget),
+            6
+        )
 
         if mergeTarget != None:
             output += ' ' + mergeTarget
@@ -399,9 +422,12 @@ class FormatterFiles:
         """
         Initialize this FormatterFiles
         Args
-            stagedFiles:    list of RepositoryFile objects: The list of staged files
-            modifiedFiles:  list of RepositoryFile objects: The list of modified files
-            untrackedFiles: list of RepositoryFile objects: The list of untracked files
+            stagedFiles:    list of RepositoryFile objects: The list of staged
+                                                            files
+            modifiedFiles:  list of RepositoryFile objects: The list of modified
+                                                            files
+            untrackedFiles: list of RepositoryFile objects: The list of untracked
+                                                            files
         """
         self.stagedFiles = stagedFiles
         self.modifiedFiles = modifiedFiles
@@ -504,7 +530,11 @@ class FormatterStashes:
 
             output = lead + ' '
             output += formatText(TEXT_GREEN, stashName)
-            output += ' ' + padOrTruncate(stash.getDescription(), 77 - len(lead + stashName))
+            output += ' '
+            output += padOrTruncate(
+                stash.getDescription(),
+                77 - len(lead + stashName)
+            )
 
             print(output)
 
