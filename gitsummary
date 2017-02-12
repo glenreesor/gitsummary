@@ -336,14 +336,20 @@ class Commit:
         """
 
         self.hash = hash
-        self.description = ''
-        self._setDescription()
+
+        ## Don't set description unless requested, because some commands
+        ## don't need it, and performance takes a hit when lots of commits
+        ## being processed
+        self.description = None
 
     def getDescription(self):
         """
         Return the description for this commit
         :returns: str
         """
+
+        if self.description == None:
+            self._setDescription()
 
         return self.description
 
@@ -355,6 +361,7 @@ class Commit:
             [
                 'git',
                 'show',
+                '--no-patch',
                 self.hash,
                 '--pretty=oneline'
             ],
@@ -1099,7 +1106,7 @@ def processCommandLineArgs(args):
             optionLong = False
 
         elif args[i] == '--version':
-            print(args[0] + ' - Version 2017-02-12')
+            print(args[0] + ' - Version 2017-02-12b')
             sys.exit()
 
         elif args[i] == '--help':
