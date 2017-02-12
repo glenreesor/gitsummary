@@ -164,6 +164,118 @@ class Branch:
         """
         return self.important
 
+class CommandBranch:
+    """
+    A class used for the branch subcommand
+    """
+
+    def __init__(self, scriptName, args):
+        """
+        Initialize this CommandBranch
+        Args
+            scriptName: str:         The name used to invoke this script
+            args:       list of str: The user-specified command line args
+        """
+
+        self._processArgs(scriptName, args)
+        self.repository = Repository()
+        self.branch = self.repository.getCurrentBranch()
+
+    def _processArgs(self, scriptName, args):
+        """
+        Process the user-specified command line args
+        Args
+            args: list of str: The user-specified command line args
+        """
+
+        if len(args) > 0:
+            print('Usage: ' + scriptName + ' branch')
+
+    def run(self):
+        """ Print the output for the 'branch' command """
+
+        ##--------------------------------------------------------------------
+        ## Branch name
+        ##--------------------------------------------------------------------
+        boldBranchName = formatText(TEXT_BOLD, self.branch.getName())
+        print('Branch      ' + boldBranchName)
+
+        ##--------------------------------------------------------------------
+        ## Stashes
+        ##--------------------------------------------------------------------
+        print()
+        stashes = FormatterStashes(self.repository.getStashes())
+        stashes.show()
+
+        ##--------------------------------------------------------------------
+        ## Staged, modified, untracked files
+        ##--------------------------------------------------------------------
+        print()
+        files = FormatterFiles(
+            self.repository.getFilesStaged(),
+            self.repository.getFilesModified(),
+            self.repository.getFilesUntracked(),
+        )
+        files.show()
+
+        print()
+        self._showCommitsRelativeToRemote()
+
+        print()
+        self._showCommitsRelativeToMergeTarget()
+
+    def _showCommitsRelativeToRemote(self):
+        """ Show the commits relative to this branch's remote tracking branch """
+
+        INDENT = '       '
+
+        remoteBranch = self.branch.getRemoteTrackingBranchName()
+        if remoteBranch == None:
+            print('No remote')
+        else:
+            ##----------------------------------------------------------------
+            ## Ahead of remote
+            ##----------------------------------------------------------------
+            print('Remote')
+
+            for commit in self.branch.getCommitsNotIn(remoteBranch):
+                formattedDescription = formatText(
+                    TEXT_GREEN,
+                    '+ ' + commit.getDescription()
+                )
+                print(INDENT + formattedDescription)
+
+            ##----------------------------------------------------------------
+            ## Behind remote
+            ##----------------------------------------------------------------
+            print()
+
+            for commit in self.branch.getCommitsOnlyIn(remoteBranch):
+                formattedDescription = formatText(
+                    TEXT_YELLOW,
+                    '- ' + commit.getDescription()
+                )
+                print(INDENT + formattedDescription)
+
+    def _showCommitsRelativeToMergeTarget(self):
+        """ Show the commits relative to this branch's merge target """
+
+        INDENT = '       '
+
+        mergeTarget = self.branch.getMergeTargetName()
+        if mergeTarget == None:
+            print('No target branch')
+        else:
+            print(mergeTarget)
+            commitsAhead = self.branch.getCommitsNotIn(mergeTarget)
+            numAhead = len(commitsAhead)
+
+            commitsBehind = self.branch.getCommitsOnlyIn(mergeTarget)
+            numBehind = len(commitsBehind)
+
+            print(INDENT + formatText(TEXT_GREEN, '+ ' + str(numAhead)))
+            print(INDENT + formatText(TEXT_YELLOW, '- ' + str(numBehind)))
+
 class CommandRepo:
     """
     A class used for the repo subcommand
@@ -915,9 +1027,14 @@ def formatText(style, text):
 ##      Drive the whole process
 ##----------------------------------------------------------------------------
 def main():
-    if (len(sys.argv) > 1 and sys.argv[1] == 'repo'):
-        cmdRepo = CommandRepo(sys.argv[0], sys.argv[2:])
-        cmdRepo.run()
+    if (len(sys.argv) > 1):
+        if sys.argv[1] == 'repo':
+            cmdRepo = CommandRepo(sys.argv[0], sys.argv[2:])
+            cmdRepo.run()
+
+        elif sys.argv[1] == 'branch':
+            cmdBranch = CommandBranch(sys.argv[0], sys.argv[2:])
+            cmdBranch.run()
 
     else:
         processCommandLineArgs(sys.argv)
