@@ -337,7 +337,7 @@ class FormatterBranches:
         if branch.isCurrent():
             currentBranchIndicator = formatText(TEXT_MAGENTA, self.CURRENT_BRANCH_INDICATOR)
             if branch.isImportant():
-                currentBranchIndicator = formatText(TEXT_FLASHING, lead)
+                currentBranchIndicator = formatText(TEXT_FLASHING, currentBranchIndicator)
         else:
             currentBranchIndicator = self.EMPTY_CURRENT_BRANCH_INDICATOR
 
