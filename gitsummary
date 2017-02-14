@@ -1099,7 +1099,7 @@ def processCommandLineArgs(args):
             optionLong = False
 
         elif args[i] == '--version':
-            print(args[0] + ' - Version 2017-02-12b')
+            print(args[0] + ' - Version 2017-02-14a')
             sys.exit()
 
         elif args[i] == '--help':
