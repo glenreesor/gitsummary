@@ -614,8 +614,7 @@ class FormatterFiles:
             lead = title if first else self.INDENT
             first = False
 
-            output = lead + ' ' + line
-            print(padOrTruncate(output, 79))
+            print(lead + ' ' + line)
 
         ## Show title even if no lines present
         if first:
