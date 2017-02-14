@@ -60,7 +60,7 @@ class Branch:
     A class used to represent one branch
     """
 
-    def __init__(self, name, important, current, remoteTrackingBranchName, mergeTargetName):
+    def __init__(self, name, important, current, mergeTargetName):
         """
         Initialize this Branch
         Args
@@ -68,8 +68,6 @@ class Branch:
             important:                bool: Whether this branch is "important"
                                             and needs to be flagged in output
             current:                  bool: Whether this is the current branch
-            remoteTrackingBranchName: str:  The name of the corresponding
-                                            remote tracking branch, possibly None
             mergeTargetName:          str:  The name of the branch this one branch
                                             will merge to
         """
@@ -77,8 +75,25 @@ class Branch:
         self.name = name
         self.important = important
         self.current = current
-        self.remoteTrackingBranchName = remoteTrackingBranchName
         self.mergeTargetName = mergeTargetName
+
+        ##---------------------------------------------------------------------
+        ## Determine remote tracking branch (if it exists)
+        ##---------------------------------------------------------------------
+        try:
+            remoteName = subprocess.check_output(
+                [
+                    'git',
+                    'config',
+                    'branch.' + name + '.remote'
+                ],
+                universal_newlines = True
+            ).splitlines()
+
+            self.remoteTrackingBranchName = remoteName[0] + '/' + name
+
+        except:
+            self.remoteTrackingBranchName = None
 
     def getCommitsNotIn(self, branchName):
         """
@@ -842,28 +857,8 @@ class Repository:
                     isCurrentBranch = True
 
                 ##-------------------------------------------------------------
-                ## Figure out remote tracking branch name
-                ## Output line takes on one of these forms:
-                ##   localbranch [remotebranch]
-                ##   localbranch [remotebranch: ahead 2]
-                ##-------------------------------------------------------------
-                startDelimiter = branchOutputLine.find('[')
-                closeBracket = branchOutputLine.find(']')
-                colon = branchOutputLine.find(':')
-
-                if (colon == -1 or colon > closeBracket):
-                    endDelimiter = closeBracket
-                else:
-                    endDelimiter = colon
-
-                if startDelimiter != -1:
-                    remoteTrackingBranchName = branchOutputLine[
-                        startDelimiter + 1 : endDelimiter
-                    ]
-                else:
-                    remoteTrackingBranchName = None
-
                 ## Create the new branch object
+                ##-------------------------------------------------------------
                 isImportant = False
                 if branchName in self.IMPORTANT_BRANCHES:
                     isImportant = True
@@ -872,7 +867,6 @@ class Repository:
                     branchName,
                     isImportant,
                     isCurrentBranch,
-                    remoteTrackingBranchName,
                     self.getMergeTargetName(branchName)
                 )
 
