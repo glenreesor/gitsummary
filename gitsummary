@@ -1036,6 +1036,15 @@ def main():
             cmdBranch = CommandBranch(sys.argv[0], sys.argv[2:])
             cmdBranch.run()
 
+        else:
+            processCommandLineArgs(sys.argv)
+
+            repository = Repository()
+
+            showFilesSummary(repository)
+            showStashSummary(repository)
+            showRepositorySummary(repository)
+
     else:
         processCommandLineArgs(sys.argv)
 
