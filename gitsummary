@@ -388,7 +388,7 @@ class Commit:
 
 class FormatterBranches:
     """
-    A class used to format a repository branches
+    A class used to format a repository's branches
     """
 
     def __init__(self, branchHierarchy, branches):
@@ -404,26 +404,31 @@ class FormatterBranches:
         self.branchHierarchy = branchHierarchy
         self.branches = branches
 
-    def getFormattedAheadBehind(self, num):
+    def getFormattedAheadBehind(self, prefix, num):
         """
         Use special criteria to return a string representation of num
-        :returns: str: The number, or '' (if num is -1) or '-' (if num is 0)
+        Args
+            prefix: str: A string to prefix num with
+            num:    int: The number to be prefixed
+
+        :returns: str: See simple logic below
         """
 
         if num == -1:
             formattedNum = ''
         elif num == 0:
-            formattedNum = '-'
+            formattedNum = '.'
         else:
-            formattedNum = str(num)
+            formattedNum = prefix + str(num)
 
         return formattedNum
 
     def show(self):
         """ Print the list of branches in hierarchical order """
 
-        TITLE1 = '   Remote        Target   '
-        TITLE2 = 'Ahead Behind  Ahead Behind'
+        TITLE = '  Remote       Target  '  ## Need space for possibly 3 digit
+        REF   = '+100  -100   +100  -100'  ## ahead/behind nums
+
 
         ##--------------------------------------------------------------------
         ## Determine the length of the branch name field so we can fit the
@@ -436,7 +441,7 @@ class FormatterBranches:
             if targetLength > maxMergeTargetLen:
                 maxMergeTargetLen = targetLength
 
-        BRANCH_NAME_LEN = 79 - maxMergeTargetLen - 2 - len(TITLE1)
+        BRANCH_NAME_LEN = 79 - maxMergeTargetLen - 2 - len(TITLE) - 2
         BRANCH_NAME_LEN -= len(self.CURRENT_BRANCH_INDICATOR)
 
         ##--------------------------------------------------------------------
@@ -445,8 +450,7 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         TITLE_PADDING = self.EMPTY_CURRENT_BRANCH_INDICATOR
         TITLE_PADDING += padOrTruncate(BLANKS, BRANCH_NAME_LEN)
-        print(TITLE_PADDING + TITLE1)
-        print(TITLE_PADDING + TITLE2)
+        print(TITLE_PADDING + TITLE)
 
         ##--------------------------------------------------------------------
         ## Print the summary line for each branch, starting with the "important"
@@ -510,14 +514,14 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         paddedBranchName = padOrTruncate(branch.getName(), branchNameLen)
         branchAndRemote = paddedBranchName
-        branchAndRemote += ' '
-        branchAndRemote += centerText(
-            self.getFormattedAheadBehind(numAheadRemote),
-            5
+
+        branchAndRemote += rightJustify(
+            self.getFormattedAheadBehind('+', numAheadRemote),
+            4
         )
-        branchAndRemote += ' '
-        branchAndRemote += centerText(
-            self.getFormattedAheadBehind(numBehindRemote),
+        branchAndRemote += '  '
+        branchAndRemote += padOrTruncate(
+            self.getFormattedAheadBehind('-', numBehindRemote),
             6
         )
 
@@ -532,13 +536,13 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         output = currentBranchIndicator + branchAndRemote
         output += '  '
-        output += centerText(
-            self.getFormattedAheadBehind(numAheadTarget),
-            5
+        output += rightJustify(
+            self.getFormattedAheadBehind('+', numAheadTarget),
+            4
         )
-        output += ' '
-        output += centerText(
-            self.getFormattedAheadBehind(numBehindTarget),
+        output += '  '
+        output += padOrTruncate(
+            self.getFormattedAheadBehind('-', numBehindTarget),
             6
         )
 
@@ -1130,6 +1134,12 @@ def processCommandLineArgs(args):
             sys.exit()
 
         i += 1
+
+def rightJustify(text, width):
+    padLength = width - len(text)
+    justifiedText = BLANKS[:padLength] + text
+
+    return justifiedText
 
 ##----------------------------------------------------------------------------
 ## showBranchSummaryShort
