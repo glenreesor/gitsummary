@@ -220,20 +220,24 @@ class CommandBranch:
         ##--------------------------------------------------------------------
         print()
         stashes = FormatterStashes(self.repository.getStashes())
-        stashes.show()
+        printed = stashes.show()
 
         ##--------------------------------------------------------------------
         ## Staged, modified, untracked files
         ##--------------------------------------------------------------------
-        print()
+        if printed:
+            print()
+
         files = FormatterFiles(
             self.repository.getFilesStaged(),
             self.repository.getFilesModified(),
             self.repository.getFilesUntracked(),
         )
-        files.show()
+        printed = files.show()
 
-        print()
+        if printed:
+            print()
+
         self._showCommitsRelativeToRemote()
 
         print()
@@ -321,17 +325,21 @@ class CommandRepo:
         """ Print the output for the 'repo' command """
 
         stashes = FormatterStashes(self.repository.getStashes())
-        stashes.show()
+        printed = stashes.show()
 
-        print()
+        if printed:
+            print()
+
         files = FormatterFiles(
             self.repository.getFilesStaged(),
             self.repository.getFilesModified(),
             self.repository.getFilesUntracked(),
         )
-        files.show()
+        printed = files.show()
 
-        print()
+        if printed:
+            print()
+
         branches = FormatterBranches(
             self.repository.getBranchHierarchy(),
             self.repository.getBranches()
@@ -566,7 +574,9 @@ class FormatterFiles:
                                                             files
             untrackedFiles: list of RepositoryFile objects: The list of untracked
                                                             files
+        :returns: bool: Whether anything was printed
         """
+
         self.stagedFiles = stagedFiles
         self.modifiedFiles = modifiedFiles
         self.untrackedFiles = untrackedFiles
@@ -578,6 +588,8 @@ class FormatterFiles:
         TITLE_MODIFIED  = 'Modified '
         TITLE_UNTRACKED = 'Untracked'
         self.INDENT = BLANKS[0:len(TITLE_UNTRACKED)]
+
+        returnVal = False
 
         ##--------------------------------------------------------------------
         ## Staged Files
@@ -592,6 +604,8 @@ class FormatterFiles:
             lines.append(formattedLine)
 
         self.showBlock(TITLE_STAGED, lines)
+        if len(lines) != 0:
+            returnVal = True
 
         ##--------------------------------------------------------------------
         ## Modified Files
@@ -605,20 +619,30 @@ class FormatterFiles:
 
             lines.append(formattedLine)
 
-        print()
-        self.showBlock(TITLE_MODIFIED, lines)
+        if len(lines) != 0:
+            if len(self.modifiedFiles) != 0:
+                print()
+
+            self.showBlock(TITLE_MODIFIED, lines)
+            returnVal = True
 
         ##--------------------------------------------------------------------
         ## Untracked Files
         ##--------------------------------------------------------------------
         lines = []
         for oneFile in self.untrackedFiles:
-            formattedLine = formatText(TEXT_YELLOW, '  ' + oneFile.getName())
+            formattedLine = formatText(TEXT_YELLOW, oneFile.getName())
 
             lines.append(formattedLine)
 
-        print()
-        self.showBlock(TITLE_UNTRACKED, lines)
+        if len(lines) != 0:
+            if len(self.modifiedFiles) != 0:
+                print()
+
+            self.showBlock(TITLE_UNTRACKED, lines)
+            returnVal = True
+
+        return returnVal
 
     def showBlock(self, title, lines):
         """
@@ -635,10 +659,6 @@ class FormatterFiles:
 
             print(lead + ' ' + line)
 
-        ## Show title even if no lines present
-        if first:
-            print(title)
-
 class FormatterStashes:
     """
     A class used to format a repository's staged, modified, and untracked files
@@ -649,6 +669,8 @@ class FormatterStashes:
         Initialize this FormatterStashes
         Args
             stashes: list of Stash objects: The list of stashes to be printed
+
+        :returns: bool: Whether anything was printed
         """
 
         self.stashes = stashes
@@ -656,7 +678,7 @@ class FormatterStashes:
     def show(self):
         """ Print a list of stashes """
 
-        TITLE = 'Stashes    '
+        TITLE = 'Stashes  '
         INDENT = BLANKS[0:len(TITLE)]
 
         first = True
@@ -676,9 +698,8 @@ class FormatterStashes:
 
             print(output)
 
-        ## Show stashes title even if no stashes present
-        if first:
-            print(TITLE)
+        ## Return whether anything was printed
+        return not first
 
 class Repository:
     """
