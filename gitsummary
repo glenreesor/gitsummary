@@ -260,7 +260,7 @@ class CommandBranch:
         ##--------------------------------------------------------------------
         remote = self.branch.getRemoteTrackingBranchName()
         if remote != None:
-            printed = self._showCommitsAheadBehind(printed, remote)
+            printed = self._showCommitsAheadBehind(printed, 'Remote', remote)
 
         ##--------------------------------------------------------------------
         ## Commits relative to merge target
@@ -268,14 +268,15 @@ class CommandBranch:
         if self.showTarget:
             mergeTarget = self.branch.getMergeTargetName()
             if mergeTarget != None:
-                self._showCommitsAheadBehind(printed, mergeTarget)
+                self._showCommitsAheadBehind(printed, 'Target', mergeTarget)
 
-    def _showCommitsAheadBehind(self, printSeparator, otherBranch):
+    def _showCommitsAheadBehind(self, printSeparator, otherBranchTitle, otherBranch):
         """
         Show the commits relative to the specified branch name
 
         Args:
             printSeparator: bool: Whether a blank separator should be printed
+            title:          str:  The title to use for the other branch
             otherBranch:    str:  The name of the other branch we're comparing to
 
         :returns: bool: Whether anything was printed
@@ -294,8 +295,8 @@ class CommandBranch:
             if printSeparator:
                 print()
 
-            title = padOrTruncate(self.branch.getName(), COLUMN_WIDTH)
-            title += '  ' + otherBranch
+            title = padOrTruncate('Local Branch', COLUMN_WIDTH)
+            title += '  ' + otherBranchTitle
             print(formatText(TEXT_BOLD, title))
 
             aheadIndex = 0
@@ -460,8 +461,8 @@ class FormatterBranches:
     def show(self):
         """ Print the list of branches in hierarchical order """
 
-        TITLE = '  Remote       Target  '  ## Need space for possibly 3 digit
-        REF   = '+100  -100   +100  -100'  ## ahead/behind nums
+        TITLE = '  Remote      Target  '  ## Need space for possibly 3 digit
+        REF   = '+100  -100  +100  -100'  ## ahead/behind nums
 
 
         ##--------------------------------------------------------------------
@@ -475,7 +476,7 @@ class FormatterBranches:
             if targetLength > maxMergeTargetLen:
                 maxMergeTargetLen = targetLength
 
-        BRANCH_NAME_LEN = 79 - maxMergeTargetLen - 2 - len(TITLE) - 2
+        BRANCH_NAME_LEN = 80 - maxMergeTargetLen - 1 - len(TITLE) - 1
         BRANCH_NAME_LEN -= len(self.CURRENT_BRANCH_INDICATOR)
 
         ##--------------------------------------------------------------------
@@ -547,7 +548,7 @@ class FormatterBranches:
         ## so we can bold face it if required
         ##--------------------------------------------------------------------
         paddedBranchName = padOrTruncate(branch.getName(), branchNameLen)
-        branchAndRemote = paddedBranchName
+        branchAndRemote = paddedBranchName + ' '
 
         branchAndRemote += rightJustify(
             self.getFormattedAheadBehind('+', numAheadRemote),
@@ -556,7 +557,7 @@ class FormatterBranches:
         branchAndRemote += '  '
         branchAndRemote += padOrTruncate(
             self.getFormattedAheadBehind('-', numBehindRemote),
-            6
+            4
         )
 
         ##--------------------------------------------------------------------
@@ -577,7 +578,7 @@ class FormatterBranches:
         output += '  '
         output += padOrTruncate(
             self.getFormattedAheadBehind('-', numBehindTarget),
-            6
+            4
         )
 
         if mergeTarget != None:
