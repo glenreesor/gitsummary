@@ -60,7 +60,7 @@ class Branch:
     A class used to represent one branch
     """
 
-    def __init__(self, name, important, current, remoteTrackingBranchName, mergeTargetName):
+    def __init__(self, name, important, current, mergeTargetName):
         """
         Initialize this Branch
         Args
@@ -68,8 +68,6 @@ class Branch:
             important:                bool: Whether this branch is "important"
                                             and needs to be flagged in output
             current:                  bool: Whether this is the current branch
-            remoteTrackingBranchName: str:  The name of the corresponding
-                                            remote tracking branch, possibly None
             mergeTargetName:          str:  The name of the branch this one branch
                                             will merge to
         """
@@ -77,8 +75,25 @@ class Branch:
         self.name = name
         self.important = important
         self.current = current
-        self.remoteTrackingBranchName = remoteTrackingBranchName
         self.mergeTargetName = mergeTargetName
+
+        ##---------------------------------------------------------------------
+        ## Determine remote tracking branch (if it exists)
+        ##---------------------------------------------------------------------
+        try:
+            remoteName = subprocess.check_output(
+                [
+                    'git',
+                    'config',
+                    'branch.' + name + '.remote'
+                ],
+                universal_newlines = True
+            ).splitlines()
+
+            self.remoteTrackingBranchName = remoteName[0] + '/' + name
+
+        except:
+            self.remoteTrackingBranchName = None
 
     def getCommitsNotIn(self, branchName):
         """
@@ -205,20 +220,24 @@ class CommandBranch:
         ##--------------------------------------------------------------------
         print()
         stashes = FormatterStashes(self.repository.getStashes())
-        stashes.show()
+        printed = stashes.show()
 
         ##--------------------------------------------------------------------
         ## Staged, modified, untracked files
         ##--------------------------------------------------------------------
-        print()
+        if printed:
+            print()
+
         files = FormatterFiles(
             self.repository.getFilesStaged(),
             self.repository.getFilesModified(),
             self.repository.getFilesUntracked(),
         )
-        files.show()
+        printed = files.show()
 
-        print()
+        if printed:
+            print()
+
         self._showCommitsRelativeToRemote()
 
         print()
@@ -306,17 +325,21 @@ class CommandRepo:
         """ Print the output for the 'repo' command """
 
         stashes = FormatterStashes(self.repository.getStashes())
-        stashes.show()
+        printed = stashes.show()
 
-        print()
+        if printed:
+            print()
+
         files = FormatterFiles(
             self.repository.getFilesStaged(),
             self.repository.getFilesModified(),
             self.repository.getFilesUntracked(),
         )
-        files.show()
+        printed = files.show()
 
-        print()
+        if printed:
+            print()
+
         branches = FormatterBranches(
             self.repository.getBranchHierarchy(),
             self.repository.getBranches()
@@ -336,14 +359,20 @@ class Commit:
         """
 
         self.hash = hash
-        self.description = ''
-        self._setDescription()
+
+        ## Don't set description unless requested, because some commands
+        ## don't need it, and performance takes a hit when lots of commits
+        ## being processed
+        self.description = None
 
     def getDescription(self):
         """
         Return the description for this commit
         :returns: str
         """
+
+        if self.description == None:
+            self._setDescription()
 
         return self.description
 
@@ -355,6 +384,7 @@ class Commit:
             [
                 'git',
                 'show',
+                '--no-patch',
                 self.hash,
                 '--pretty=oneline'
             ],
@@ -366,7 +396,7 @@ class Commit:
 
 class FormatterBranches:
     """
-    A class used to format a repository branches
+    A class used to format a repository's branches
     """
 
     def __init__(self, branchHierarchy, branches):
@@ -382,26 +412,31 @@ class FormatterBranches:
         self.branchHierarchy = branchHierarchy
         self.branches = branches
 
-    def getFormattedAheadBehind(self, num):
+    def getFormattedAheadBehind(self, prefix, num):
         """
         Use special criteria to return a string representation of num
-        :returns: str: The number, or '' (if num is -1) or '-' (if num is 0)
+        Args
+            prefix: str: A string to prefix num with
+            num:    int: The number to be prefixed
+
+        :returns: str: See simple logic below
         """
 
         if num == -1:
             formattedNum = ''
         elif num == 0:
-            formattedNum = '-'
+            formattedNum = '.'
         else:
-            formattedNum = str(num)
+            formattedNum = prefix + str(num)
 
         return formattedNum
 
     def show(self):
         """ Print the list of branches in hierarchical order """
 
-        TITLE1 = '   Remote        Target   '
-        TITLE2 = 'Ahead Behind  Ahead Behind'
+        TITLE = '  Remote       Target  '  ## Need space for possibly 3 digit
+        REF   = '+100  -100   +100  -100'  ## ahead/behind nums
+
 
         ##--------------------------------------------------------------------
         ## Determine the length of the branch name field so we can fit the
@@ -414,7 +449,7 @@ class FormatterBranches:
             if targetLength > maxMergeTargetLen:
                 maxMergeTargetLen = targetLength
 
-        BRANCH_NAME_LEN = 79 - maxMergeTargetLen - 2 - len(TITLE1)
+        BRANCH_NAME_LEN = 79 - maxMergeTargetLen - 2 - len(TITLE) - 2
         BRANCH_NAME_LEN -= len(self.CURRENT_BRANCH_INDICATOR)
 
         ##--------------------------------------------------------------------
@@ -423,8 +458,7 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         TITLE_PADDING = self.EMPTY_CURRENT_BRANCH_INDICATOR
         TITLE_PADDING += padOrTruncate(BLANKS, BRANCH_NAME_LEN)
-        print(TITLE_PADDING + TITLE1)
-        print(TITLE_PADDING + TITLE2)
+        print(TITLE_PADDING + TITLE)
 
         ##--------------------------------------------------------------------
         ## Print the summary line for each branch, starting with the "important"
@@ -488,14 +522,14 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         paddedBranchName = padOrTruncate(branch.getName(), branchNameLen)
         branchAndRemote = paddedBranchName
-        branchAndRemote += ' '
-        branchAndRemote += centerText(
-            self.getFormattedAheadBehind(numAheadRemote),
-            5
+
+        branchAndRemote += rightJustify(
+            self.getFormattedAheadBehind('+', numAheadRemote),
+            4
         )
-        branchAndRemote += ' '
-        branchAndRemote += centerText(
-            self.getFormattedAheadBehind(numBehindRemote),
+        branchAndRemote += '  '
+        branchAndRemote += padOrTruncate(
+            self.getFormattedAheadBehind('-', numBehindRemote),
             6
         )
 
@@ -510,13 +544,13 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         output = currentBranchIndicator + branchAndRemote
         output += '  '
-        output += centerText(
-            self.getFormattedAheadBehind(numAheadTarget),
-            5
+        output += rightJustify(
+            self.getFormattedAheadBehind('+', numAheadTarget),
+            4
         )
-        output += ' '
-        output += centerText(
-            self.getFormattedAheadBehind(numBehindTarget),
+        output += '  '
+        output += padOrTruncate(
+            self.getFormattedAheadBehind('-', numBehindTarget),
             6
         )
 
@@ -540,7 +574,9 @@ class FormatterFiles:
                                                             files
             untrackedFiles: list of RepositoryFile objects: The list of untracked
                                                             files
+        :returns: bool: Whether anything was printed
         """
+
         self.stagedFiles = stagedFiles
         self.modifiedFiles = modifiedFiles
         self.untrackedFiles = untrackedFiles
@@ -552,6 +588,8 @@ class FormatterFiles:
         TITLE_MODIFIED  = 'Modified '
         TITLE_UNTRACKED = 'Untracked'
         self.INDENT = BLANKS[0:len(TITLE_UNTRACKED)]
+
+        returnVal = False
 
         ##--------------------------------------------------------------------
         ## Staged Files
@@ -566,6 +604,8 @@ class FormatterFiles:
             lines.append(formattedLine)
 
         self.showBlock(TITLE_STAGED, lines)
+        if len(lines) != 0:
+            returnVal = True
 
         ##--------------------------------------------------------------------
         ## Modified Files
@@ -579,20 +619,30 @@ class FormatterFiles:
 
             lines.append(formattedLine)
 
-        print()
-        self.showBlock(TITLE_MODIFIED, lines)
+        if len(lines) != 0:
+            if len(self.modifiedFiles) != 0:
+                print()
+
+            self.showBlock(TITLE_MODIFIED, lines)
+            returnVal = True
 
         ##--------------------------------------------------------------------
         ## Untracked Files
         ##--------------------------------------------------------------------
         lines = []
         for oneFile in self.untrackedFiles:
-            formattedLine = formatText(TEXT_YELLOW, '  ' + oneFile.getName())
+            formattedLine = formatText(TEXT_YELLOW, oneFile.getName())
 
             lines.append(formattedLine)
 
-        print()
-        self.showBlock(TITLE_UNTRACKED, lines)
+        if len(lines) != 0:
+            if len(self.modifiedFiles) != 0:
+                print()
+
+            self.showBlock(TITLE_UNTRACKED, lines)
+            returnVal = True
+
+        return returnVal
 
     def showBlock(self, title, lines):
         """
@@ -607,12 +657,7 @@ class FormatterFiles:
             lead = title if first else self.INDENT
             first = False
 
-            output = lead + ' ' + line
-            print(padOrTruncate(output, 79))
-
-        ## Show title even if no lines present
-        if first:
-            print(title)
+            print(lead + ' ' + line)
 
 class FormatterStashes:
     """
@@ -624,6 +669,8 @@ class FormatterStashes:
         Initialize this FormatterStashes
         Args
             stashes: list of Stash objects: The list of stashes to be printed
+
+        :returns: bool: Whether anything was printed
         """
 
         self.stashes = stashes
@@ -631,7 +678,7 @@ class FormatterStashes:
     def show(self):
         """ Print a list of stashes """
 
-        TITLE = 'Stashes    '
+        TITLE = 'Stashes  '
         INDENT = BLANKS[0:len(TITLE)]
 
         first = True
@@ -651,9 +698,8 @@ class FormatterStashes:
 
             print(output)
 
-        ## Show stashes title even if no stashes present
-        if first:
-            print(TITLE)
+        ## Return whether anything was printed
+        return not first
 
 class Repository:
     """
@@ -836,28 +882,8 @@ class Repository:
                     isCurrentBranch = True
 
                 ##-------------------------------------------------------------
-                ## Figure out remote tracking branch name
-                ## Output line takes on one of these forms:
-                ##   localbranch [remotebranch]
-                ##   localbranch [remotebranch: ahead 2]
-                ##-------------------------------------------------------------
-                startDelimiter = branchOutputLine.find('[')
-                closeBracket = branchOutputLine.find(']')
-                colon = branchOutputLine.find(':')
-
-                if (colon == -1 or colon > closeBracket):
-                    endDelimiter = closeBracket
-                else:
-                    endDelimiter = colon
-
-                if startDelimiter != -1:
-                    remoteTrackingBranchName = branchOutputLine[
-                        startDelimiter + 1 : endDelimiter
-                    ]
-                else:
-                    remoteTrackingBranchName = None
-
                 ## Create the new branch object
+                ##-------------------------------------------------------------
                 isImportant = False
                 if branchName in self.IMPORTANT_BRANCHES:
                     isImportant = True
@@ -866,7 +892,6 @@ class Repository:
                     branchName,
                     isImportant,
                     isCurrentBranch,
-                    remoteTrackingBranchName,
                     self.getMergeTargetName(branchName)
                 )
 
@@ -1036,6 +1061,15 @@ def main():
             cmdBranch = CommandBranch(sys.argv[0], sys.argv[2:])
             cmdBranch.run()
 
+        else:
+            processCommandLineArgs(sys.argv)
+
+            repository = Repository()
+
+            showFilesSummary(repository)
+            showStashSummary(repository)
+            showRepositorySummary(repository)
+
     else:
         processCommandLineArgs(sys.argv)
 
@@ -1099,7 +1133,7 @@ def processCommandLineArgs(args):
             optionLong = False
 
         elif args[i] == '--version':
-            print(args[0] + ' - Version 2017-02-12')
+            print(args[0] + ' - Version 2017-02-14a')
             sys.exit()
 
         elif args[i] == '--help':
@@ -1121,6 +1155,12 @@ def processCommandLineArgs(args):
             sys.exit()
 
         i += 1
+
+def rightJustify(text, width):
+    padLength = width - len(text)
+    justifiedText = BLANKS[:padLength] + text
+
+    return justifiedText
 
 ##----------------------------------------------------------------------------
 ## showBranchSummaryShort
