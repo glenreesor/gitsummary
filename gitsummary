@@ -13,6 +13,7 @@
 ##  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import re
 import subprocess
 import sys
 
@@ -189,9 +190,11 @@ class CommandBranch:
         Initialize this CommandBranch
         Args
             scriptName: str:         The name used to invoke this script
-            args:       list of str: The user-specified command line args
+            args:       list of str: The user-specified command line args, excluding
+                                     'branch'
         """
 
+        self.screenWidth = 80
         self._processArgs(scriptName, args)
         self.repository = Repository()
         self.branch = self.repository.getCurrentBranch()
@@ -200,20 +203,42 @@ class CommandBranch:
         """
         Process the user-specified command line args
         Args
-            args: list of str: The user-specified command line args
+            args: list of str: The user-specified command line args, excluding
+                               'branch'
         """
 
-        if len(args) > 0:
-            print('Usage: ' + scriptName + ' branch')
+        self.showTarget = False
+        i = 0
+        while i < len(args):
+            if args[i] == '--target':
+                self.showTarget = True
+
+            elif re.match('^--[0-9]+$', args[i]):
+                self.screenWidth = int(args[i][2:])
+
+            else:
+                print('Unknown commandline argument: ' + args[i])
+                sys.exit()
+
+            i += 1
 
     def run(self):
         """ Print the output for the 'branch' command """
 
         ##--------------------------------------------------------------------
-        ## Branch name
+        ## Branch name, remote, and merge target
         ##--------------------------------------------------------------------
-        boldBranchName = formatText(TEXT_BOLD, self.branch.getName())
-        print('Branch      ' + boldBranchName)
+        remote = self.branch.getRemoteTrackingBranchName()
+        if remote == None:
+            remote = 'None'
+
+        mergeTarget = self.branch.getMergeTargetName()
+        if mergeTarget == None:
+            mergeTarget = 'None'
+
+        print('Branch ' + formatText(TEXT_BOLD, self.branch.getName()))
+        print('Remote ' + formatText(TEXT_BOLD, remote))
+        print('Target ' + formatText(TEXT_BOLD, mergeTarget))
 
         ##--------------------------------------------------------------------
         ## Stashes
@@ -235,65 +260,71 @@ class CommandBranch:
         )
         printed = files.show()
 
-        if printed:
-            print()
+        ##--------------------------------------------------------------------
+        ## Commits relative to remote
+        ##--------------------------------------------------------------------
+        remote = self.branch.getRemoteTrackingBranchName()
+        if remote != None:
+            printed = self._showCommitsAheadBehind(printed, 'Remote', remote)
 
-        self._showCommitsRelativeToRemote()
+        ##--------------------------------------------------------------------
+        ## Commits relative to merge target
+        ##--------------------------------------------------------------------
+        if self.showTarget:
+            mergeTarget = self.branch.getMergeTargetName()
+            if mergeTarget != None:
+                self._showCommitsAheadBehind(printed, 'Target', mergeTarget)
 
-        print()
-        self._showCommitsRelativeToMergeTarget()
+    def _showCommitsAheadBehind(self, printSeparator, otherBranchTitle, otherBranch):
+        """
+        Show the commits relative to the specified branch name
 
-    def _showCommitsRelativeToRemote(self):
-        """ Show the commits relative to this branch's remote tracking branch """
+        Args:
+            printSeparator: bool: Whether a blank separator should be printed
+            title:          str:  The title to use for the other branch
+            otherBranch:    str:  The name of the other branch we're comparing to
 
-        INDENT = '       '
+        :returns: bool: Whether anything was printed
+        """
 
-        remoteBranch = self.branch.getRemoteTrackingBranchName()
-        if remoteBranch == None:
-            print('No remote')
-        else:
-            ##----------------------------------------------------------------
-            ## Ahead of remote
-            ##----------------------------------------------------------------
-            print('Remote')
+        COLUMN_WIDTH = round((self.screenWidth - 1) / 2)
+        returnVal = False
+        ##----------------------------------------------------------------
+        ## Get commits to be printed
+        ##----------------------------------------------------------------
+        commitsAhead = self.branch.getCommitsNotIn(otherBranch)
+        commitsBehind = self.branch.getCommitsOnlyIn(otherBranch)
 
-            for commit in self.branch.getCommitsNotIn(remoteBranch):
-                formattedDescription = formatText(
-                    TEXT_GREEN,
-                    '+ ' + commit.getDescription()
-                )
-                print(INDENT + formattedDescription)
+        if len(commitsAhead) > 0 or len(commitsBehind) > 0:
+            returnVal = True
+            if printSeparator:
+                print()
 
-            ##----------------------------------------------------------------
-            ## Behind remote
-            ##----------------------------------------------------------------
-            print()
+            title = padOrTruncate('Local Branch', COLUMN_WIDTH)
+            title += '  ' + otherBranchTitle
+            print(formatText(TEXT_BOLD, title))
 
-            for commit in self.branch.getCommitsOnlyIn(remoteBranch):
-                formattedDescription = formatText(
-                    TEXT_YELLOW,
-                    '- ' + commit.getDescription()
-                )
-                print(INDENT + formattedDescription)
+            aheadIndex = 0
+            behindIndex = 0
 
-    def _showCommitsRelativeToMergeTarget(self):
-        """ Show the commits relative to this branch's merge target """
+            while (aheadIndex < len(commitsAhead) or
+                  behindIndex < len(commitsBehind)):
 
-        INDENT = '       '
+                if aheadIndex < len(commitsAhead):
+                    text = commitsAhead[aheadIndex].getDescription()
+                    output = padOrTruncate(text, COLUMN_WIDTH)
+                    aheadIndex += 1
+                else:
+                    output = BLANKS[:COLUMN_WIDTH]
 
-        mergeTarget = self.branch.getMergeTargetName()
-        if mergeTarget == None:
-            print('No target branch')
-        else:
-            print(mergeTarget)
-            commitsAhead = self.branch.getCommitsNotIn(mergeTarget)
-            numAhead = len(commitsAhead)
+                if behindIndex < len(commitsBehind):
+                    text = commitsBehind[behindIndex].getDescription()
+                    output += '  ' + padOrTruncate(text, COLUMN_WIDTH)
+                    behindIndex += 1
 
-            commitsBehind = self.branch.getCommitsOnlyIn(mergeTarget)
-            numBehind = len(commitsBehind)
+                print(output)
 
-            print(INDENT + formatText(TEXT_GREEN, '+ ' + str(numAhead)))
-            print(INDENT + formatText(TEXT_YELLOW, '- ' + str(numBehind)))
+        return returnVal
 
 class CommandRepo:
     """
@@ -305,9 +336,11 @@ class CommandRepo:
         Initialize this CommandRepo
         Args
             scriptName: str:         The name used to invoke this script
-            args:       list of str: The user-specified command line args
+            args:       list of str: The user-specified command line args, excluding
+                                     "repo"
         """
 
+        self.screenWidth = 80
         self._processArgs(scriptName, args)
         self.repository = Repository()
 
@@ -315,11 +348,19 @@ class CommandRepo:
         """
         Process the user-specified command line args
         Args
-            args: list of str: The user-specified command line args
+            args: list of str: The user-specified command line args after "repo"
         """
 
-        if len(args) > 0:
-            print('Usage: ' + scriptName + ' repo')
+        i = 0
+        while i < len(args):
+            if re.match('^--[0-9]+$', args[i]):
+                self.screenWidth = int(args[i][2:])
+
+            else:
+                print('Unknown commandline argument: ' + args[i])
+                sys.exit()
+
+            i += 1
 
     def run(self):
         """ Print the output for the 'repo' command """
@@ -341,6 +382,7 @@ class CommandRepo:
             print()
 
         branches = FormatterBranches(
+            self.screenWidth,
             self.repository.getBranchHierarchy(),
             self.repository.getBranches()
         )
@@ -399,16 +441,18 @@ class FormatterBranches:
     A class used to format a repository's branches
     """
 
-    def __init__(self, branchHierarchy, branches):
+    def __init__(self, screenWidth, branchHierarchy, branches):
         """
         Initialize this FormatterBranches
         Args
+            screenWidth    : int: Required output width
             branchHierarchy: list of Branch objects
             branches:        list of Branch objects: The list of branches
         """
 
         self.CURRENT_BRANCH_INDICATOR = '* '
         self.EMPTY_CURRENT_BRANCH_INDICATOR = '  '
+        self.screenWidth = screenWidth
         self.branchHierarchy = branchHierarchy
         self.branches = branches
 
@@ -434,8 +478,8 @@ class FormatterBranches:
     def show(self):
         """ Print the list of branches in hierarchical order """
 
-        TITLE = '  Remote       Target  '  ## Need space for possibly 3 digit
-        REF   = '+100  -100   +100  -100'  ## ahead/behind nums
+        TITLE = '  Remote      Target  '  ## Need space for possibly 3 digit
+        REF   = '+100  -100  +100  -100'  ## ahead/behind nums
 
 
         ##--------------------------------------------------------------------
@@ -449,7 +493,7 @@ class FormatterBranches:
             if targetLength > maxMergeTargetLen:
                 maxMergeTargetLen = targetLength
 
-        BRANCH_NAME_LEN = 79 - maxMergeTargetLen - 2 - len(TITLE) - 2
+        BRANCH_NAME_LEN = self.screenWidth - maxMergeTargetLen - 1 - len(TITLE) - 1
         BRANCH_NAME_LEN -= len(self.CURRENT_BRANCH_INDICATOR)
 
         ##--------------------------------------------------------------------
@@ -521,7 +565,7 @@ class FormatterBranches:
         ## so we can bold face it if required
         ##--------------------------------------------------------------------
         paddedBranchName = padOrTruncate(branch.getName(), branchNameLen)
-        branchAndRemote = paddedBranchName
+        branchAndRemote = paddedBranchName + ' '
 
         branchAndRemote += rightJustify(
             self.getFormattedAheadBehind('+', numAheadRemote),
@@ -530,7 +574,7 @@ class FormatterBranches:
         branchAndRemote += '  '
         branchAndRemote += padOrTruncate(
             self.getFormattedAheadBehind('-', numBehindRemote),
-            6
+            4
         )
 
         ##--------------------------------------------------------------------
@@ -551,7 +595,7 @@ class FormatterBranches:
         output += '  '
         output += padOrTruncate(
             self.getFormattedAheadBehind('-', numBehindTarget),
-            6
+            4
         )
 
         if mergeTarget != None:
