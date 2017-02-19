@@ -13,6 +13,7 @@
 ##  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import re
 import subprocess
 import sys
 
@@ -193,6 +194,7 @@ class CommandBranch:
                                      'branch'
         """
 
+        self.screenWidth = 80
         self._processArgs(scriptName, args)
         self.repository = Repository()
         self.branch = self.repository.getCurrentBranch()
@@ -210,6 +212,9 @@ class CommandBranch:
         while i < len(args):
             if args[i] == '--target':
                 self.showTarget = True
+
+            elif re.match('^--[0-9]+$', args[i]):
+                self.screenWidth = int(args[i][2:])
 
             else:
                 print('Unknown commandline argument: ' + args[i])
@@ -282,7 +287,7 @@ class CommandBranch:
         :returns: bool: Whether anything was printed
         """
 
-        COLUMN_WIDTH = 38
+        COLUMN_WIDTH = round((self.screenWidth - 1) / 2)
         returnVal = False
         ##----------------------------------------------------------------
         ## Get commits to be printed
@@ -335,6 +340,7 @@ class CommandRepo:
                                      "repo"
         """
 
+        self.screenWidth = 80
         self._processArgs(scriptName, args)
         self.repository = Repository()
 
@@ -345,8 +351,16 @@ class CommandRepo:
             args: list of str: The user-specified command line args after "repo"
         """
 
-        if len(args) > 0:
-            print('Usage: ' + scriptName + ' repo')
+        i = 0
+        while i < len(args):
+            if re.match('^--[0-9]+$', args[i]):
+                self.screenWidth = int(args[i][2:])
+
+            else:
+                print('Unknown commandline argument: ' + args[i])
+                sys.exit()
+
+            i += 1
 
     def run(self):
         """ Print the output for the 'repo' command """
@@ -368,6 +382,7 @@ class CommandRepo:
             print()
 
         branches = FormatterBranches(
+            self.screenWidth,
             self.repository.getBranchHierarchy(),
             self.repository.getBranches()
         )
@@ -426,16 +441,18 @@ class FormatterBranches:
     A class used to format a repository's branches
     """
 
-    def __init__(self, branchHierarchy, branches):
+    def __init__(self, screenWidth, branchHierarchy, branches):
         """
         Initialize this FormatterBranches
         Args
+            screenWidth    : int: Required output width
             branchHierarchy: list of Branch objects
             branches:        list of Branch objects: The list of branches
         """
 
         self.CURRENT_BRANCH_INDICATOR = '* '
         self.EMPTY_CURRENT_BRANCH_INDICATOR = '  '
+        self.screenWidth = screenWidth
         self.branchHierarchy = branchHierarchy
         self.branches = branches
 
@@ -476,7 +493,7 @@ class FormatterBranches:
             if targetLength > maxMergeTargetLen:
                 maxMergeTargetLen = targetLength
 
-        BRANCH_NAME_LEN = 80 - maxMergeTargetLen - 1 - len(TITLE) - 1
+        BRANCH_NAME_LEN = self.screenWidth - maxMergeTargetLen - 1 - len(TITLE) - 1
         BRANCH_NAME_LEN -= len(self.CURRENT_BRANCH_INDICATOR)
 
         ##--------------------------------------------------------------------
