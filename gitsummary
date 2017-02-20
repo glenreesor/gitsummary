@@ -551,7 +551,7 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         ## Bold face if the branch is out of sync with its remote
         ##--------------------------------------------------------------------
-        if (numAheadRemote > 0 or numBehindRemote > 0):
+        if numAheadRemote > 0 or numBehindRemote > 0:
            branchAndRemote = formatText(TEXT_BOLD, branchAndRemote)
 
         ##--------------------------------------------------------------------
@@ -846,9 +846,9 @@ class Repository:
         :returns: str
         """
 
-        if (branchName in self.MERGE_TARGETS['noTarget']):
+        if branchName in self.MERGE_TARGETS['noTarget']:
             returnVal = None
-        elif (branchName in self.MERGE_TARGETS['targets']):
+        elif branchName in self.MERGE_TARGETS['targets']:
             returnVal = self.MERGE_TARGETS['targets'][branchName]
         else:
             returnVal = self.MERGE_TARGETS['default']
@@ -1104,11 +1104,11 @@ def main():
 def padOrTruncate(text, length):
     returnVal = text
 
-    if (len(text) < length):
+    if len(text) < length:
         formatString = '{{:<{}}}'.format(str(length))
         returnVal = formatString.format(text)
 
-    elif (len(text) > length):
+    elif len(text) > length:
         returnVal = text[0:length]
 
     return returnVal
