@@ -27,35 +27,6 @@ TEXT_NORMAL = 'normal'
 TEXT_YELLOW = 'yellow'
 TEXT_RED = 'red'
 
-ANSI_NORMAL   = '0'
-ANSI_BOLD     = '1'
-ANSI_FLASHING = '5'
-
-ANSI_GREEN    = '32'
-ANSI_MAGENTA  = '35'
-ANSI_RED      = '31'
-ANSI_WHITE    = '37'
-ANSI_YELLOW   = '33'
-
-COLOR_CURRENT_BRANCH       = '\033[' + ANSI_MAGENTA + 'm'
-COLOR_DETACHED_HEAD_STATE  = '\033[' + ANSI_BOLD + 'm'
-COLOR_ERROR                = '\033[' + ANSI_RED + 'm'
-COLOR_FILE_MODIFIED        = '\033[' + ANSI_RED + 'm'
-COLOR_FILE_STAGED          = '\033[' + ANSI_GREEN + 'm'
-COLOR_FILE_UNTRACKED       = '\033[' + ANSI_YELLOW  + 'm'
-COLOR_IMPORTANT_BRANCH     = '\033[' + ANSI_BOLD + ';' + ANSI_FLASHING + ';' + ANSI_MAGENTA + 'm'
-COLOR_NORMAL               = '\033[' + ANSI_NORMAL + 'm'
-COLOR_STASH_NAME           = '\033[' + ANSI_GREEN + 'm'
-COLOR_UNMERGED_BRANCH_NAME = '\033[' + ANSI_BOLD + 'm'
-
-##----------------------------------------------------------------------------
-## Global vars
-##----------------------------------------------------------------------------
-optionBranch = ''
-optionCurrentBranch = False
-optionLocalCompareTo = ''
-optionLog = False
-
 class Branch:
     """
     A class used to represent one branch
@@ -1096,7 +1067,11 @@ def formatText(style, text):
 ##      Drive the whole process
 ##----------------------------------------------------------------------------
 def main():
-    if (len(sys.argv) > 1):
+    if len(sys.argv) == 1:
+        cmdRepo = CommandRepo(sys.argv[0], [])
+        cmdRepo.run()
+
+    else:
         if sys.argv[1] == 'repo':
             cmdRepo = CommandRepo(sys.argv[0], sys.argv[2:])
             cmdRepo.run()
@@ -1106,13 +1081,20 @@ def main():
             cmdBranch.run()
 
         else:
-            processCommandLineArgs(sys.argv)
-
-            repository = Repository()
-
-            showFilesSummary(repository)
-            showStashSummary(repository)
-            showRepositorySummary(repository)
+            print('Usage: ' + sys.argv[0] + '[repo | branch] [options]')
+            print('    repo   - Show a summary of the current git repository.')
+            print('             This is the default if neither \'repo\' nor \'branch\' is specified.')
+            print()
+            print('             Options:')
+            print('                 --n - Format output for a screen width of n characters')
+            print()
+            print('    branch - Show a summary of the current branch, including remote name,')
+            print('             merge target name, commits differing from the remote.')
+            print()
+            print('             Options:')
+            print('                 --target - Also show the commits differing from')
+            print('                            the merge target')
+            print('                 --n      - Format output for a screen width of n characters')
 
 ##----------------------------------------------------------------------------
 ## padOrTruncate(text, length)
@@ -1131,65 +1113,6 @@ def padOrTruncate(text, length):
 
     return returnVal
 
-##----------------------------------------------------------------------------
-## processCommandLineArgs
-##      Set options variables based on command line arguments
-##----------------------------------------------------------------------------
-def processCommandLineArgs(args):
-    global optionBranch
-    global optionCurrentBranch
-    global optionLocalCompareTo
-    global optionLong
-
-    optionBranch         = ''
-    optionCurrentBranch  = False
-    optionLocalCompareTo = ''
-    optionLong           = False
-
-    i = 1
-    while i < len(args):
-        if args[i] == '--branch':
-            optionLong = True
-            optionBranch = args[i+1]
-            i += 1
-
-        elif args[i] == '--compareto':
-            optionLocalCompareTo = args[i+1]
-            i += 1
-
-        elif args[i] == '--current':
-            optionCurrentBranch = True
-            optionLong = True
-
-        elif args[i] == '--long':
-            optionLong = True
-
-        elif args[i] == '--short':
-            optionLong = False
-
-        elif args[i] == '--version':
-            print(args[0] + ' - Version 2017-02-14a')
-            sys.exit()
-
-        elif args[i] == '--help':
-            print('Usage: ' + args[0])
-            print('    --branch NAME    - Show only the specified branch. Implies --long')
-            print('    --compareto NAME - Compare to the specified local branch rather')
-            print('                       than dev/master')
-            print('    --current        - Show only the current branch. Implies --long')
-            print('    --long           - Also show commits that differ between branch')
-            print('                       and dev (or master if dev does\'t exist)')
-            print('    --short          - Do not show commits that differ between branch and')
-            print('                       dev (or master if dev does\'t exist)')
-            print('                       This is the default when --current is not specified')
-            sys.exit()
-
-        else:
-            print('Unknown commandline argument:')
-            print('    ' + args[i])
-            sys.exit()
-
-        i += 1
 
 def rightJustify(text, width):
     padLength = width - len(text)
