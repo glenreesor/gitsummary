@@ -258,7 +258,7 @@ class CommandBranch:
         :returns: bool: Whether anything was printed
         """
 
-        COLUMN_WIDTH = round((self.screenWidth - 1) / 2)
+        COLUMN_WIDTH = round(self.screenWidth / 2) - 1
         returnVal = False
         ##----------------------------------------------------------------
         ## Get commits to be printed
