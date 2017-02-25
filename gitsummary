@@ -373,7 +373,7 @@ class CommandRepo:
     def run(self):
         """ Print the output for the 'repo' command """
 
-        stashes = FormatterStashes(self.repository.getStashes())
+        stashes = FormatterStashes(self.screenWidth, self.repository.getStashes())
         printed = stashes.show()
 
         if printed:
@@ -716,15 +716,17 @@ class FormatterStashes:
     A class used to format a repository's staged, modified, and untracked files
     """
 
-    def __init__(self, stashes):
+    def __init__(self, screenWidth, stashes):
         """
         Initialize this FormatterStashes
         Args
+            screenwidth: int: The screen's width
             stashes: list of Stash objects: The list of stashes to be printed
 
         :returns: bool: Whether anything was printed
         """
 
+        self.screenWidth = screenWidth
         self.stashes = stashes
 
     def show(self):
@@ -744,7 +746,7 @@ class FormatterStashes:
             output += formatText(TEXT_GREEN, stashName)
             output += ' '
             output += padOrTruncateText(
-                77 - len(lead + stashName),
+                self.screenWidth - 3 - len(lead + stashName),
                 stash.getDescription()
             )
 
