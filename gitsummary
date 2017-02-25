@@ -27,35 +27,6 @@ TEXT_NORMAL = 'normal'
 TEXT_YELLOW = 'yellow'
 TEXT_RED = 'red'
 
-ANSI_NORMAL   = '0'
-ANSI_BOLD     = '1'
-ANSI_FLASHING = '5'
-
-ANSI_GREEN    = '32'
-ANSI_MAGENTA  = '35'
-ANSI_RED      = '31'
-ANSI_WHITE    = '37'
-ANSI_YELLOW   = '33'
-
-COLOR_CURRENT_BRANCH       = '\033[' + ANSI_MAGENTA + 'm'
-COLOR_DETACHED_HEAD_STATE  = '\033[' + ANSI_BOLD + 'm'
-COLOR_ERROR                = '\033[' + ANSI_RED + 'm'
-COLOR_FILE_MODIFIED        = '\033[' + ANSI_RED + 'm'
-COLOR_FILE_STAGED          = '\033[' + ANSI_GREEN + 'm'
-COLOR_FILE_UNTRACKED       = '\033[' + ANSI_YELLOW  + 'm'
-COLOR_IMPORTANT_BRANCH     = '\033[' + ANSI_BOLD + ';' + ANSI_FLASHING + ';' + ANSI_MAGENTA + 'm'
-COLOR_NORMAL               = '\033[' + ANSI_NORMAL + 'm'
-COLOR_STASH_NAME           = '\033[' + ANSI_GREEN + 'm'
-COLOR_UNMERGED_BRANCH_NAME = '\033[' + ANSI_BOLD + 'm'
-
-##----------------------------------------------------------------------------
-## Global vars
-##----------------------------------------------------------------------------
-optionBranch = ''
-optionCurrentBranch = False
-optionLocalCompareTo = ''
-optionLog = False
-
 class Branch:
     """
     A class used to represent one branch
@@ -265,29 +236,40 @@ class CommandBranch:
         ##--------------------------------------------------------------------
         remote = self.branch.getRemoteTrackingBranchName()
         if remote != None:
-            printed = self._showCommitsAheadBehind(printed, 'Remote', remote)
+            printed = self._showCommitsAheadBehind(
+                          printed,
+                          True,
+                          'Remote',
+                          remote
+                      )
 
         ##--------------------------------------------------------------------
         ## Commits relative to merge target
         ##--------------------------------------------------------------------
-        if self.showTarget:
-            mergeTarget = self.branch.getMergeTargetName()
-            if mergeTarget != None:
-                self._showCommitsAheadBehind(printed, 'Target', mergeTarget)
+        mergeTarget = self.branch.getMergeTargetName()
+        if mergeTarget != None:
+            self._showCommitsAheadBehind(
+                printed,
+                self.showTarget,
+                'Target',
+                mergeTarget
+            )
 
-    def _showCommitsAheadBehind(self, printSeparator, otherBranchTitle, otherBranch):
+    def _showCommitsAheadBehind(self, printSeparator, showAllCommits, otherBranchTitle, otherBranch):
         """
         Show the commits relative to the specified branch name
 
         Args:
             printSeparator: bool: Whether a blank separator should be printed
+            showAllCommits: bool: Whether to show all differing commits (True)
+                                  or just number of differing ommits (False)
             title:          str:  The title to use for the other branch
             otherBranch:    str:  The name of the other branch we're comparing to
 
         :returns: bool: Whether anything was printed
         """
 
-        COLUMN_WIDTH = round((self.screenWidth - 1) / 2)
+        COLUMN_WIDTH = round(self.screenWidth / 2) - 1
         returnVal = False
         ##----------------------------------------------------------------
         ## Get commits to be printed
@@ -300,29 +282,55 @@ class CommandBranch:
             if printSeparator:
                 print()
 
-            title = padOrTruncate('Local Branch', COLUMN_WIDTH)
+            title = padOrTruncateText(COLUMN_WIDTH, 'Local Branch')
             title += '  ' + otherBranchTitle
             print(formatText(TEXT_BOLD, title))
 
-            aheadIndex = 0
-            behindIndex = 0
-
-            while (aheadIndex < len(commitsAhead) or
-                  behindIndex < len(commitsBehind)):
-
-                if aheadIndex < len(commitsAhead):
-                    text = commitsAhead[aheadIndex].getDescription()
-                    output = padOrTruncate(text, COLUMN_WIDTH)
-                    aheadIndex += 1
+            if not showAllCommits:
+                ##-------------------------------------------------------------
+                ## Only show the number of commits differing between this branch
+                ## and the specified one branch
+                ##-------------------------------------------------------------
+                if len(commitsAhead) == 1:
+                    output = '1 commit'
+                elif len(commitsAhead) > 1:
+                    output = str(len(commitsAhead)) + ' commits'
                 else:
-                    output = BLANKS[:COLUMN_WIDTH]
+                    output = ''
 
-                if behindIndex < len(commitsBehind):
-                    text = commitsBehind[behindIndex].getDescription()
-                    output += '  ' + padOrTruncate(text, COLUMN_WIDTH)
-                    behindIndex += 1
+                output = padOrTruncateText(COLUMN_WIDTH, output) + '  '
+
+                if len(commitsBehind) == 1:
+                    output += '1 commit'
+                elif len(commitsBehind) > 1:
+                    output += str(len(commitsBehind)) + ' commits'
 
                 print(output)
+
+            else:
+                ##-------------------------------------------------------------
+                ## Show description of each commit differing between this branch
+                ## and the specified one branch
+                ##-------------------------------------------------------------
+                aheadIndex = 0
+                behindIndex = 0
+
+                while (aheadIndex < len(commitsAhead) or
+                      behindIndex < len(commitsBehind)):
+
+                    if aheadIndex < len(commitsAhead):
+                        text = commitsAhead[aheadIndex].getDescription()
+                        output = padOrTruncateText(COLUMN_WIDTH, text)
+                        aheadIndex += 1
+                    else:
+                        output = BLANKS[:COLUMN_WIDTH]
+
+                    if behindIndex < len(commitsBehind):
+                        text = commitsBehind[behindIndex].getDescription()
+                        output += '  ' + padOrTruncateText(COLUMN_WIDTH, text)
+                        behindIndex += 1
+
+                    print(output)
 
         return returnVal
 
@@ -365,7 +373,7 @@ class CommandRepo:
     def run(self):
         """ Print the output for the 'repo' command """
 
-        stashes = FormatterStashes(self.repository.getStashes())
+        stashes = FormatterStashes(self.screenWidth, self.repository.getStashes())
         printed = stashes.show()
 
         if printed:
@@ -501,7 +509,7 @@ class FormatterBranches:
         ## info
         ##--------------------------------------------------------------------
         TITLE_PADDING = self.EMPTY_CURRENT_BRANCH_INDICATOR
-        TITLE_PADDING += padOrTruncate(BLANKS, BRANCH_NAME_LEN)
+        TITLE_PADDING += padOrTruncateText(BRANCH_NAME_LEN, BLANKS)
         print(TITLE_PADDING + TITLE)
 
         ##--------------------------------------------------------------------
@@ -564,23 +572,23 @@ class FormatterBranches:
         ## Create a string of the branch name and remote ahead/behind info
         ## so we can bold face it if required
         ##--------------------------------------------------------------------
-        paddedBranchName = padOrTruncate(branch.getName(), branchNameLen)
+        paddedBranchName = padOrTruncateText(branchNameLen, branch.getName())
         branchAndRemote = paddedBranchName + ' '
 
-        branchAndRemote += rightJustify(
-            self.getFormattedAheadBehind('+', numAheadRemote),
-            4
+        branchAndRemote += justifyText(
+            4,
+            self.getFormattedAheadBehind('+', numAheadRemote)
         )
         branchAndRemote += '  '
-        branchAndRemote += padOrTruncate(
-            self.getFormattedAheadBehind('-', numBehindRemote),
-            4
+        branchAndRemote += padOrTruncateText(
+            4,
+            self.getFormattedAheadBehind('-', numBehindRemote)
         )
 
         ##--------------------------------------------------------------------
         ## Bold face if the branch is out of sync with its remote
         ##--------------------------------------------------------------------
-        if (numAheadRemote > 0 or numBehindRemote > 0):
+        if numAheadRemote > 0 or numBehindRemote > 0:
            branchAndRemote = formatText(TEXT_BOLD, branchAndRemote)
 
         ##--------------------------------------------------------------------
@@ -588,14 +596,14 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         output = currentBranchIndicator + branchAndRemote
         output += '  '
-        output += rightJustify(
-            self.getFormattedAheadBehind('+', numAheadTarget),
-            4
+        output += justifyText(
+            4,
+            self.getFormattedAheadBehind('+', numAheadTarget)
         )
         output += '  '
-        output += padOrTruncate(
-            self.getFormattedAheadBehind('-', numBehindTarget),
-            4
+        output += padOrTruncateText(
+            4,
+            self.getFormattedAheadBehind('-', numBehindTarget)
         )
 
         if mergeTarget != None:
@@ -664,7 +672,7 @@ class FormatterFiles:
             lines.append(formattedLine)
 
         if len(lines) != 0:
-            if len(self.modifiedFiles) != 0:
+            if len(self.stagedFiles) != 0:
                 print()
 
             self.showBlock(TITLE_MODIFIED, lines)
@@ -708,15 +716,17 @@ class FormatterStashes:
     A class used to format a repository's staged, modified, and untracked files
     """
 
-    def __init__(self, stashes):
+    def __init__(self, screenWidth, stashes):
         """
         Initialize this FormatterStashes
         Args
+            screenwidth: int: The screen's width
             stashes: list of Stash objects: The list of stashes to be printed
 
         :returns: bool: Whether anything was printed
         """
 
+        self.screenWidth = screenWidth
         self.stashes = stashes
 
     def show(self):
@@ -735,9 +745,9 @@ class FormatterStashes:
             output = lead + ' '
             output += formatText(TEXT_GREEN, stashName)
             output += ' '
-            output += padOrTruncate(
-                stash.getDescription(),
-                77 - len(lead + stashName)
+            output += padOrTruncateText(
+                self.screenWidth - 3 - len(lead + stashName),
+                stash.getDescription()
             )
 
             print(output)
@@ -875,9 +885,9 @@ class Repository:
         :returns: str
         """
 
-        if (branchName in self.MERGE_TARGETS['noTarget']):
+        if branchName in self.MERGE_TARGETS['noTarget']:
             returnVal = None
-        elif (branchName in self.MERGE_TARGETS['targets']):
+        elif branchName in self.MERGE_TARGETS['targets']:
             returnVal = self.MERGE_TARGETS['targets'][branchName]
         else:
             returnVal = self.MERGE_TARGETS['default']
@@ -1062,12 +1072,6 @@ class Stash:
 
         return self.name
 
-def centerText(text, width):
-    padLength = round((width - len(text)) / 2)
-    centeredText = BLANKS[:padLength] + text
-
-    return padOrTruncate(centeredText, width)
-
 def formatText(style, text):
     """
     Print the specified text in the specified style
@@ -1096,7 +1100,11 @@ def formatText(style, text):
 ##      Drive the whole process
 ##----------------------------------------------------------------------------
 def main():
-    if (len(sys.argv) > 1):
+    if len(sys.argv) == 1:
+        cmdRepo = CommandRepo(sys.argv[0], [])
+        cmdRepo.run()
+
+    else:
         if sys.argv[1] == 'repo':
             cmdRepo = CommandRepo(sys.argv[0], sys.argv[2:])
             cmdRepo.run()
@@ -1106,457 +1114,67 @@ def main():
             cmdBranch.run()
 
         else:
-            processCommandLineArgs(sys.argv)
-
-            repository = Repository()
-
-            showFilesSummary(repository)
-            showStashSummary(repository)
-            showRepositorySummary(repository)
-
-    else:
-        processCommandLineArgs(sys.argv)
-
-        repository = Repository()
-
-        showFilesSummary(repository)
-        showStashSummary(repository)
-        showRepositorySummary(repository)
+            print('Usage: ' + sys.argv[0] + '[repo | branch] [options]')
+            print('    repo   - Show a summary of the current git repository, including:')
+            print('                 - Stashes and staged/modified/untracked files')
+            print('                 - All local branches')
+            print('                 - For each branch, the number of commits differing from its')
+            print('                   remote and merge target')
+            print('                       - Commits Ahead: +n')
+            print('                       - Commits Behind: -n')
+            print('                       - No remote or merge target signified by blanks')
+            print('           - This is the default if neither \'repo\' nor \'branch\' is specified.')
+            print()
+            print('             Options:')
+            print('                 --n - Format output for a screen width of n characters')
+            print()
+            print('    branch - Show a summary of the current branch, including remote name,')
+            print('             merge target name, commits differing from the remote, and')
+            print('             number of commits differing from merge target.')
+            print()
+            print('           - Commits listed under "Local Branch" exist in the local branch but')
+            print('             not the remote. Commits listed under "Remote" exist in the remote')
+            print('             but not the local branch.')
+            print('             Options:')
+            print('                 --target - Show the commits differing from the merge target')
+            print('                            instead of just the number')
+            print('                 --n      - Format output for a screen width of n characters')
 
 ##----------------------------------------------------------------------------
-## padOrTruncate(text, length)
+## padOrTruncateText(length, text)
 ##      - Pad or truncate the specified string to return one of the exact
 ##        specified length
 ##----------------------------------------------------------------------------
-def padOrTruncate(text, length):
+def padOrTruncateText(length, text):
+    """
+    Pad or truncate the specified string so it is exactly the specified length
+    Args
+        length: int: The length the resulting string should be
+        text:   str: The string to pad/truncate
+    """
     returnVal = text
 
-    if (len(text) < length):
+    if len(text) < length:
         formatString = '{{:<{}}}'.format(str(length))
         returnVal = formatString.format(text)
 
-    elif (len(text) > length):
+    elif len(text) > length:
         returnVal = text[0:length]
 
     return returnVal
 
-##----------------------------------------------------------------------------
-## processCommandLineArgs
-##      Set options variables based on command line arguments
-##----------------------------------------------------------------------------
-def processCommandLineArgs(args):
-    global optionBranch
-    global optionCurrentBranch
-    global optionLocalCompareTo
-    global optionLong
 
-    optionBranch         = ''
-    optionCurrentBranch  = False
-    optionLocalCompareTo = ''
-    optionLong           = False
-
-    i = 1
-    while i < len(args):
-        if args[i] == '--branch':
-            optionLong = True
-            optionBranch = args[i+1]
-            i += 1
-
-        elif args[i] == '--compareto':
-            optionLocalCompareTo = args[i+1]
-            i += 1
-
-        elif args[i] == '--current':
-            optionCurrentBranch = True
-            optionLong = True
-
-        elif args[i] == '--long':
-            optionLong = True
-
-        elif args[i] == '--short':
-            optionLong = False
-
-        elif args[i] == '--version':
-            print(args[0] + ' - Version 2017-02-14a')
-            sys.exit()
-
-        elif args[i] == '--help':
-            print('Usage: ' + args[0])
-            print('    --branch NAME    - Show only the specified branch. Implies --long')
-            print('    --compareto NAME - Compare to the specified local branch rather')
-            print('                       than dev/master')
-            print('    --current        - Show only the current branch. Implies --long')
-            print('    --long           - Also show commits that differ between branch')
-            print('                       and dev (or master if dev does\'t exist)')
-            print('    --short          - Do not show commits that differ between branch and')
-            print('                       dev (or master if dev does\'t exist)')
-            print('                       This is the default when --current is not specified')
-            sys.exit()
-
-        else:
-            print('Unknown commandline argument:')
-            print('    ' + args[i])
-            sys.exit()
-
-        i += 1
-
-def rightJustify(text, width):
+def justifyText(width, text):
+    """
+    Right justify the specified text in a field of the specified width
+    Args
+        width: int: The length of the resulting string
+        text:  str: The string to justify
+    """
     padLength = width - len(text)
     justifiedText = BLANKS[:padLength] + text
 
     return justifiedText
-
-##----------------------------------------------------------------------------
-## showBranchSummaryShort
-##      Show a short summary of the specified branch. This consists of:
-##          One line with:
-##              - '*' if the branch is the current one checked out
-##              - The branch name--bold if it is ahead of local dev/master
-##              - 'Ahead', and/or 'Behind' if it's ahead and/or behind of
-##                dev/master
-##              - 'dev' or 'master', depending on which branch we're comparing to
-##
-##          A list of commits that are ahead/behind of this branch's origin
-##----------------------------------------------------------------------------
-def showBranchSummaryShort(branch):
-    BRANCH_NAME_LENGTH = 54
-    INDENT = '        '
-    COMMIT_LENGTH = 79 - len(INDENT)
-
-    branchName = branch.getName()
-    mergeTargetName = branch.getMergeTargetName()
-
-    ##--------------------------------------------------------------------
-    ## Figure out if we have a corresponding branch in origin
-    ##--------------------------------------------------------------------
-    remoteTrackingBranchName = branch.getRemoteTrackingBranchName()
-
-    ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of origin
-    ##--------------------------------------------------------------------
-    commitsBehindOrigin = []
-    commitsAheadOfOrigin = []
-
-    if remoteTrackingBranchName != None:
-        for commit in branch.getCommitsNotIn(remoteTrackingBranchName):
-            commitsAheadOfOrigin.append('+ ' + commit.getDescription())
-
-        for commit in branch.getCommitsOnlyIn(remoteTrackingBranchName):
-            commitsBehindOrigin.append('- ' + commit.getDescription())
-
-    ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of merge target
-    ##--------------------------------------------------------------------
-    commitsBehindMergeTarget = []
-    commitsAheadOfMergeTarget = []
-
-    if mergeTargetName != None:
-        for commit in branch.getCommitsNotIn(mergeTargetName):
-            commitsAheadOfMergeTarget.append('+ ' + commit.getDescription())
-
-        for commit in branch.getCommitsOnlyIn(mergeTargetName):
-            commitsBehindMergeTarget.append('- ' + commit.getDescription())
-
-    ##--------------------------------------------------------------------
-    ## Combine our lists by column
-    ##--------------------------------------------------------------------
-    commitsRelativeToOrigin = commitsBehindOrigin + commitsAheadOfOrigin
-    commitsRelativeToMergeTarget = commitsBehindMergeTarget + commitsAheadOfMergeTarget
-
-    ##--------------------------------------------------------------------
-    ## Formatted Branch Name
-    ##--------------------------------------------------------------------
-    currentBranchIndicator = ' '
-    if branch.isCurrent():
-        if branch.isImportant():
-            currentBranchIndicator = COLOR_IMPORTANT_BRANCH + '*' + COLOR_NORMAL
-        else:
-            currentBranchIndicator = COLOR_CURRENT_BRANCH + '*' + COLOR_NORMAL
-
-    ##--------------------------------------------------------------------
-    ## Ahead / behind of merge target
-    ##--------------------------------------------------------------------
-    ahead = '-----'
-    if len(commitsAheadOfMergeTarget) != 0:
-        ahead = 'Ahead'
-
-    behind = '------'
-    if len(commitsBehindMergeTarget) != 0:
-        behind = 'Behind'
-
-    ##--------------------------------------------------------------------
-    ## Print branchname line
-    ##--------------------------------------------------------------------
-    if len(commitsRelativeToOrigin) > 0:
-        print()
-
-    outputString = currentBranchIndicator + ' '
-
-    if len(commitsAheadOfMergeTarget) != 0:
-        outputString += COLOR_UNMERGED_BRANCH_NAME
-        outputString += padOrTruncate(branchName, BRANCH_NAME_LENGTH) + ' '
-        outputString += COLOR_NORMAL
-
-    else:
-        outputString += padOrTruncate(branchName, BRANCH_NAME_LENGTH) + ' '
-
-    outputString += padOrTruncate(ahead, 7) + ' '
-    outputString += padOrTruncate(behind, 7) + ' '
-
-    if mergeTargetName != None:
-        outputString += mergeTargetName
-
-    print(outputString)
-
-    ##--------------------------------------------------------------------
-    ## Print commits relative to origin
-    ##--------------------------------------------------------------------
-    for commit in commitsRelativeToOrigin:
-        outputString = INDENT + padOrTruncate(commit, COMMIT_LENGTH)
-
-        print(outputString)
-
-    if len(commitsRelativeToOrigin) != 0:
-        print()
-
-##----------------------------------------------------------------------------
-## showBranchSummaryFull
-##      Show a full summary of the specified branch. This consists of:
-##          One line with:
-##              - '*' if the branch is the current one checked out
-##              - The branch name--bold if it is ahead of local dev/master
-##              - 'Ahead', and/or 'Behind' if it's ahead and/or behind of
-##                dev/master
-##              - 'dev' or 'master', depending on which branch we're comparing to
-##
-##          One column listing commits ahead/behind of this branch's origin
-##          One column listing commits ahead/behind of dev/master
-##----------------------------------------------------------------------------
-def showBranchSummaryFull(branch):
-    INDENT = '        '
-    COMMIT_LENGTH = 60
-
-    branchName = branch.getName()
-    mergeTargetName = branch.getMergeTargetName()
-
-    ##--------------------------------------------------------------------
-    ## Figure out if we have a corresponding branch in origin
-    ##--------------------------------------------------------------------
-    remoteTrackingBranchName = branch.getRemoteTrackingBranchName()
-
-    ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of origin
-    ##--------------------------------------------------------------------
-    commitsBehindOrigin = []
-    commitsAheadOfOrigin = []
-
-    ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of origin
-    ##--------------------------------------------------------------------
-    commitsBehindOrigin = []
-    commitsAheadOfOrigin = []
-
-    if remoteTrackingBranchName != None:
-        for commit in branch.getCommitsNotIn(remoteTrackingBranchName):
-            commitsAheadOfOrigin.append('+ ' + commit.getDescription())
-
-        for commit in branch.getCommitsOnlyIn(remoteTrackingBranchName):
-            commitsBehindOrigin.append('- ' + commit.getDescription())
-
-    ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of merge target
-    ##--------------------------------------------------------------------
-    commitsBehindMergeTarget = []
-    commitsAheadOfMergeTarget = []
-
-    if mergeTargetName != None:
-        for commit in branch.getCommitsNotIn(mergeTargetName):
-            commitsAheadOfMergeTarget.append('+ ' + commit.getDescription())
-
-        for commit in branch.getCommitsOnlyIn(mergeTargetName):
-            commitsBehindMergeTarget.append('- ' + commit.getDescription())
-
-    ##--------------------------------------------------------------------
-    ## Combine our lists by column
-    ##--------------------------------------------------------------------
-    commitsRelativeToOrigin = commitsBehindOrigin + commitsAheadOfOrigin
-    commitsRelativeToMergeTarget = commitsBehindMergeTarget + commitsAheadOfMergeTarget
-
-    ##--------------------------------------------------------------------
-    ## Formatted Branch Name
-    ##--------------------------------------------------------------------
-    currentBranchIndicator = ' '
-    if branch.isCurrent():
-        currentBranchIndicator = COLOR_CURRENT_BRANCH + '*' + COLOR_NORMAL
-
-    formattedBranchName = branchName
-    if len(commitsAheadOfMergeTarget) != 0:
-        formattedBranchName =COLOR_UNMERGED_BRANCH_NAME + branchName + COLOR_NORMAL
-
-    ##--------------------------------------------------------------------
-    ## Print branchname line
-    ##--------------------------------------------------------------------
-    print(currentBranchIndicator + ' ' + formattedBranchName)
-
-    ##--------------------------------------------------------------------
-    ## Commits differing between origin and/or mergeTarget
-    ##--------------------------------------------------------------------
-    if len(commitsRelativeToOrigin) > 0 or len(commitsRelativeToMergeTarget) > 0:
-        outputLine = INDENT
-        outputLine += padOrTruncate('Relative to Origin', COMMIT_LENGTH) + '  '
-        outputLine += padOrTruncate(
-            'Relative to ' + mergeTargetName,
-            COMMIT_LENGTH
-        )
-        print(outputLine)
-
-        indexOrigin = 0
-        indexMergeTarget = 0
-
-        while (indexOrigin < len(commitsRelativeToOrigin) or
-               indexMergeTarget < len(commitsRelativeToMergeTarget)):
-
-            outputLine = INDENT
-            if indexOrigin < len(commitsRelativeToOrigin):
-                outputLine += padOrTruncate(
-                    commitsRelativeToOrigin[indexOrigin],
-                    COMMIT_LENGTH
-                )
-                indexOrigin += 1
-            else:
-                outputLine += padOrTruncate('', COMMIT_LENGTH)
-
-            if indexMergeTarget < len(commitsRelativeToMergeTarget):
-                outputLine += '  '
-                outputLine += padOrTruncate(
-                    commitsRelativeToMergeTarget[indexMergeTarget],
-                    COMMIT_LENGTH
-                )
-                indexMergeTarget += 1
-
-            print(outputLine)
-
-##----------------------------------------------------------------------------
-## showFilesSummary()
-##      Summarize the following for the current branch:
-##          Staged changes
-##          Unstaged changes
-##          Untracked files
-##----------------------------------------------------------------------------
-def showFilesSummary(repository):
-    INDENT = '           '
-
-    print('Staged')
-    for repoFile in repository.getFilesStaged():
-        print(COLOR_FILE_STAGED, end='')
-        print(INDENT + repoFile.getIndexStatus() + ' ' + repoFile.getName())
-        print(COLOR_NORMAL, end='')
-
-    print()
-    print('Modified')
-    for repoFile in repository.getFilesModified():
-        print(COLOR_FILE_MODIFIED, end='')
-        print(INDENT + repoFile.getWorkingTreeStatus() + ' ' + repoFile.getName())
-        print(COLOR_NORMAL, end='')
-
-    print()
-    print('Untracked')
-    for repoFile in repository.getFilesUntracked():
-        print(COLOR_FILE_UNTRACKED, end='')
-        print(INDENT + repoFile.getName())
-        print(COLOR_NORMAL, end='')
-
-##----------------------------------------------------------------------------
-## showRepositorySummary()
-##      List all branches and show:
-##          - First line:
-##              - Branch/repository we'll be comparing to. Precedence is:
-##                  - origin (if exists)
-##                  - local dev (if exists and we're not dev)
-##                  - local master (last resort, unless we're master)
-##              - '*' if this is the current branch
-##              - Branch Name
-##                  - Make it bold face if it hasn't been merged into:
-##                  - dev (if exists)
-##                  - master (last resort)
-##              - Flashing arrow if this is the current branch
-##
-##          - Following lines:
-##              - Commits differing between the above branch/repository
-##----------------------------------------------------------------------------
-def showRepositorySummary(repository):
-    global optionCurrentBranch
-    global optionLong
-
-    ##-------------------------------------------------------------------------
-    ## We may be in detached head state
-    ##-------------------------------------------------------------------------
-    if repository.isDetachedHeadState():
-        print(
-            '\n' +
-            COLOR_DETACHED_HEAD_STATE + 'Currently in detached head state' +
-            COLOR_NORMAL
-        )
-
-    ##-------------------------------------------------------------------------
-    ## Appropriate titles
-    ##-------------------------------------------------------------------------
-    print()
-
-    if optionLong:
-        print('Local Branches')
-    else:
-        print('Local Branches Commits Relative to Origin')
-
-    print('Bold = not merged to dev (or master if no dev)')
-    print()
-
-    ##-------------------------------------------------------------------------
-    ## One of:
-    ##      - current branch (--current)
-    ##      - manually selected branch (--branch xyz)
-    ##      - all branches
-    ##-------------------------------------------------------------------------
-    if optionCurrentBranch:
-        if optionLong:
-            showBranchSummaryFull(repository.getCurrentBranch())
-        else:
-            showBranchSummaryShort(repository.getCurrentBranch())
-
-    elif optionBranch != '':
-        if optionLong:
-            showBranchSummaryFull(repository.getBranch(optionBranch))
-        else:
-            showBranchSummaryShort(repository.getBranch(optionBranch))
-
-    else:
-        for branch in repository.getBranchHierarchy():
-            if optionLong:
-                showBranchSummaryFull(branch)
-            else:
-                showBranchSummaryShort(branch)
-
-##----------------------------------------------------------------------------
-## showStashSummary()
-##      List all the stashes nicely
-##----------------------------------------------------------------------------
-def showStashSummary(repository):
-    INDENT1 = '    '
-    INDENT2 = INDENT1 + '          '
-
-    print()
-    print('Stashes')
-
-    i = 0
-
-    for stash in repository.getStashes():
-        if i != 0:
-            print()
-
-        print(COLOR_STASH_NAME, end='')
-        print(INDENT1 + stash.getName())
-        print(COLOR_NORMAL, end='')
-        print(padOrTruncate(INDENT2 + stash.getDescription(), 79))
 
 ##----------------------------------------------------------------------------
 ##----------------------------------------------------------------------------
