@@ -672,7 +672,7 @@ class FormatterFiles:
             lines.append(formattedLine)
 
         if len(lines) != 0:
-            if len(self.modifiedFiles) != 0:
+            if len(self.stagedFiles) != 0:
                 print()
 
             self.showBlock(TITLE_MODIFIED, lines)
