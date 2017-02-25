@@ -282,7 +282,7 @@ class CommandBranch:
             if printSeparator:
                 print()
 
-            title = padOrTruncate('Local Branch', COLUMN_WIDTH)
+            title = padOrTruncateText(COLUMN_WIDTH, 'Local Branch')
             title += '  ' + otherBranchTitle
             print(formatText(TEXT_BOLD, title))
 
@@ -298,7 +298,7 @@ class CommandBranch:
                 else:
                     output = ''
 
-                output = padOrTruncate(output, COLUMN_WIDTH) + '  '
+                output = padOrTruncateText(COLUMN_WIDTH, output) + '  '
 
                 if len(commitsBehind) == 1:
                     output += '1 commit'
@@ -320,14 +320,14 @@ class CommandBranch:
 
                     if aheadIndex < len(commitsAhead):
                         text = commitsAhead[aheadIndex].getDescription()
-                        output = padOrTruncate(text, COLUMN_WIDTH)
+                        output = padOrTruncateText(COLUMN_WIDTH, text)
                         aheadIndex += 1
                     else:
                         output = BLANKS[:COLUMN_WIDTH]
 
                     if behindIndex < len(commitsBehind):
                         text = commitsBehind[behindIndex].getDescription()
-                        output += '  ' + padOrTruncate(text, COLUMN_WIDTH)
+                        output += '  ' + padOrTruncateText(COLUMN_WIDTH, text)
                         behindIndex += 1
 
                     print(output)
@@ -509,7 +509,7 @@ class FormatterBranches:
         ## info
         ##--------------------------------------------------------------------
         TITLE_PADDING = self.EMPTY_CURRENT_BRANCH_INDICATOR
-        TITLE_PADDING += padOrTruncate(BLANKS, BRANCH_NAME_LEN)
+        TITLE_PADDING += padOrTruncateText(BRANCH_NAME_LEN, BLANKS)
         print(TITLE_PADDING + TITLE)
 
         ##--------------------------------------------------------------------
@@ -572,17 +572,17 @@ class FormatterBranches:
         ## Create a string of the branch name and remote ahead/behind info
         ## so we can bold face it if required
         ##--------------------------------------------------------------------
-        paddedBranchName = padOrTruncate(branch.getName(), branchNameLen)
+        paddedBranchName = padOrTruncateText(branchNameLen, branch.getName())
         branchAndRemote = paddedBranchName + ' '
 
-        branchAndRemote += rightJustify(
-            self.getFormattedAheadBehind('+', numAheadRemote),
-            4
+        branchAndRemote += justifyText(
+            4,
+            self.getFormattedAheadBehind('+', numAheadRemote)
         )
         branchAndRemote += '  '
-        branchAndRemote += padOrTruncate(
-            self.getFormattedAheadBehind('-', numBehindRemote),
-            4
+        branchAndRemote += padOrTruncateText(
+            4,
+            self.getFormattedAheadBehind('-', numBehindRemote)
         )
 
         ##--------------------------------------------------------------------
@@ -596,14 +596,14 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         output = currentBranchIndicator + branchAndRemote
         output += '  '
-        output += rightJustify(
-            self.getFormattedAheadBehind('+', numAheadTarget),
-            4
+        output += justifyText(
+            4,
+            self.getFormattedAheadBehind('+', numAheadTarget)
         )
         output += '  '
-        output += padOrTruncate(
-            self.getFormattedAheadBehind('-', numBehindTarget),
-            4
+        output += padOrTruncateText(
+            4,
+            self.getFormattedAheadBehind('-', numBehindTarget)
         )
 
         if mergeTarget != None:
@@ -743,9 +743,9 @@ class FormatterStashes:
             output = lead + ' '
             output += formatText(TEXT_GREEN, stashName)
             output += ' '
-            output += padOrTruncate(
-                stash.getDescription(),
-                77 - len(lead + stashName)
+            output += padOrTruncateText(
+                77 - len(lead + stashName),
+                stash.getDescription()
             )
 
             print(output)
@@ -1070,12 +1070,6 @@ class Stash:
 
         return self.name
 
-def centerText(text, width):
-    padLength = round((width - len(text)) / 2)
-    centeredText = BLANKS[:padLength] + text
-
-    return padOrTruncate(centeredText, width)
-
 def formatText(style, text):
     """
     Print the specified text in the specified style
@@ -1145,11 +1139,17 @@ def main():
             print('                 --n      - Format output for a screen width of n characters')
 
 ##----------------------------------------------------------------------------
-## padOrTruncate(text, length)
+## padOrTruncateText(length, text)
 ##      - Pad or truncate the specified string to return one of the exact
 ##        specified length
 ##----------------------------------------------------------------------------
-def padOrTruncate(text, length):
+def padOrTruncateText(length, text):
+    """
+    Pad or truncate the specified string so it is exactly the specified length
+    Args
+        length: int: The length the resulting string should be
+        text:   str: The string to pad/truncate
+    """
     returnVal = text
 
     if len(text) < length:
@@ -1162,7 +1162,13 @@ def padOrTruncate(text, length):
     return returnVal
 
 
-def rightJustify(text, width):
+def justifyText(width, text):
+    """
+    Right justify the specified text in a field of the specified width
+    Args
+        width: int: The length of the resulting string
+        text:  str: The string to justify
+    """
     padLength = width - len(text)
     justifiedText = BLANKS[:padLength] + text
 
