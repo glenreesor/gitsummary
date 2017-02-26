@@ -169,8 +169,6 @@ class CommandBranch:
 
         self.screenWidth = 80
         self.repository = Repository()
-        self.branch = self.repository.getCurrentBranch()
-
         self._processArgs(scriptName, args)
 
     def _processArgs(self, scriptName, args):
@@ -181,6 +179,7 @@ class CommandBranch:
                                'branch'
         """
 
+        self.branch = self.repository.getCurrentBranch()
         self.showTarget = False
         self.showHashes = False
 
@@ -194,6 +193,9 @@ class CommandBranch:
 
             elif re.match('^--[0-9]+$', args[i]):
                 self.screenWidth = int(args[i][2:])
+
+            elif not args[i].startswith('--'):
+                self.branch = self.repository.getBranch(args[i])
 
             else:
                 print('Unknown commandline argument: ' + args[i])
@@ -1165,6 +1167,9 @@ def main():
             print('             not the remote. Commits listed under "Remote" exist in the remote')
             print('             but not the local branch.')
             print('             Options:')
+            print('                 BRANCH   - Any argument that doesn\'t start with -- is treated')
+            print('                            as a branch to use for the comparison, instead of')
+            print('                            the current branch')
             print('                 --hash   - Show commit hashes as well as descriptions')
             print('                 --target - Show the commits differing from the merge target')
             print('                            instead of just the number')
