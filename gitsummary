@@ -189,6 +189,7 @@ class CommandBranch:
 
             else:
                 print('Unknown commandline argument: ' + args[i])
+                print('Use --help for options.')
                 sys.exit()
 
             i += 1
@@ -366,6 +367,7 @@ class CommandRepo:
 
             else:
                 print('Unknown commandline argument: ' + args[i])
+                print('Use --help for options.')
                 sys.exit()
 
             i += 1
@@ -1096,7 +1098,7 @@ def formatText(style, text):
     return escapeStart + text + escapeEnd
 
 ##----------------------------------------------------------------------------
-## main()
+## (main)
 ##      Drive the whole process
 ##----------------------------------------------------------------------------
 def main():
@@ -1113,7 +1115,7 @@ def main():
             cmdBranch = CommandBranch(sys.argv[0], sys.argv[2:])
             cmdBranch.run()
 
-        else:
+        elif sys.argv[1] == '--help':
             print('Usage: ' + sys.argv[0] + '[repo | branch] [options]')
             print('    repo   - Show a summary of the current git repository, including:')
             print('                 - Stashes and staged/modified/untracked files')
@@ -1139,6 +1141,16 @@ def main():
             print('                 --target - Show the commits differing from the merge target')
             print('                            instead of just the number')
             print('                 --n      - Format output for a screen width of n characters')
+
+        elif sys.argv[1].startswith('--'):
+            ## If there's an option without either 'repo' or 'branch', we default
+            ## to 'repo'
+            cmdRepo = CommandRepo(sys.argv[0], sys.argv[1:])
+            cmdRepo.run()
+
+        else:
+            print('Unrecognized option: ' + argv[i])
+            print('Use --help for options.')
 
 ##----------------------------------------------------------------------------
 ## padOrTruncateText(length, text)
