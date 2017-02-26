@@ -1175,6 +1175,9 @@ def main():
             print('                            instead of just the number')
             print('                 --n      - Format output for a screen width of n characters')
 
+        elif sys.argv[1] == '--version':
+            print('gitsummary version 2.0.0')
+
         elif sys.argv[1].startswith('--'):
             ## If there's an option without either 'repo' or 'branch', we default
             ## to 'repo'
