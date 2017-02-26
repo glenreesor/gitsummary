@@ -215,7 +215,7 @@ class CommandBranch:
         ## Stashes
         ##--------------------------------------------------------------------
         print()
-        stashes = FormatterStashes(self.repository.getStashes())
+        stashes = FormatterStashes(self.screenWidth, self.repository.getStashes())
         printed = stashes.show()
 
         ##--------------------------------------------------------------------
