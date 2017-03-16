@@ -209,18 +209,23 @@ class CommandBranch:
 
         ##--------------------------------------------------------------------
         ## Branch name, remote, and merge target
+        ## Remember we may be in detached HEAD state, hence "None"
         ##--------------------------------------------------------------------
-        remote = self.branch.getRemoteTrackingBranchName()
-        if remote == None:
-            remote = 'None'
+        if self.branch != None:
+            remote = self.branch.getRemoteTrackingBranchName()
+            if remote == None:
+                remote = 'None'
 
-        mergeTarget = self.branch.getMergeTargetName()
-        if mergeTarget == None:
-            mergeTarget = 'None'
+            mergeTarget = self.branch.getMergeTargetName()
+            if mergeTarget == None:
+                mergeTarget = 'None'
 
-        print('Branch ' + formatText(TEXT_BOLD, self.branch.getName()))
-        print('Remote ' + formatText(TEXT_BOLD, remote))
-        print('Target ' + formatText(TEXT_BOLD, mergeTarget))
+            print('Branch ' + formatText(TEXT_BOLD, self.branch.getName()))
+            print('Remote ' + formatText(TEXT_BOLD, remote))
+            print('Target ' + formatText(TEXT_BOLD, mergeTarget))
+
+        else:
+            print('Branch ' + formatText(TEXT_BOLD, 'detached HEAD'))
 
         ##--------------------------------------------------------------------
         ## Stashes
@@ -244,27 +249,31 @@ class CommandBranch:
 
         ##--------------------------------------------------------------------
         ## Commits relative to remote
+        ## Remember we may be in detached HEAD state, hence "None"
         ##--------------------------------------------------------------------
-        remote = self.branch.getRemoteTrackingBranchName()
-        if remote != None:
-            printed = self._showCommitsAheadBehind(
-                          printed,
-                          True,
-                          'Remote',
-                          remote
-                      )
+        if self.branch != None:
+            remote = self.branch.getRemoteTrackingBranchName()
+            if remote != None:
+                printed = self._showCommitsAheadBehind(
+                              printed,
+                              True,
+                              'Remote',
+                              remote
+                          )
 
         ##--------------------------------------------------------------------
         ## Commits relative to merge target
+        ## Remember we may be in detached HEAD state, hence "None"
         ##--------------------------------------------------------------------
-        mergeTarget = self.branch.getMergeTargetName()
-        if mergeTarget != None:
-            self._showCommitsAheadBehind(
-                printed,
-                self.showTarget,
-                'Target',
-                mergeTarget
-            )
+        if self.branch != None:
+            mergeTarget = self.branch.getMergeTargetName()
+            if mergeTarget != None:
+                self._showCommitsAheadBehind(
+                    printed,
+                    self.showTarget,
+                    'Target',
+                    mergeTarget
+                )
 
     def _showCommitsAheadBehind(self, printSeparator, showAllCommits, otherBranchTitle, otherBranch):
         """
@@ -419,6 +428,10 @@ class CommandRepo:
             self.repository.getBranches()
         )
         branches.show()
+
+        if self.repository.isDetachedHeadState():
+            currentBranchIndicator = formatText(TEXT_MAGENTA, '*')
+            print(currentBranchIndicator + ' detached HEAD')
 
 class Commit:
     """
@@ -960,9 +973,11 @@ class Repository:
             branchNameEnd = branchOutputLine.index(' ', 2)
             branchName = branchOutputLine[branchNameStart : branchNameEnd]
 
-            self.detachedHeadState = (branchName.startswith('(detached'))
+            if branchName.startswith('(detached'):
+                ## Not a branch, so nothing to summarize
+                self.detachedHeadState = True
 
-            if not self.detachedHeadState:
+            else:
                 if branchOutputLine[0] == '*':
                     isCurrentBranch = True
 
