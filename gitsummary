@@ -195,7 +195,12 @@ class CommandBranch:
                 self.screenWidth = int(args[i][2:])
 
             elif not args[i].startswith('--'):
-                self.branch = self.repository.getBranch(args[i])
+                selectedBranch = self.repository.getBranch(args[i])
+                if selectedBranch == None:
+                    print('Unknown branch: ' + args[i])
+                    sys.exit()
+
+                self.branch = selectedBranch
 
             else:
                 print('Unknown commandline argument: ' + args[i])
@@ -1200,7 +1205,7 @@ def main():
             cmdRepo.run()
 
         else:
-            print('Unrecognized option: ' + argv[i])
+            print('Unrecognized option: ' + sys.argv[1])
             print('Use --help for options.')
 
 ##----------------------------------------------------------------------------
