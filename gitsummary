@@ -148,7 +148,7 @@ class Branch:
 
     def isImportant(self):
         """
-        Return this is an "important" branch
+        Return if this is an "important" branch
         :returns: bool
         """
         return self.important
@@ -232,25 +232,28 @@ class CommandBranch:
         else:
             print('Branch ' + formatText(TEXT_BOLD, 'detached HEAD'))
 
+        separatorRequired = True
+
         ##--------------------------------------------------------------------
         ## Stashes
         ##--------------------------------------------------------------------
-        print()
-        stashes = FormatterStashes(self.screenWidth, self.repository.getStashes())
-        printed = stashes.show()
+        stashesOutput = FormatterStashes(
+            self.screenWidth,
+            self.repository.getStashes()
+        ).getFormattedLines()
+
+        separatorRequired = printLines(separatorRequired, stashesOutput)
 
         ##--------------------------------------------------------------------
         ## Staged, modified, untracked files
         ##--------------------------------------------------------------------
-        if printed:
-            print()
-
-        files = FormatterFiles(
+        filesOutput = FormatterFiles(
             self.repository.getFilesStaged(),
             self.repository.getFilesModified(),
             self.repository.getFilesUntracked(),
-        )
-        printed = files.show()
+        ).getFormattedLines()
+
+        separatorRequired = printLines(separatorRequired, filesOutput)
 
         ##--------------------------------------------------------------------
         ## Commits relative to remote
@@ -259,12 +262,13 @@ class CommandBranch:
         if self.branch != None:
             remote = self.branch.getRemoteTrackingBranchName()
             if remote != None:
-                printed = self._showCommitsAheadBehind(
-                              printed,
-                              True,
-                              'Remote',
-                              remote
-                          )
+                commitsOutput = self._getCommitsAheadBehind(
+                    True,
+                    'Remote',
+                    remote
+                )
+
+                separatorRequired = printLines(separatorRequired, commitsOutput)
 
         ##--------------------------------------------------------------------
         ## Commits relative to merge target
@@ -273,29 +277,30 @@ class CommandBranch:
         if self.branch != None:
             mergeTarget = self.branch.getMergeTargetName()
             if mergeTarget != None:
-                self._showCommitsAheadBehind(
-                    printed,
+                commitsOutput = self._getCommitsAheadBehind(
                     self.showTarget,
                     'Target',
                     mergeTarget
                 )
 
-    def _showCommitsAheadBehind(self, printSeparator, showAllCommits, otherBranchTitle, otherBranch):
+                separatorRequired = printLines(separatorRequired, commitsOutput)
+
+    def _getCommitsAheadBehind(self, showAllCommits, otherBranchTitle, otherBranch):
         """
-        Show the commits relative to the specified branch name
+        Get the commits relative to the specified branch name
 
         Args:
-            printSeparator: bool: Whether a blank separator should be printed
             showAllCommits: bool: Whether to show all differing commits (True)
                                   or just number of differing ommits (False)
             title:          str:  The title to use for the other branch
             otherBranch:    str:  The name of the other branch we're comparing to
 
-        :returns: bool: Whether anything was printed
+        :returns: list of str: The formatted output lines
         """
 
+        outputLines = []
+
         COLUMN_WIDTH = round(self.screenWidth / 2) - 1
-        returnVal = False
         ##----------------------------------------------------------------
         ## Get commits to be printed
         ##----------------------------------------------------------------
@@ -303,13 +308,9 @@ class CommandBranch:
         commitsBehind = self.branch.getCommitsOnlyIn(otherBranch)
 
         if len(commitsAhead) > 0 or len(commitsBehind) > 0:
-            returnVal = True
-            if printSeparator:
-                print()
-
             title = padOrTruncateText(COLUMN_WIDTH, 'Local Branch')
             title += '  ' + otherBranchTitle
-            print(formatText(TEXT_BOLD, title))
+            outputLines.append(formatText(TEXT_BOLD, title))
 
             if not showAllCommits:
                 ##-------------------------------------------------------------
@@ -330,7 +331,7 @@ class CommandBranch:
                 elif len(commitsBehind) > 1:
                     output += str(len(commitsBehind)) + ' commits'
 
-                print(output)
+                outputLines.append(output)
 
             else:
                 ##-------------------------------------------------------------
@@ -367,9 +368,8 @@ class CommandBranch:
                         output += '  ' + padOrTruncateText(COLUMN_WIDTH, text)
                         behindIndex += 1
 
-                    print(output)
-
-        return returnVal
+                    outputLines.append(output)
+        return outputLines
 
 class CommandRepo:
     """
@@ -411,28 +411,37 @@ class CommandRepo:
     def run(self):
         """ Print the output for the 'repo' command """
 
-        stashes = FormatterStashes(self.screenWidth, self.repository.getStashes())
-        printed = stashes.show()
+        ##--------------------------------------------------------------------
+        ## Stashes
+        ##--------------------------------------------------------------------
+        stashesOutput = FormatterStashes(
+            self.screenWidth,
+            self.repository.getStashes()
+        ).getFormattedLines()
 
-        if printed:
-            print()
+        separatorRequired = printLines(False, stashesOutput)
 
-        files = FormatterFiles(
+        ##--------------------------------------------------------------------
+        ## Staged, modified, untracked files
+        ##--------------------------------------------------------------------
+        filesOutput = FormatterFiles(
             self.repository.getFilesStaged(),
             self.repository.getFilesModified(),
             self.repository.getFilesUntracked(),
-        )
-        printed = files.show()
+        ).getFormattedLines()
 
-        if printed:
-            print()
+        separatorRequired = printLines(separatorRequired, filesOutput)
 
-        branches = FormatterBranches(
+        ##--------------------------------------------------------------------
+        ## Branches
+        ##--------------------------------------------------------------------
+        branchesOutput = FormatterBranches(
             self.screenWidth,
             self.repository.getBranchHierarchy(),
             self.repository.getBranches()
-        )
-        branches.show()
+        ).getFormattedLines()
+
+        separatorRequired = printLines(separatorRequired, branchesOutput)
 
         if self.repository.isDetachedHeadState():
             currentBranchIndicator = formatText(TEXT_MAGENTA, '*')
@@ -513,7 +522,7 @@ class FormatterBranches:
         self.branchHierarchy = branchHierarchy
         self.branches = branches
 
-    def getFormattedAheadBehind(self, prefix, num):
+    def _getFormattedAheadBehind(self, prefix, num):
         """
         Use special criteria to return a string representation of num
         Args
@@ -532,12 +541,17 @@ class FormatterBranches:
 
         return formattedNum
 
-    def show(self):
-        """ Print the list of branches in hierarchical order """
+    def getFormattedLines(self):
+        """
+        Return a formatted list of branches in hierarchical order
+
+        :returns: list of str: The formatted branches
+        """
+
+        outputLines = []
 
         TITLE = '  Remote      Target  '  ## Need space for possibly 3 digit
         REF   = '+100  -100  +100  -100'  ## ahead/behind nums
-
 
         ##--------------------------------------------------------------------
         ## Determine the length of the branch name field so we can fit the
@@ -559,21 +573,25 @@ class FormatterBranches:
         ##--------------------------------------------------------------------
         TITLE_PADDING = self.EMPTY_CURRENT_BRANCH_INDICATOR
         TITLE_PADDING += padOrTruncateText(BRANCH_NAME_LEN, BLANKS)
-        print(TITLE_PADDING + TITLE)
+        outputLines.append(TITLE_PADDING + TITLE)
 
         ##--------------------------------------------------------------------
         ## Print the summary line for each branch, starting with the "important"
         ## branches (i.e. in hierarchical order)
         ##--------------------------------------------------------------------
         for branch in self.branchHierarchy:
-            self._showShortSummary(BRANCH_NAME_LEN, branch)
+            outputLines.append(self._getShortSummary(BRANCH_NAME_LEN, branch))
 
-    def _showShortSummary(self, branchNameLen, branch):
+        return outputLines
+
+    def _getShortSummary(self, branchNameLen, branch):
         """
-        Show a one-line summary for the specified branch
+        Return a one-line summary for the specified branch
         Args
             branchNameLen : int:    The length for branch names
             branch:         Branch: The Branch object to be printed
+
+        :returns: str: The one-line summary
         """
 
         ##--------------------------------------------------------------------
@@ -626,12 +644,12 @@ class FormatterBranches:
 
         branchAndRemote += justifyText(
             4,
-            self.getFormattedAheadBehind('+', numAheadRemote)
+            self._getFormattedAheadBehind('+', numAheadRemote)
         )
         branchAndRemote += '  '
         branchAndRemote += padOrTruncateText(
             4,
-            self.getFormattedAheadBehind('-', numBehindRemote)
+            self._getFormattedAheadBehind('-', numBehindRemote)
         )
 
         ##--------------------------------------------------------------------
@@ -647,18 +665,18 @@ class FormatterBranches:
         output += '  '
         output += justifyText(
             4,
-            self.getFormattedAheadBehind('+', numAheadTarget)
+            self._getFormattedAheadBehind('+', numAheadTarget)
         )
         output += '  '
         output += padOrTruncateText(
             4,
-            self.getFormattedAheadBehind('-', numBehindTarget)
+            self._getFormattedAheadBehind('-', numBehindTarget)
         )
 
         if mergeTarget != None:
             output += ' ' + mergeTarget
 
-        print(output)
+        return output
 
 class FormatterFiles:
     """
@@ -675,22 +693,27 @@ class FormatterFiles:
                                                             files
             untrackedFiles: list of RepositoryFile objects: The list of untracked
                                                             files
-        :returns: bool: Whether anything was printed
         """
 
         self.stagedFiles = stagedFiles
         self.modifiedFiles = modifiedFiles
         self.untrackedFiles = untrackedFiles
 
-    def show(self):
-        """ Print a staged, modified, and untracked files """
+    def getFormattedLines(self):
+        """
+        Return a formatted  list of staged, modified, and untracked files
+
+        :returns: list of str: The formatted lines
+        """
 
         TITLE_STAGED    = 'Staged   '
         TITLE_MODIFIED  = 'Modified '
         TITLE_UNTRACKED = 'Untracked'
         self.INDENT = BLANKS[0:len(TITLE_UNTRACKED)]
 
-        returnVal = False
+        outputLines = []
+
+        separatorRequired = False
 
         ##--------------------------------------------------------------------
         ## Staged Files
@@ -704,9 +727,9 @@ class FormatterFiles:
 
             lines.append(formattedLine)
 
-        self.showBlock(TITLE_STAGED, lines)
         if len(lines) != 0:
-            returnVal = True
+            outputLines += self._getBlock(TITLE_STAGED, lines)
+            separatorRequired = True
 
         ##--------------------------------------------------------------------
         ## Modified Files
@@ -721,11 +744,11 @@ class FormatterFiles:
             lines.append(formattedLine)
 
         if len(lines) != 0:
-            if len(self.stagedFiles) != 0:
-                print()
+            if separatorRequired:
+                outputLines.append('')
 
-            self.showBlock(TITLE_MODIFIED, lines)
-            returnVal = True
+            outputLines += self._getBlock(TITLE_MODIFIED, lines)
+            separatorRequired = True
 
         ##--------------------------------------------------------------------
         ## Untracked Files
@@ -737,28 +760,33 @@ class FormatterFiles:
             lines.append(formattedLine)
 
         if len(lines) != 0:
-            if len(self.modifiedFiles) != 0:
-                print()
+            if separatorRequired:
+                outputLines.append('')
 
-            self.showBlock(TITLE_UNTRACKED, lines)
-            returnVal = True
+            outputLines += self._getBlock(TITLE_UNTRACKED, lines)
 
-        return returnVal
+        return outputLines
 
-    def showBlock(self, title, lines):
+    def _getBlock(self, title, lines):
         """
-        Print a block of lines with a title
+        Return a block of lines with a title
         Args
             title: str:         The title for this block of lines
             lines: list of str: The list of lines to be printed
+
+        :returns: list of str: The formatted lines
         """
+
+        outputLines = []
 
         first = True
         for line in lines:
             lead = title if first else self.INDENT
             first = False
 
-            print(lead + ' ' + line)
+            outputLines.append(lead + ' ' + line)
+
+        return outputLines
 
 class FormatterStashes:
     """
@@ -771,15 +799,19 @@ class FormatterStashes:
         Args
             screenwidth: int: The screen's width
             stashes: list of Stash objects: The list of stashes to be printed
-
-        :returns: bool: Whether anything was printed
         """
 
         self.screenWidth = screenWidth
         self.stashes = stashes
 
-    def show(self):
-        """ Print a list of stashes """
+    def getFormattedLines(self):
+        """
+        Return a formatted list of stashes
+
+        :returns: list of str: The formatted stashes
+        """
+
+        outputLines = []
 
         TITLE = 'Stashes  '
         INDENT = BLANKS[0:len(TITLE)]
@@ -799,10 +831,9 @@ class FormatterStashes:
                 stash.getDescription()
             )
 
-            print(output)
+            outputLines.append(output)
 
-        ## Return whether anything was printed
-        return not first
+        return outputLines
 
 class Repository:
     """
@@ -1208,11 +1239,6 @@ def main():
             print('Unrecognized option: ' + sys.argv[1])
             print('Use --help for options.')
 
-##----------------------------------------------------------------------------
-## padOrTruncateText(length, text)
-##      - Pad or truncate the specified string to return one of the exact
-##        specified length
-##----------------------------------------------------------------------------
 def padOrTruncateText(length, text):
     """
     Pad or truncate the specified string so it is exactly the specified length
@@ -1231,6 +1257,29 @@ def padOrTruncateText(length, text):
 
     return returnVal
 
+def printLines(separatorRequired, lines):
+    """
+    Print the specified lines, with a blank separator line if required
+    Args:
+        separatorRequire: bool:        Whether a blank separator line is required
+        lines:            list of str: The lines to print
+
+    :returns: bool: the passed-in value of separatorRequired if nothing is printed,
+                    otherwise True
+    """
+
+    returnVal = separatorRequired
+
+    if len(lines) != 0:
+        if separatorRequired:
+            print()
+
+        for line in lines:
+            print(line)
+
+        returnVal = True
+
+    return returnVal
 
 def justifyText(width, text):
     """
