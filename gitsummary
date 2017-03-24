@@ -17,7 +17,10 @@ import re
 import subprocess
 import sys
 
+## Having a long string of blanks makes it easy to pad things with [] notation
 BLANKS = '                                                                    '
+BLANKS += BLANKS
+BLANKS += BLANKS
 
 TEXT_BOLD = 'bold'
 TEXT_FLASHING = 'flashing'
