@@ -1199,7 +1199,7 @@ def main():
             cmdBranch.run()
 
         elif sys.argv[1] == '--help':
-            print('Usage: ' + sys.argv[0] + '[repo | branch] [options]')
+            print('Usage: ' + sys.argv[0] + ' [repo | branch] [options]')
             print('    repo   - Show a summary of the current git repository, including:')
             print('                 - Stashes and staged/modified/untracked files')
             print('                 - All local branches')
