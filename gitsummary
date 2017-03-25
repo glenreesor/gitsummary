@@ -13,686 +13,1288 @@
 ##  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import re
 import subprocess
 import sys
 
-ANSI_NORMAL   = '0'
-ANSI_BOLD     = '1'
-ANSI_FLASHING = '5'
+## Having a long string of blanks makes it easy to pad things with [] notation
+BLANKS = '                                                                    '
+BLANKS += BLANKS
+BLANKS += BLANKS
 
-ANSI_GREEN    = '32'
-ANSI_MAGENTA  = '35'
-ANSI_RED      = '31'
-ANSI_WHITE    = '37'
-ANSI_YELLOW   = '33'
+TEXT_BOLD = 'bold'
+TEXT_FLASHING = 'flashing'
+TEXT_GREEN = 'green'
+TEXT_MAGENTA = 'magenta'
+TEXT_NORMAL = 'normal'
+TEXT_YELLOW = 'yellow'
+TEXT_RED = 'red'
 
-COLOR_CURRENT_BRANCH       = '\033[' + ANSI_MAGENTA + 'm'
-COLOR_DETACHED_HEAD_STATE  = '\033[' + ANSI_BOLD + 'm'
-COLOR_ERROR                = '\033[' + ANSI_RED + 'm'
-COLOR_FILE_MODIFIED        = '\033[' + ANSI_RED + 'm'
-COLOR_FILE_STAGED          = '\033[' + ANSI_GREEN + 'm'
-COLOR_FILE_UNTRACKED       = '\033[' + ANSI_YELLOW  + 'm'
-COLOR_IMPORTANT_BRANCH     = '\033[' + ANSI_BOLD + ';' + ANSI_FLASHING + ';' + ANSI_MAGENTA + 'm'
-COLOR_NORMAL               = '\033[' + ANSI_NORMAL + 'm'
-COLOR_STASH_NAME           = '\033[' + ANSI_GREEN + 'm'
-COLOR_UNMERGED_BRANCH_NAME = '\033[' + ANSI_BOLD + 'm'
+class Branch:
+    """
+    A class used to represent one branch
+    """
+
+    def __init__(self, name, important, current, mergeTargetName):
+        """
+        Initialize this Branch
+        Args
+            name:                     str:  The name of the branch
+            important:                bool: Whether this branch is "important"
+                                            and needs to be flagged in output
+            current:                  bool: Whether this is the current branch
+            mergeTargetName:          str:  The name of the branch this one branch
+                                            will merge to
+        """
+
+        self.name = name
+        self.important = important
+        self.current = current
+        self.mergeTargetName = mergeTargetName
+
+        ##---------------------------------------------------------------------
+        ## Determine remote tracking branch (if it exists)
+        ##---------------------------------------------------------------------
+        try:
+            remoteName = subprocess.check_output(
+                [
+                    'git',
+                    'config',
+                    'branch.' + name + '.remote'
+                ],
+                universal_newlines = True
+            ).splitlines()
+
+            self.remoteTrackingBranchName = remoteName[0] + '/' + name
+
+        except:
+            self.remoteTrackingBranchName = None
+
+    def getCommitsNotIn(self, branchName):
+        """
+        Get a list of Commit objects for the commits that are in the current
+        branch, but not in the specified branch
+        :returns: list of Commit objects
+        """
+
+        commitHashes = subprocess.check_output(
+            [
+                'git',
+                'rev-list',
+                '--abbrev-commit',  ## Because we might want to display the hash
+                self.name,
+                '^' + branchName
+            ],
+            universal_newlines = True
+        ).splitlines()
+
+        commits = []
+        for hash in commitHashes:
+            commits.append(Commit(hash))
+
+        return commits
+
+    def getCommitsOnlyIn(self, branchName):
+        """
+        Get a list of Commit objects for the commits that are in the specified
+        branch, but not in the current branch
+        :returns: list of Commit objects
+        """
+
+        commitHashes = subprocess.check_output(
+            [
+                'git',
+                'rev-list',
+                '--abbrev-commit',  ## Because we might want to display the hash
+                branchName,
+                '^' + self.name
+            ],
+            universal_newlines = True
+        ).splitlines()
+
+        commits = []
+        for hash in commitHashes:
+            commits.append(Commit(hash))
+
+        return commits
+    def getMergeTargetName(self):
+        """
+        Get the name of the branch that this will eventually be merged to
+        :returns: str
+        """
+
+        return self.mergeTargetName
+
+    def getName(self):
+        """
+        Return this branch's name
+        :returns: str
+        """
+
+        return self.name
+
+    def getRemoteTrackingBranchName(self):
+        """
+        Return this branch's remote tracking branch name, possibly None
+        :returns: str
+        """
+
+        return self.remoteTrackingBranchName
+
+    def isCurrent(self):
+        """
+        Return this is the current branch
+        :returns: bool
+        """
+
+        return self.current
+
+    def isImportant(self):
+        """
+        Return if this is an "important" branch
+        :returns: bool
+        """
+        return self.important
+
+class CommandBranch:
+    """
+    A class used for the branch subcommand
+    """
+
+    def __init__(self, scriptName, args):
+        """
+        Initialize this CommandBranch
+        Args
+            scriptName: str:         The name used to invoke this script
+            args:       list of str: The user-specified command line args, excluding
+                                     'branch'
+        """
+
+        self.screenWidth = 80
+        self.repository = Repository()
+        self._processArgs(scriptName, args)
+
+    def _processArgs(self, scriptName, args):
+        """
+        Process the user-specified command line args
+        Args
+            args: list of str: The user-specified command line args, excluding
+                               'branch'
+        """
+
+        self.branch = self.repository.getCurrentBranch()
+        self.showTarget = False
+        self.showHashes = False
+
+        i = 0
+        while i < len(args):
+            if args[i] == '--hash':
+                self.showHashes = True
+
+            elif args[i] == '--target':
+                self.showTarget = True
+
+            elif re.match('^--[0-9]+$', args[i]):
+                self.screenWidth = int(args[i][2:])
+
+            elif not args[i].startswith('--'):
+                selectedBranch = self.repository.getBranch(args[i])
+                if selectedBranch == None:
+                    print('Unknown branch: ' + args[i])
+                    sys.exit()
+
+                self.branch = selectedBranch
+
+            else:
+                print('Unknown commandline argument: ' + args[i])
+                print('Use --help for options.')
+                sys.exit()
+
+            i += 1
+
+    def run(self):
+        """ Print the output for the 'branch' command """
+
+        ##--------------------------------------------------------------------
+        ## Branch name, remote, and merge target
+        ## Remember we may be in detached HEAD state, hence "None"
+        ##--------------------------------------------------------------------
+        if self.branch != None:
+            remote = self.branch.getRemoteTrackingBranchName()
+            if remote == None:
+                remote = 'None'
+
+            mergeTarget = self.branch.getMergeTargetName()
+            if mergeTarget == None:
+                mergeTarget = 'None'
+
+            print('Branch ' + formatText(TEXT_BOLD, self.branch.getName()))
+            print('Remote ' + formatText(TEXT_BOLD, remote))
+            print('Target ' + formatText(TEXT_BOLD, mergeTarget))
+
+        else:
+            print('Branch ' + formatText(TEXT_BOLD, 'detached HEAD'))
+
+        separatorRequired = True
+
+        ##--------------------------------------------------------------------
+        ## Stashes
+        ##--------------------------------------------------------------------
+        stashesOutput = FormatterStashes(
+            self.screenWidth,
+            self.repository.getStashes()
+        ).getFormattedLines()
+
+        separatorRequired = printLines(separatorRequired, stashesOutput)
+
+        ##--------------------------------------------------------------------
+        ## Staged, modified, untracked files
+        ##--------------------------------------------------------------------
+        filesOutput = FormatterFiles(
+            self.repository.getFilesStaged(),
+            self.repository.getFilesModified(),
+            self.repository.getFilesUntracked(),
+        ).getFormattedLines()
+
+        separatorRequired = printLines(separatorRequired, filesOutput)
+
+        ##--------------------------------------------------------------------
+        ## Commits relative to remote
+        ## Remember we may be in detached HEAD state, hence "None"
+        ##--------------------------------------------------------------------
+        if self.branch != None:
+            remote = self.branch.getRemoteTrackingBranchName()
+            if remote != None:
+                commitsOutput = self._getCommitsAheadBehind(
+                    True,
+                    'Remote',
+                    remote
+                )
+
+                separatorRequired = printLines(separatorRequired, commitsOutput)
+
+        ##--------------------------------------------------------------------
+        ## Commits relative to merge target
+        ## Remember we may be in detached HEAD state, hence "None"
+        ##--------------------------------------------------------------------
+        if self.branch != None:
+            mergeTarget = self.branch.getMergeTargetName()
+            if mergeTarget != None:
+                commitsOutput = self._getCommitsAheadBehind(
+                    self.showTarget,
+                    'Target',
+                    mergeTarget
+                )
+
+                separatorRequired = printLines(separatorRequired, commitsOutput)
+
+    def _getCommitsAheadBehind(self, showAllCommits, otherBranchTitle, otherBranch):
+        """
+        Get the commits relative to the specified branch name
+
+        Args:
+            showAllCommits: bool: Whether to show all differing commits (True)
+                                  or just number of differing ommits (False)
+            title:          str:  The title to use for the other branch
+            otherBranch:    str:  The name of the other branch we're comparing to
+
+        :returns: list of str: The formatted output lines
+        """
+
+        outputLines = []
+
+        COLUMN_WIDTH = round(self.screenWidth / 2) - 1
+        ##----------------------------------------------------------------
+        ## Get commits to be printed
+        ##----------------------------------------------------------------
+        commitsAhead = self.branch.getCommitsNotIn(otherBranch)
+        commitsBehind = self.branch.getCommitsOnlyIn(otherBranch)
+
+        if len(commitsAhead) > 0 or len(commitsBehind) > 0:
+            title = padOrTruncateText(COLUMN_WIDTH, 'Local Branch')
+            title += '  ' + otherBranchTitle
+            outputLines.append(formatText(TEXT_BOLD, title))
+
+            if not showAllCommits:
+                ##-------------------------------------------------------------
+                ## Only show the number of commits differing between this branch
+                ## and the specified one branch
+                ##-------------------------------------------------------------
+                if len(commitsAhead) == 1:
+                    output = '1 commit'
+                elif len(commitsAhead) > 1:
+                    output = str(len(commitsAhead)) + ' commits'
+                else:
+                    output = ''
+
+                output = padOrTruncateText(COLUMN_WIDTH, output) + '  '
+
+                if len(commitsBehind) == 1:
+                    output += '1 commit'
+                elif len(commitsBehind) > 1:
+                    output += str(len(commitsBehind)) + ' commits'
+
+                outputLines.append(output)
+
+            else:
+                ##-------------------------------------------------------------
+                ## Show description of each commit differing between this branch
+                ## and the specified one branch
+                ##-------------------------------------------------------------
+                aheadIndex = 0
+                behindIndex = 0
+
+                while (aheadIndex < len(commitsAhead) or
+                      behindIndex < len(commitsBehind)):
+
+                    if aheadIndex < len(commitsAhead):
+                        commit = commitsAhead[aheadIndex]
+                        text = ''
+
+                        if self.showHashes:
+                            text = commit.getHash() + ' '
+
+                        text += commit.getDescription()
+                        output = padOrTruncateText(COLUMN_WIDTH, text)
+                        aheadIndex += 1
+                    else:
+                        output = BLANKS[:COLUMN_WIDTH]
+
+                    if behindIndex < len(commitsBehind):
+                        commit = commitsBehind[behindIndex]
+                        text = ''
+
+                        if self.showHashes:
+                            text = commit.getHash() + ' '
+
+                        text += commit.getDescription()
+                        output += '  ' + padOrTruncateText(COLUMN_WIDTH, text)
+                        behindIndex += 1
+
+                    outputLines.append(output)
+        return outputLines
+
+class CommandRepo:
+    """
+    A class used for the repo subcommand
+    """
+
+    def __init__(self, scriptName, args):
+        """
+        Initialize this CommandRepo
+        Args
+            scriptName: str:         The name used to invoke this script
+            args:       list of str: The user-specified command line args, excluding
+                                     "repo"
+        """
+
+        self.screenWidth = 80
+        self._processArgs(scriptName, args)
+        self.repository = Repository()
+
+    def _processArgs(self, scriptName, args):
+        """
+        Process the user-specified command line args
+        Args
+            args: list of str: The user-specified command line args after "repo"
+        """
+
+        i = 0
+        while i < len(args):
+            if re.match('^--[0-9]+$', args[i]):
+                self.screenWidth = int(args[i][2:])
+
+            else:
+                print('Unknown commandline argument: ' + args[i])
+                print('Use --help for options.')
+                sys.exit()
+
+            i += 1
+
+    def run(self):
+        """ Print the output for the 'repo' command """
+
+        ##--------------------------------------------------------------------
+        ## Stashes
+        ##--------------------------------------------------------------------
+        stashesOutput = FormatterStashes(
+            self.screenWidth,
+            self.repository.getStashes()
+        ).getFormattedLines()
+
+        separatorRequired = printLines(False, stashesOutput)
+
+        ##--------------------------------------------------------------------
+        ## Staged, modified, untracked files
+        ##--------------------------------------------------------------------
+        filesOutput = FormatterFiles(
+            self.repository.getFilesStaged(),
+            self.repository.getFilesModified(),
+            self.repository.getFilesUntracked(),
+        ).getFormattedLines()
+
+        separatorRequired = printLines(separatorRequired, filesOutput)
+
+        ##--------------------------------------------------------------------
+        ## Branches
+        ##--------------------------------------------------------------------
+        branchesOutput = FormatterBranches(
+            self.screenWidth,
+            self.repository.getBranchHierarchy(),
+            self.repository.getBranches()
+        ).getFormattedLines()
+
+        separatorRequired = printLines(separatorRequired, branchesOutput)
+
+        if self.repository.isDetachedHeadState():
+            currentBranchIndicator = formatText(TEXT_MAGENTA, '*')
+            print(currentBranchIndicator + ' detached HEAD')
+
+class Commit:
+    """
+    A class used to represent a commit
+    """
+
+    def __init__(self, hash):
+        """
+        Initialize this Commit
+        Args
+            hash: str: The hash for this particular commit
+        """
+
+        self.hash = hash
+
+        ## Don't set description unless requested, because some commands
+        ## don't need it, and performance takes a hit when lots of commits
+        ## being processed
+        self.description = None
+
+    def getDescription(self):
+        """
+        Return the description for this commit
+        :returns: str
+        """
+
+        if self.description == None:
+            self._setDescription()
+
+        return self.description
+
+    def getHash(self):
+        """
+        Return the hash for this commit
+        :returns: str
+        """
+        return self.hash
+
+    def _setDescription(self):
+        """
+        Set self.description. This is intended to be called only by __init__()
+        """
+        gitShowOutput = subprocess.check_output(
+            [
+                'git',
+                'show',
+                '--no-patch',
+                self.hash,
+                '--pretty=oneline'
+            ],
+            universal_newlines = True
+        ).splitlines()
+
+        descriptionStart = gitShowOutput[0].find(' ') + 1
+        self.description = gitShowOutput[0][descriptionStart:]
+
+class FormatterBranches:
+    """
+    A class used to format a repository's branches
+    """
+
+    def __init__(self, screenWidth, branchHierarchy, branches):
+        """
+        Initialize this FormatterBranches
+        Args
+            screenWidth    : int: Required output width
+            branchHierarchy: list of Branch objects
+            branches:        list of Branch objects: The list of branches
+        """
+
+        self.CURRENT_BRANCH_INDICATOR = '* '
+        self.EMPTY_CURRENT_BRANCH_INDICATOR = '  '
+        self.screenWidth = screenWidth
+        self.branchHierarchy = branchHierarchy
+        self.branches = branches
+
+    def _getFormattedAheadBehind(self, prefix, num):
+        """
+        Use special criteria to return a string representation of num
+        Args
+            prefix: str: A string to prefix num with
+            num:    int: The number to be prefixed
+
+        :returns: str: See simple logic below
+        """
+
+        if num == -1:
+            formattedNum = ''
+        elif num == 0:
+            formattedNum = '.'
+        else:
+            formattedNum = prefix + str(num)
+
+        return formattedNum
+
+    def getFormattedLines(self):
+        """
+        Return a formatted list of branches in hierarchical order
+
+        :returns: list of str: The formatted branches
+        """
+
+        outputLines = []
+
+        TITLE = '  Remote      Target  '  ## Need space for possibly 3 digit
+        REF   = '+100  -100  +100  -100'  ## ahead/behind nums
+
+        ##--------------------------------------------------------------------
+        ## Determine the length of the branch name field so we can fit the
+        ## remote and merge target information
+        ##--------------------------------------------------------------------
+        maxMergeTargetLen = 0
+        for branch in self.branches:
+            mergeTarget = branch.getMergeTargetName()
+            targetLength = 0 if mergeTarget == None else len(mergeTarget)
+            if targetLength > maxMergeTargetLen:
+                maxMergeTargetLen = targetLength
+
+        BRANCH_NAME_LEN = self.screenWidth - maxMergeTargetLen - 1 - len(TITLE) - 1
+        BRANCH_NAME_LEN -= len(self.CURRENT_BRANCH_INDICATOR)
+
+        ##--------------------------------------------------------------------
+        ## Print the two title lines for remote and merge target ahead/behind
+        ## info
+        ##--------------------------------------------------------------------
+        TITLE_PADDING = self.EMPTY_CURRENT_BRANCH_INDICATOR
+        TITLE_PADDING += padOrTruncateText(BRANCH_NAME_LEN, BLANKS)
+        outputLines.append(TITLE_PADDING + TITLE)
+
+        ##--------------------------------------------------------------------
+        ## Print the summary line for each branch, starting with the "important"
+        ## branches (i.e. in hierarchical order)
+        ##--------------------------------------------------------------------
+        for branch in self.branchHierarchy:
+            outputLines.append(self._getShortSummary(BRANCH_NAME_LEN, branch))
+
+        return outputLines
+
+    def _getShortSummary(self, branchNameLen, branch):
+        """
+        Return a one-line summary for the specified branch
+        Args
+            branchNameLen : int:    The length for branch names
+            branch:         Branch: The Branch object to be printed
+
+        :returns: str: The one-line summary
+        """
+
+        ##--------------------------------------------------------------------
+        ## Determine what the current branch indicator should be:
+        ##  - blank if not current branch
+        ##  - '*' if it's the current branch
+        ##  - flashing if it's important (i.e. dev or master)
+        ##--------------------------------------------------------------------
+        if branch.isCurrent():
+            currentBranchIndicator = formatText(
+                TEXT_MAGENTA,
+                self.CURRENT_BRANCH_INDICATOR
+            )
+            if branch.isImportant():
+                currentBranchIndicator = formatText(
+                    TEXT_FLASHING,
+                    currentBranchIndicator
+                )
+        else:
+            currentBranchIndicator = self.EMPTY_CURRENT_BRANCH_INDICATOR
+
+        ##--------------------------------------------------------------------
+        ## Get count of commits ahead/behind of remote tracking branch
+        ##--------------------------------------------------------------------
+        remote = branch.getRemoteTrackingBranchName()
+        numAheadRemote = -1
+        numBehindRemote = -1
+
+        if remote != None:
+            numAheadRemote = len(branch.getCommitsNotIn(remote))
+            numBehindRemote = len(branch.getCommitsOnlyIn(remote))
+
+        ##--------------------------------------------------------------------
+        ## Get count of commits ahead/behind of merge target
+        ##--------------------------------------------------------------------
+        mergeTarget = branch.getMergeTargetName()
+        numAheadTarget = -1
+        numBehindTarget = -1
+
+        if mergeTarget != None:
+            numAheadTarget = len(branch.getCommitsNotIn(mergeTarget))
+            numBehindTarget = len(branch.getCommitsOnlyIn(mergeTarget))
+
+        ##--------------------------------------------------------------------
+        ## Create a string of the branch name and remote ahead/behind info
+        ## so we can bold face it if required
+        ##--------------------------------------------------------------------
+        paddedBranchName = padOrTruncateText(branchNameLen, branch.getName())
+        branchAndRemote = paddedBranchName + ' '
+
+        branchAndRemote += justifyText(
+            4,
+            self._getFormattedAheadBehind('+', numAheadRemote)
+        )
+        branchAndRemote += '  '
+        branchAndRemote += padOrTruncateText(
+            4,
+            self._getFormattedAheadBehind('-', numBehindRemote)
+        )
+
+        ##--------------------------------------------------------------------
+        ## Bold face if the branch is out of sync with its remote
+        ##--------------------------------------------------------------------
+        if numAheadRemote > 0 or numBehindRemote > 0:
+           branchAndRemote = formatText(TEXT_BOLD, branchAndRemote)
+
+        ##--------------------------------------------------------------------
+        ## Build up the rest of the output line
+        ##--------------------------------------------------------------------
+        output = currentBranchIndicator + branchAndRemote
+        output += '  '
+        output += justifyText(
+            4,
+            self._getFormattedAheadBehind('+', numAheadTarget)
+        )
+        output += '  '
+        output += padOrTruncateText(
+            4,
+            self._getFormattedAheadBehind('-', numBehindTarget)
+        )
+
+        if mergeTarget != None:
+            output += ' ' + mergeTarget
+
+        return output
+
+class FormatterFiles:
+    """
+    A class used to format a repository's staged, modified, and untracked files
+    """
+
+    def __init__(self, stagedFiles, modifiedFiles, untrackedFiles):
+        """
+        Initialize this FormatterFiles
+        Args
+            stagedFiles:    list of RepositoryFile objects: The list of staged
+                                                            files
+            modifiedFiles:  list of RepositoryFile objects: The list of modified
+                                                            files
+            untrackedFiles: list of RepositoryFile objects: The list of untracked
+                                                            files
+        """
+
+        self.stagedFiles = stagedFiles
+        self.modifiedFiles = modifiedFiles
+        self.untrackedFiles = untrackedFiles
+
+    def getFormattedLines(self):
+        """
+        Return a formatted  list of staged, modified, and untracked files
+
+        :returns: list of str: The formatted lines
+        """
+
+        TITLE_STAGED    = 'Staged   '
+        TITLE_MODIFIED  = 'Modified '
+        TITLE_UNTRACKED = 'Untracked'
+        self.INDENT = BLANKS[0:len(TITLE_UNTRACKED)]
+
+        outputLines = []
+
+        separatorRequired = False
+
+        ##--------------------------------------------------------------------
+        ## Staged Files
+        ##--------------------------------------------------------------------
+        lines = []
+        for oneFile in self.stagedFiles:
+            formattedLine = formatText(
+                TEXT_GREEN,
+                oneFile.getIndexStatus() + ' ' + oneFile.getName()
+            )
+
+            lines.append(formattedLine)
+
+        if len(lines) != 0:
+            outputLines += self._getBlock(TITLE_STAGED, lines)
+            separatorRequired = True
+
+        ##--------------------------------------------------------------------
+        ## Modified Files
+        ##--------------------------------------------------------------------
+        lines = []
+        for oneFile in self.modifiedFiles:
+            formattedLine = formatText(
+                TEXT_RED,
+                oneFile.getWorkingTreeStatus() + ' ' + oneFile.getName()
+            )
+
+            lines.append(formattedLine)
+
+        if len(lines) != 0:
+            if separatorRequired:
+                outputLines.append('')
+
+            outputLines += self._getBlock(TITLE_MODIFIED, lines)
+            separatorRequired = True
+
+        ##--------------------------------------------------------------------
+        ## Untracked Files
+        ##--------------------------------------------------------------------
+        lines = []
+        for oneFile in self.untrackedFiles:
+            formattedLine = formatText(TEXT_YELLOW, oneFile.getName())
+
+            lines.append(formattedLine)
+
+        if len(lines) != 0:
+            if separatorRequired:
+                outputLines.append('')
+
+            outputLines += self._getBlock(TITLE_UNTRACKED, lines)
+
+        return outputLines
+
+    def _getBlock(self, title, lines):
+        """
+        Return a block of lines with a title
+        Args
+            title: str:         The title for this block of lines
+            lines: list of str: The list of lines to be printed
+
+        :returns: list of str: The formatted lines
+        """
+
+        outputLines = []
+
+        first = True
+        for line in lines:
+            lead = title if first else self.INDENT
+            first = False
+
+            outputLines.append(lead + ' ' + line)
+
+        return outputLines
+
+class FormatterStashes:
+    """
+    A class used to format a repository's staged, modified, and untracked files
+    """
+
+    def __init__(self, screenWidth, stashes):
+        """
+        Initialize this FormatterStashes
+        Args
+            screenwidth: int: The screen's width
+            stashes: list of Stash objects: The list of stashes to be printed
+        """
+
+        self.screenWidth = screenWidth
+        self.stashes = stashes
+
+    def getFormattedLines(self):
+        """
+        Return a formatted list of stashes
+
+        :returns: list of str: The formatted stashes
+        """
+
+        outputLines = []
+
+        TITLE = 'Stashes  '
+        INDENT = BLANKS[0:len(TITLE)]
+
+        first = True
+        for stash in self.stashes:
+            lead = TITLE if first else INDENT
+            first = False
+
+            stashName = stash.getName()
+
+            output = lead + ' '
+            output += formatText(TEXT_GREEN, stashName)
+            output += ' '
+            output += padOrTruncateText(
+                self.screenWidth - 3 - len(lead + stashName),
+                stash.getDescription()
+            )
+
+            outputLines.append(output)
+
+        return outputLines
+
+class Repository:
+    """
+    A class used to represent the git repository contained in the current
+    working directory
+    """
+
+    def __init__(self):
+        """ Initialize git info corresponding to current directory """
+
+        ## "Important" branches that should be flagged in output
+        self.IMPORTANT_BRANCHES = ['dev', 'master']
+
+        ## A mapping of branches to their corresponding merge targets
+        self.MERGE_TARGETS = {
+            'default': 'dev',
+            'noTarget': ['master'],
+            'targets': {
+                'dev': 'master'
+            }
+        }
+
+
+        self.branches = []
+        self.branchNames = []
+        self.currentBranch= None
+        self.detachedHeadState = False
+        self.filesModified = []
+        self.filesStaged = []
+        self.filesUntracked = []
+        self.stashes = []
+
+        self.ensureGitTrackedFolder()
+        self._populateBranchInfo()
+        self._populateFilesInfo()
+        self._populateStashInfo()
+
+    def ensureGitTrackedFolder(self):
+        """ Ensure this is a git-tracked folder """
+
+        try:
+            gitOutput = subprocess.check_output(
+                ['git', 'status'],
+                stderr=subprocess.STDOUT
+            )
+        except:
+            print("This isn't a git tracked folder.")
+            exit()
+
+    def getBranch(self, branchName):
+        """
+        Return the Branch object whose name is branchName
+        :returns: Branch The Branch object
+        """
+
+        for branch in self.branches:
+            if branch.getName() == branchName:
+                return branch
+
+        return None
+
+    def getBranches(self):
+        """
+        Return a List of the (local) branches
+        :returns: list of Branch objects
+        """
+
+        return self.branches
+
+    def getBranchHierarchy(self):
+        """
+        Return a list of Branch objects in the following order:
+            - Branches with no merge target
+            - Branches whose merge targets have been specified
+            - Other branches
+        :returns: list of Branch objects
+        """
+
+        branchList = self.MERGE_TARGETS['noTarget']
+        branchList += self.MERGE_TARGETS['targets'].keys()
+
+        for branch in self.branchNames:
+            if branch not in branchList:
+                branchList.append(branch)
+
+        returnVal = []
+        for branchName in branchList:
+            branch = self.getBranch(branchName)
+            if branch != None:
+                returnVal.append(branch)
+
+        return returnVal
+
+    def getCurrentBranch(self):
+        """
+        Return the current branch
+        :returns: Branch
+        """
+
+        return self.currentBranch
+
+    def getFilesModified(self):
+        """
+        Get a list of this repository's modified files
+        :returns: list of str
+        """
+
+        return self.filesModified
+
+    def getFilesStaged(self):
+        """
+        Get a list of this repository's staged files
+        :returns: list of str
+        """
+
+        return self.filesStaged
+
+    def getFilesUntracked(self):
+        """
+        Get a list of this repository's untracked files
+        :returns: list of str
+        """
+
+        return self.filesUntracked
+
+    def getMergeTargetName(self, branchName):
+        """
+        Return the name of the branch that branchName will merge to
+        :returns: str
+        """
+
+        if branchName in self.MERGE_TARGETS['noTarget']:
+            returnVal = None
+        elif branchName in self.MERGE_TARGETS['targets']:
+            returnVal = self.MERGE_TARGETS['targets'][branchName]
+        else:
+            returnVal = self.MERGE_TARGETS['default']
+
+        return returnVal
+
+    def getStashes(self):
+        """
+        Return a list of Stash objects
+        :returns: list of STash objects
+        """
+
+        return self.stashes
+
+    def isDetachedHeadState(self):
+        """
+        Return whether the git repository is in "detached head state"
+        :returns: bool
+        """
+
+        return self.detachedHeadState
+
+    def _populateBranchInfo(self):
+        """
+        Populate the information about this repository's branches.
+        This is intended to be called only by __init__()
+        """
+
+        branchesOutput = subprocess.check_output(
+            ['git', 'branch', '--list', '-vv'],
+            universal_newlines = True
+        ).splitlines()
+
+        for branchOutputLine in branchesOutput:
+            isCurrentBranch = False
+            remoteTrackingBranchName = None
+
+            branchNameStart = 2
+            branchNameEnd = branchOutputLine.index(' ', 2)
+            branchName = branchOutputLine[branchNameStart : branchNameEnd]
+
+            if branchName.startswith('(detached'):
+                ## Not a branch, so nothing to summarize
+                self.detachedHeadState = True
+
+            else:
+                if branchOutputLine[0] == '*':
+                    isCurrentBranch = True
+
+                ##-------------------------------------------------------------
+                ## Create the new branch object
+                ##-------------------------------------------------------------
+                isImportant = False
+                if branchName in self.IMPORTANT_BRANCHES:
+                    isImportant = True
+
+                newBranch = Branch(
+                    branchName,
+                    isImportant,
+                    isCurrentBranch,
+                    self.getMergeTargetName(branchName)
+                )
+
+                ## Assign some stuff that can only be done after branch object
+                ## creation
+                self.branches.append(newBranch)
+                self.branchNames.append(newBranch.getName())
+                if isCurrentBranch:
+                    self.currentBranch = newBranch
+
+    def _populateFilesInfo(self):
+        """
+        Populate the information about this repository's files
+        (staged, modified, and untracked).
+        This is intended to be called only by __init__()
+        """
+
+        gitStatusOutput = subprocess.check_output(
+            ['git', 'status', '--porcelain'],
+            universal_newlines = True
+        ).splitlines()
+
+        for line in gitStatusOutput:
+            indexStatus = line[0]
+            workingTreeStatus = line[1]
+            fileName = line[3:]
+
+            newRepositoryFile = RepositoryFile(
+                fileName,
+                indexStatus,
+                workingTreeStatus
+            )
+
+            if indexStatus != ' ' and indexStatus != '?':
+                self.filesStaged.append(newRepositoryFile)
+
+            if workingTreeStatus != ' ' and workingTreeStatus != '?':
+                self.filesModified.append(newRepositoryFile)
+
+            if indexStatus == '?':
+                self.filesUntracked.append(newRepositoryFile)
+
+    def _populateStashInfo(self):
+        """
+        Populate the information about this repository's stashes.
+        This is intended to be called only by __init__()
+        """
+
+        stashesOutput = subprocess.check_output(
+            ['git', 'stash', 'list'],
+            universal_newlines = True
+        ).splitlines()
+
+        for stashLine in stashesOutput:
+            nameEnd = stashLine.find(':')
+            newStash = Stash(stashLine[:nameEnd], stashLine[nameEnd+2:])
+            self.stashes.append(newStash)
+
+class RepositoryFile:
+    """
+    A class used to represent a staged, modified, or untracked file in
+    the current git repository
+    """
+
+    def __init__(self, name, indexStatus, workingTreeStatus):
+        """
+        Initialize this RepositoryFile
+        Args
+            name:             str: The name of this file
+            indexStatus       str: The one-character index status of this file
+            workingTreeStatus str: The one-character working tree status of this file
+        """
+        self.name = name
+        self.indexStatus = indexStatus
+        self.workingTreeStatus = workingTreeStatus
+
+    def getIndexStatus(self):
+        """
+        Get the one-character index status of this file
+        :returns: str
+        """
+
+        return self.indexStatus
+
+    def getName(self):
+        """
+        Get the fully qualified name of this file
+        :returns: str
+        """
+
+        return self.name
+
+    def getWorkingTreeStatus(self):
+        """
+        Get the one-character working tree status of this file
+        :returns: str
+        """
+
+        return self.workingTreeStatus
+
+class Stash:
+    """
+    A class used to represent one stash
+    """
+
+    def __init__(self, name, description):
+        """ Initialize a stash """
+
+        self.name = name
+        self.description = description
+
+    def getDescription(self):
+        """
+        Return the description of this stash
+        :returns: str
+        """
+        return self.description
+
+    def getName(self):
+        """
+        Return the name of this stash
+        :returns: str
+        """
+
+        return self.name
+
+def formatText(style, text):
+    """
+    Print the specified text in the specified style
+    Args
+        style: str: One of the global TEXT_* constants
+        text:  str: The text to print
+    """
+
+    ESCAPE_MAPPING = {
+        TEXT_BOLD: '1',
+        TEXT_FLASHING: '5',
+        TEXT_GREEN: '32',
+        TEXT_MAGENTA: '35',
+        TEXT_NORMAL: '0',
+        TEXT_RED: '31',
+        TEXT_YELLOW: '33'
+    }
+
+    escapeStart = '\033[' + ESCAPE_MAPPING[style] + 'm'
+    escapeEnd = '\033[' + ESCAPE_MAPPING[TEXT_NORMAL] + 'm'
+
+    return escapeStart + text + escapeEnd
 
 ##----------------------------------------------------------------------------
-## Global vars
-##----------------------------------------------------------------------------
-currentBranch = ''
-
-devBranchPresent = False
-detachedHeadState = False
-masterBranchPresent = False
-
-optionBranch = ''
-optionCurrentBranch = False
-optionLocalCompareTo = ''
-optionLog = False
-
-localBranches = []
-originBranches = []
-
-##----------------------------------------------------------------------------
-## main()
+## (main)
 ##      Drive the whole process
 ##----------------------------------------------------------------------------
 def main():
-    processCommandLineArgs(sys.argv)
-    ensureGitTrackedFolder()
+    if len(sys.argv) == 1:
+        cmdRepo = CommandRepo(sys.argv[0], [])
+        cmdRepo.run()
 
-    ## Get all required information
-    getAllBranchInfo()
+    else:
+        if sys.argv[1] == 'repo':
+            cmdRepo = CommandRepo(sys.argv[0], sys.argv[2:])
+            cmdRepo.run()
 
-    ## Now show everything
-    showFilesSummary()
-    showStashSummary()
-    showRepositorySummary()
+        elif sys.argv[1] == 'branch':
+            cmdBranch = CommandBranch(sys.argv[0], sys.argv[2:])
+            cmdBranch.run()
 
-##----------------------------------------------------------------------------
-## ensureGitTrackedFolder()
-##      Make sure we're in a git tracked folder. Exit it we're not
-##----------------------------------------------------------------------------
-def ensureGitTrackedFolder():
-    try:
-        gitOutput = subprocess.check_output(
-            ['git', 'status'],
-            stderr=subprocess.STDOUT
-        )
-    except:
-        print("This isn't a git tracked folder.")
-        exit()
+        elif sys.argv[1] == '--help':
+            print('Usage: ' + sys.argv[0] + ' [repo | branch] [options]')
+            print('    repo   - Show a summary of the current git repository, including:')
+            print('                 - Stashes and staged/modified/untracked files')
+            print('                 - All local branches')
+            print('                 - For each branch, the number of commits differing from its')
+            print('                   remote and merge target')
+            print('                       - Commits Ahead: +n')
+            print('                       - Commits Behind: -n')
+            print('                       - No remote or merge target signified by blanks')
+            print('           - This is the default if neither \'repo\' nor \'branch\' is specified.')
+            print()
+            print('             Options:')
+            print('                 --n - Format output for a screen width of n characters')
+            print()
+            print('    branch - Show a summary of the current branch, including remote name,')
+            print('             merge target name, commits differing from the remote, and')
+            print('             number of commits differing from merge target.')
+            print()
+            print('           - Commits listed under "Local Branch" exist in the local branch but')
+            print('             not the remote. Commits listed under "Remote" exist in the remote')
+            print('             but not the local branch.')
+            print('             Options:')
+            print('                 BRANCH   - Any argument that doesn\'t start with -- is treated')
+            print('                            as a branch to use for the comparison, instead of')
+            print('                            the current branch')
+            print('                 --hash   - Show commit hashes as well as descriptions')
+            print('                 --target - Show the commits differing from the merge target')
+            print('                            instead of just the number')
+            print('                 --n      - Format output for a screen width of n characters')
 
-##----------------------------------------------------------------------------
-## getAllBranchInfo()
-##      Get the following information that is required later
-##          - Name of current branch      (global currentBranch)
-##          - List of all local branches  (global localBranches)
-##          - List of all origin branches (global originBranches)
-##----------------------------------------------------------------------------
-def getAllBranchInfo():
-    global currentBranch
-    global detachedHeadState
-    global localBranches
+        elif sys.argv[1] == '--version':
+            print('gitsummary version 2.0.0')
 
-    ##------------------------------------------------------------------------
-    ## localBranches and currentBranch
-    ##------------------------------------------------------------------------
-    gitBranchOutput = subprocess.check_output(
-        ['git', 'branch', '--list'],
-        universal_newlines = True
-    )
+        elif sys.argv[1].startswith('--'):
+            ## If there's an option without either 'repo' or 'branch', we default
+            ## to 'repo'
+            cmdRepo = CommandRepo(sys.argv[0], sys.argv[1:])
+            cmdRepo.run()
 
-    for branchName in gitBranchOutput.splitlines():
-
-        ## If we're not currently at the head of a branch, output shows:
-        ## '* (detached from  xyz)'
-        if branchName[2] == '(':
-            detachedHeadState = True
         else:
-            if branchName[0] == '*':
-                currentBranch = branchName[2:]
-            localBranches.append(branchName[2:])
+            print('Unrecognized option: ' + sys.argv[1])
+            print('Use --help for options.')
 
-    ##------------------------------------------------------------------------
-    ## originBranches
-    ##------------------------------------------------------------------------
-    gitBranchOutput = subprocess.check_output(
-        ['git', 'branch', '--list', '--remote'],
-        universal_newlines = True
-    )
-
-    for branchName in gitBranchOutput.splitlines():
-        originBranchName = branchName[branchName.index('/')+1:]
-        if not originBranchName.startswith('HEAD'):
-            originBranches.append(originBranchName)
-
-##----------------------------------------------------------------------------
-## getCommitList()
-##      Return a list of commit titles that are:
-##          - In branch inBranch
-##          - Not in branch notInBranch
-##
-##      Each commit will have the specified prefix (typically '- ' or '+ ')
-##----------------------------------------------------------------------------
-def getCommitList(prefix, inBranch, notInBranch):
-    commitList = []
-
-    unformattedList = subprocess.check_output(
-        [
-            'git',
-            'rev-list',
-            '--pretty=oneline',
-            inBranch,
-            '^' + notInBranch
-        ],
-        universal_newlines = True
-    ).splitlines()
-
-    ## Remove hash strings
-    for commit in unformattedList:
-        commitTitle = commit[commit.index(' ') + 1:]
-        commitList.append(prefix + commitTitle)
-
-    return commitList
-
-##----------------------------------------------------------------------------
-##  getLocalCompareTo()
-##      Return the local branch that should be compared to when --long has
-##      been specified.
-##
-##      If user hasn't specified the branch using --compareto, then:
-##          return one of 'dev', 'master', '' which will be used for comparing
-##          the specified branch to.
-##
-##          The value returned is determined by the existence of those branches
-##          (in that order), as opposed to which branch the specified branch was
-##          branched off of.
-##----------------------------------------------------------------------------
-def getLocalCompareTo(branchName):
-    if optionLocalCompareTo != '':
-        localCompareTo = optionLocalCompareTo
-
-    elif branchName != 'dev' and branchName != 'master':
-        if devBranchPresent:
-            localCompareTo = 'dev'
-        elif masterBranchPresent:
-            localCompareTo = 'master'
-        else:
-            localCompareTo = ''
-
-    elif branchName == 'dev':
-        if masterBranchPresent:
-            localCompareTo = 'master'
-        else:
-            localCompareTo = ''
-
-    else:  ## master branch
-        localCompareTo = ''
-
-    return localCompareTo
-
-##----------------------------------------------------------------------------
-## padOrTruncate(text, length)
-##      - Pad or truncate the specified string to return one of the exact
-##        specified length
-##----------------------------------------------------------------------------
-def padOrTruncate(text, length):
+def padOrTruncateText(length, text):
+    """
+    Pad or truncate the specified string so it is exactly the specified length
+    Args
+        length: int: The length the resulting string should be
+        text:   str: The string to pad/truncate
+    """
     returnVal = text
 
-    if (len(text) < length):
+    if len(text) < length:
         formatString = '{{:<{}}}'.format(str(length))
         returnVal = formatString.format(text)
 
-    elif (len(text) > length):
+    elif len(text) > length:
         returnVal = text[0:length]
 
     return returnVal
 
-##----------------------------------------------------------------------------
-## processCommandLineArgs
-##      Set options variables based on command line arguments
-##----------------------------------------------------------------------------
-def processCommandLineArgs(args):
-    global optionBranch
-    global optionCurrentBranch
-    global optionLocalCompareTo
-    global optionLong
-
-    optionBranch         = ''
-    optionCurrentBranch  = False
-    optionLocalCompareTo = ''
-    optionLong           = False
-
-    i = 1
-    while i < len(args):
-        if args[i] == '--branch':
-            optionLong = True
-            optionBranch = args[i+1]
-            i += 1
-
-        elif args[i] == '--compareto':
-            optionLocalCompareTo = args[i+1]
-            i += 1
-
-        elif args[i] == '--current':
-            optionCurrentBranch = True
-            optionLong = True
-
-        elif args[i] == '--long':
-            optionLong = True
-
-        elif args[i] == '--short':
-            optionLong = False
-
-        elif args[i] == '--version':
-            print(args[0] + ' - Version 1.0')
-            sys.exit()
-
-        elif args[i] == '--help':
-            print('Usage: ' + args[0])
-            print('    --branch NAME    - Show only the specified branch. Implies --long')
-            print('    --compareto NAME - Compare to the specified local branch rather')
-            print('                       than dev/master')
-            print('    --current        - Show only the current branch. Implies --long')
-            print('    --long           - Also show commits that differ between branch')
-            print('                       and dev (or master if dev does\'t exist)')
-            print('    --short          - Do not show commits that differ between branch and')
-            print('                       dev (or master if dev does\'t exist)')
-            print('                       This is the default when --current is not specified')
-            sys.exit()
-
-        else:
-            print('Unknown commandline argument:')
-            print('    ' + args[i])
-            sys.exit()
-
-        i += 1
-
-##----------------------------------------------------------------------------
-## showBranchSummaryShort
-##      Show a short summary of the specified branch. This consists of:
-##          One line with:
-##              - '*' if the branch is the current one checked out
-##              - The branch name--bold if it is ahead of local dev/master
-##              - 'Ahead', and/or 'Behind' if it's ahead and/or behind of
-##                dev/master
-##              - 'dev' or 'master', depending on which branch we're comparing to
-##
-##          A list of commits that are ahead/behind of this branch's origin
-##----------------------------------------------------------------------------
-def showBranchSummaryShort(branchName):
-    global currentBranch
-    global devBranchPresent
-    global localBranches
-    global masterBranchPresent
-
-    BRANCH_NAME_LENGTH = 54
-    INDENT = '        '
-    COMMIT_LENGTH = 79 - len(INDENT)
-
-    localCompareto = getLocalCompareTo(branchName)
-
-    ##--------------------------------------------------------------------
-    ## Figure out if we have a corresponding branch in origin
-    ##--------------------------------------------------------------------
-    hasCorrespondingOrigin = False
-    if originBranches.count(branchName) != 0:
-        hasCorrespondingOrigin = True
-
-    ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of origin
-    ##--------------------------------------------------------------------
-    commitsBehindOrigin = []
-    commitsAheadOfOrigin = []
-
-    if hasCorrespondingOrigin:
-        commitsBehindOrigin = getCommitList('- ', 'origin/' + branchName, branchName)
-        commitsAheadOfOrigin = getCommitList('+ ', branchName, 'origin/' + branchName)
-
-    ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of dev/master
-    ##--------------------------------------------------------------------
-    commitsBehindDevMaster = []
-    commitsAheadOfDevMaster = []
-
-    if localCompareto != '':
-        commitsBehindDevMaster = getCommitList('- ', localCompareto, branchName)
-        commitsAheadOfDevMaster = getCommitList('+ ', branchName, localCompareto)
-
-    ##--------------------------------------------------------------------
-    ## Combine our lists by column
-    ##--------------------------------------------------------------------
-    commitsRelativeToOrigin = commitsBehindOrigin + commitsAheadOfOrigin
-    commitsRelativeToDevMaster = commitsBehindDevMaster + commitsAheadOfDevMaster
-
-    ##--------------------------------------------------------------------
-    ## Formatted Branch Name
-    ##--------------------------------------------------------------------
-    currentBranchIndicator = ' '
-    if branchName == currentBranch:
-        if branchName != 'dev' and branchName != 'master':
-            currentBranchIndicator = COLOR_CURRENT_BRANCH + '*' + COLOR_NORMAL
-        else:
-            currentBranchIndicator = COLOR_IMPORTANT_BRANCH + '*' + COLOR_NORMAL
-
-    ##--------------------------------------------------------------------
-    ## Ahead / behind of dev/master
-    ##--------------------------------------------------------------------
-    ahead = '-----'
-    if len(commitsAheadOfDevMaster) != 0:
-        ahead = 'Ahead'
-
-    behind = '------'
-    if len(commitsBehindDevMaster) != 0:
-        behind = 'Behind'
-
-    ##--------------------------------------------------------------------
-    ## Print branchname line
-    ##--------------------------------------------------------------------
-    if len(commitsRelativeToOrigin) > 0:
-        print()
-
-    outputString = currentBranchIndicator + ' '
-
-    if len(commitsAheadOfDevMaster) != 0:
-        outputString += COLOR_UNMERGED_BRANCH_NAME
-        outputString += padOrTruncate(branchName, BRANCH_NAME_LENGTH) + ' '
-        outputString += COLOR_NORMAL
-
-    else:
-        outputString += padOrTruncate(branchName, BRANCH_NAME_LENGTH) + ' '
-
-    outputString += padOrTruncate(ahead, 7) + ' '
-    outputString += padOrTruncate(behind, 7) + ' '
-    outputString += localCompareto
-
-    print(outputString)
-
-    ##--------------------------------------------------------------------
-    ## Print commits relative to origin
-    ##--------------------------------------------------------------------
-    for commit in commitsRelativeToOrigin:
-        outputString = INDENT + padOrTruncate(commit, COMMIT_LENGTH)
-
-        print(outputString)
-
-    if len(commitsRelativeToOrigin) != 0:
-        print()
-
-##----------------------------------------------------------------------------
-## showBranchSummaryFull
-##      Show a full summary of the specified branch. This consists of:
-##          One line with:
-##              - '*' if the branch is the current one checked out
-##              - The branch name--bold if it is ahead of local dev/master
-##              - 'Ahead', and/or 'Behind' if it's ahead and/or behind of
-##                dev/master
-##              - 'dev' or 'master', depending on which branch we're comparing to
-##
-##          One column listing commits ahead/behind of this branch's origin
-##          One column listing commits ahead/behind of dev/master
-##----------------------------------------------------------------------------
-def showBranchSummaryFull(branchName):
-    global currentBranch
-    global devBranchPresent
-    global localBranches
-    global masterBranchPresent
-
-    INDENT = '        '
-    COMMIT_LENGTH = 60
-
-    localCompareto = getLocalCompareTo(branchName)
-
-    ##--------------------------------------------------------------------
-    ## Figure out if we have a corresponding branch in origin
-    ##--------------------------------------------------------------------
-    hasCorrespondingOrigin = False
-    if originBranches.count(branchName) != 0:
-        hasCorrespondingOrigin = True
-
-    ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of origin
-    ##--------------------------------------------------------------------
-    commitsBehindOrigin = []
-    commitsAheadOfOrigin = []
-
-    if hasCorrespondingOrigin:
-        commitsBehindOrigin = getCommitList('- ', 'origin/' + branchName, branchName)
-        commitsAheadOfOrigin = getCommitList('+ ', branchName, 'origin/' + branchName)
-
-    ##--------------------------------------------------------------------
-    ## Get commits ahead/behind of dev/master
-    ##--------------------------------------------------------------------
-    commitsBehindDevMaster = []
-    commitsAheadOfDevMaster = []
-
-    if localCompareto != '':
-        commitsBehindDevMaster = getCommitList('- ', localCompareto, branchName)
-        commitsAheadOfDevMaster = getCommitList('+ ', branchName, localCompareto)
-
-    ##--------------------------------------------------------------------
-    ## Combine our lists by column
-    ##--------------------------------------------------------------------
-    commitsRelativeToOrigin = commitsBehindOrigin + commitsAheadOfOrigin
-    commitsRelativeToDevMaster = commitsBehindDevMaster + commitsAheadOfDevMaster
-
-    ##--------------------------------------------------------------------
-    ## Formatted Branch Name
-    ##--------------------------------------------------------------------
-    currentBranchIndicator = ' '
-    if branchName == currentBranch:
-        currentBranchIndicator = COLOR_CURRENT_BRANCH + '*' + COLOR_NORMAL
-
-    formattedBranchName = branchName
-    if len(commitsAheadOfDevMaster) != 0:
-        formattedBranchName =COLOR_UNMERGED_BRANCH_NAME + branchName + COLOR_NORMAL
-
-    ##--------------------------------------------------------------------
-    ## Print branchname line
-    ##--------------------------------------------------------------------
-    print(currentBranchIndicator + ' ' + formattedBranchName)
-
-    ##--------------------------------------------------------------------
-    ## Commits differing between origin and/or dev/master
-    ##--------------------------------------------------------------------
-    if len(commitsRelativeToOrigin) > 0 or len(commitsRelativeToDevMaster) > 0:
-        outputLine = INDENT
-        outputLine += padOrTruncate('Relative to Origin', COMMIT_LENGTH) + '  '
-        outputLine += padOrTruncate(
-            'Relative to ' + localCompareto,
-            COMMIT_LENGTH
-        )
-        print(outputLine)
-
-        indexOrigin = 0
-        indexDevMaster = 0
-
-        while (indexOrigin < len(commitsRelativeToOrigin) or
-               indexDevMaster < len(commitsRelativeToDevMaster)):
-
-            outputLine = INDENT
-            if indexOrigin < len(commitsRelativeToOrigin):
-                outputLine += padOrTruncate(
-                    commitsRelativeToOrigin[indexOrigin],
-                    COMMIT_LENGTH
-                )
-                indexOrigin += 1
-            else:
-                outputLine += padOrTruncate('', COMMIT_LENGTH)
-
-            if indexDevMaster < len(commitsRelativeToDevMaster):
-                outputLine += '  '
-                outputLine += padOrTruncate(
-                    commitsRelativeToDevMaster[indexDevMaster],
-                    COMMIT_LENGTH
-                )
-                indexDevMaster += 1
-
-            print(outputLine)
-
-##----------------------------------------------------------------------------
-## showFilesSummary()
-##      Summarize the following for the current branch:
-##          Staged changes
-##          Unstaged changes
-##          Untracked files
-##----------------------------------------------------------------------------
-def showFilesSummary():
-    INDENT = '           '
-
-    gitStatusOutput = subprocess.check_output(
-        ['git', 'status', '--porcelain'],
-        universal_newlines = True
-    )
-    gitStatusLines = gitStatusOutput.splitlines()
-
-    ## Keep a count of files outputted to make sure we get them all
-    printedFiles = 0
-
-    ##------------------------------------------------------------------------
-    ## Staged files
-    ##------------------------------------------------------------------------
-    print('Staged')
-    for line in gitStatusLines:
-        indexStatus = line[0]
-        fileName = line[3:]
-
-        if indexStatus != ' ' and indexStatus != '?':
-            print(COLOR_FILE_STAGED, end='')
-            print(INDENT + indexStatus + ' ' + fileName)
-            print(COLOR_NORMAL, end='')
-
-            printedFiles += 1
-
-    ##------------------------------------------------------------------------
-    ## Modified
-    ##------------------------------------------------------------------------
-    print()
-    print('Modified')
-    for line in gitStatusLines:
-        workingTreeStatus = line[1]
-        fileName = line[3:]
-
-        if workingTreeStatus != ' ' and workingTreeStatus != '?':
-            print(COLOR_FILE_MODIFIED, end='')
-            print(INDENT + workingTreeStatus + ' ' + fileName)
-            print(COLOR_NORMAL, end='')
-
-            printedFiles += 1
-
-    ##------------------------------------------------------------------------
-    ## Untracked files
-    ##------------------------------------------------------------------------
-    print()
-    print('Untracked')
-    for line in gitStatusLines:
-        indexStatus = line[0]
-        fileName = line[3:]
-
-        if indexStatus == '?':
-            print(COLOR_FILE_UNTRACKED, end='')
-            print(INDENT + fileName)
-            print(COLOR_NORMAL, end='')
-
-            printedFiles += 1
-
-##----------------------------------------------------------------------------
-## showRepositorySummary()
-##      List all branches and show:
-##          - First line:
-##              - Branch/repository we'll be comparing to. Precedence is:
-##                  - origin (if exists)
-##                  - local dev (if exists and we're not dev)
-##                  - local master (last resort, unless we're master)
-##              - '*' if this is the current branch
-##              - Branch Name
-##                  - Make it bold face if it hasn't been merged into:
-##                  - dev (if exists)
-##                  - master (last resort)
-##              - Flashing arrow if this is the current branch
-##
-##          - Following lines:
-##              - Commits differing between the above branch/repository
-##----------------------------------------------------------------------------
-def showRepositorySummary():
-    global currentBranch
-    global devBranchPresent
-    global detachedHeadState
-    global localBranches
-    global masterBranchPresent
-    global optionCurrentBranch
-    global optionLong
-
-    ##-------------------------------------------------------------------------
-    ## Figure out if dev and/or master branches are present
-    ##-------------------------------------------------------------------------
-    devBranchPresent = False
-    masterBranchPresent = False
-
-    if localBranches.count('dev') != 0:
-        devBranchPresent = True
-
-    if localBranches.count('master') != 0:
-        masterBranchPresent = True
-
-    ##-------------------------------------------------------------------------
-    ## We may be in detached head state
-    ##-------------------------------------------------------------------------
-    if detachedHeadState:
-        print(
-            '\n' +
-            COLOR_DETACHED_HEAD_STATE + 'Currently in detached head state' +
-            COLOR_NORMAL
-        )
-
-    ##-------------------------------------------------------------------------
-    ## Appropriate titles
-    ##-------------------------------------------------------------------------
-    print()
-
-    if optionLong:
-        print('Local Branches')
-    else:
-        print('Local Branches Commits Relative to Origin')
-
-    print('Bold = not merged to dev (or master if no dev)')
-    print()
-
-    ##-------------------------------------------------------------------------
-    ## Show master and dev first, unless a specific branch has been selected
-    ##-------------------------------------------------------------------------
-    if masterBranchPresent and not optionCurrentBranch and optionBranch == '':
-        if optionLong:
-            showBranchSummaryFull('master')
-        else:
-            showBranchSummaryShort('master')
-
-    if devBranchPresent and not optionCurrentBranch and optionBranch == '':
-        if optionLong:
-            showBranchSummaryFull('dev')
-        else:
-            showBranchSummaryShort('dev')
-
-    ##-------------------------------------------------------------------------
-    ## One of:
-    ##      - current branch (--current)
-    ##      - manually selected branch (--branch xyz)
-    ##      - all branches
-    ##-------------------------------------------------------------------------
-    if optionCurrentBranch:
-        if optionLong:
-            showBranchSummaryFull(currentBranch)
-        else:
-            showBranchSummaryShort(currentBranch)
-
-    elif optionBranch != '':
-        if optionLong:
-            showBranchSummaryFull(optionBranch)
-        else:
-            showBranchSummaryShort(optionBranch)
-
-    else:
-        for branchName in localBranches:
-            if branchName != 'master' and branchName != 'dev':
-                if optionLong:
-                    showBranchSummaryFull(branchName)
-                else:
-                    showBranchSummaryShort(branchName)
-
-##----------------------------------------------------------------------------
-## showStashSummary()
-##      List all the stashes nicely
-##----------------------------------------------------------------------------
-def showStashSummary():
-    INDENT1 = '    '
-    INDENT2 = INDENT1 + '          '
-
-    gitStashOutput = subprocess.check_output(
-        ['git', 'stash', 'list'],
-        universal_newlines = True
-    )
-    gitStashLines = gitStashOutput.splitlines()
-
-    print()
-    print('Stashes')
-
-    i = 0
-
-    for line in gitStashLines:
-        endOfName = line.index(':')
-
-        stashName = line[0:endOfName]
-        stashDescription = line[endOfName + 1:]
-
-        if i != 0:
+def printLines(separatorRequired, lines):
+    """
+    Print the specified lines, with a blank separator line if required
+    Args:
+        separatorRequire: bool:        Whether a blank separator line is required
+        lines:            list of str: The lines to print
+
+    :returns: bool: the passed-in value of separatorRequired if nothing is printed,
+                    otherwise True
+    """
+
+    returnVal = separatorRequired
+
+    if len(lines) != 0:
+        if separatorRequired:
             print()
 
-        print(COLOR_STASH_NAME, end='')
-        print(INDENT1 + stashName)
-        print(COLOR_NORMAL, end='')
-        print(padOrTruncate(INDENT2 + stashDescription, 79))
+        for line in lines:
+            print(line)
+
+        returnVal = True
+
+    return returnVal
+
+def justifyText(width, text):
+    """
+    Right justify the specified text in a field of the specified width
+    Args
+        width: int: The length of the resulting string
+        text:  str: The string to justify
+    """
+    padLength = width - len(text)
+    justifiedText = BLANKS[:padLength] + text
+
+    return justifiedText
 
 ##----------------------------------------------------------------------------
 ##----------------------------------------------------------------------------
