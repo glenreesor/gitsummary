@@ -172,8 +172,8 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
         LOCAL = 'local'
 
         createNonEmptyRemoteLocalPair('remote', LOCAL)
-        os.chdir(LOCAL)
 
+        os.chdir(LOCAL)
         createAndCommitFile('newFile1')
         createAndCommitFile('newFile2')
 
@@ -214,11 +214,26 @@ class Test_gitGetCurrentBranch(unittest.TestCase):
         createNonEmptyGitRepository()
         self.assertEqual(gs.gitGetCurrentBranch(), EXPECTED_BRANCH)
 
-    def test_multipleBranchesExit(self):
+    def test_multipleBranchesExist(self):
         EXPECTED_BRANCH = 'dev'
 
         createNonEmptyGitRepository()
         execute(['git', 'checkout', '-b', EXPECTED_BRANCH])
+
+        self.assertEqual(gs.gitGetCurrentBranch(), EXPECTED_BRANCH)
+
+    def test_detachedHeadState(self):
+        EXPECTED_BRANCH = ''
+
+        createNonEmptyGitRepository()
+        createAndCommitFile('newFile1')
+        firstHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'master'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', firstHash])
 
         self.assertEqual(gs.gitGetCurrentBranch(), EXPECTED_BRANCH)
 
@@ -251,6 +266,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         self.assertEqual(statuses[gs.KEY_FILE_STATUSES_STAGED], [])
         self.assertEqual(statuses[gs.KEY_FILE_STATUSES_MODIFIED], [])
         self.assertEqual(statuses[gs.KEY_FILE_STATUSES_UNTRACKED], [])
+        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_UNKNOWN], [])
 
     def test_stageAddedFile(self):
         TEST_FILE = 'testfile'
@@ -561,6 +577,16 @@ class Test_gitGetLocalBranches(unittest.TestCase):
         execute(['git', 'checkout', '-b', NEW_BRANCH])
 
         self.assertEqual(gs.gitGetLocalBranches(), EXPECTED_BRANCHES)
+
+    def test_remoteTrackingBranchExists(self):
+        LOCAL = 'local'
+        EXPECTED_BRANCHES = ['master']
+
+        createNonEmptyRemoteLocalPair('remote', LOCAL)
+        os.chdir(LOCAL)
+
+        self.assertEqual(gs.gitGetLocalBranches(), EXPECTED_BRANCHES)
+
 
 #-----------------------------------------------------------------------------
 class Test_gitGetRemoteTrackingBranch(unittest.TestCase):

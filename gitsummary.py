@@ -90,7 +90,7 @@ def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
         String  branch2          - The fully qualified name of the second branch
         Boolean topologicalOrder - Whether the commits should be:
                                     - topology order (True), or
-                                    - reverse chronological (False), or
+                                    - reverse chronological (False)
                                  - This uses 'git rev-list --topo-order' when True
 
     Return
@@ -135,7 +135,7 @@ def gitGetFileStatuses():
         Dictionary with the following contents:
             KEY_FILE_STATUSES_STAGED: []         - staged files are different
             KEY_FILE_STATUSES_MODIFIED: []       - working dir files are different
-            KEY_FILE_STATUSES_UNTRACKED: []      - not git tracked
+            KEY_FILE_STATUSES_UNTRACKED: []      - not git tracked files
             KEY_FILE_STATUSES_UNKNOWN: []        - unknown git output
 
         The elements of each list have the following formats (all keys prepended
@@ -153,9 +153,9 @@ def gitGetFileStatuses():
             TYPE           : String - The single letter code from 'git status --short'
             FILENAME       : String - The filename
 
-        UNTRACKED: String (the file that's untracked)
+        UNTRACKED: String - The name of the file that's untracked
 
-        UNKNOWN: String (the raw git output that couldn't be parsed)
+        UNKNOWN: String - The raw git output that couldn't be parsed
     """
     TRACKED = 'tracked'
     UNKNOWN_FORMAT = 'unknown-format'
@@ -299,7 +299,7 @@ def gitGetRemoteTrackingBranch(localBranch):
         String - The fully qualified name of the corresponding remote tracking
                  branch
                - '' if localBranch is ''
-               - '' if localBranch does not exist
+               - '' if localBranch has no remote tracking branch
     """
     localBranches = gitGetLocalBranches()
     if localBranch not in localBranches:
@@ -420,8 +420,10 @@ def gitUtilGetOutput(command):
         )
 
     except subprocess.CalledProcessError as e:
-        if gitUtilFolderIsNotTracked(e.output):
-            print('Current folder is not git tracked. This is a programming error in gitsummary.')
+        if gitUtilOutputSaysNotTracked(e.output):
+            msg = 'Current folder is not git tracked. '
+            msg += 'This is a programming error in gitsummary.'
+            print(msg)
             sys.exit()
         else:
             raise
@@ -431,7 +433,7 @@ def gitUtilGetOutput(command):
     return returnVal
 
 #-----------------------------------------------------------------------------
-def gitUtilFolderIsNotTracked(gitOutput):
+def gitUtilOutputSaysNotTracked(gitOutput):
     """
     Return whether the specified string matches the git message when the current
     folder (or any of it's parents) is not git tracked.
@@ -460,7 +462,7 @@ def gitUtilRepositoryIsInitialState():
             'git',
             'for-each-ref',
             '--count=1',
-            '--format="%(*refname)"'
+            '--format=%(*refname)'
         ]
     )
 
