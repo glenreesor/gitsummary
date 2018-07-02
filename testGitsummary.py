@@ -66,10 +66,12 @@ class Test_gitGetCommitDetails(unittest.TestCase):
     #   - cd into it on creation
     #-------------------------------------------------------------------------
     def setUp(self):
+        self.setupInitialDir = os.getcwd()
         self.tempDir = tempfile.TemporaryDirectory()
         os.chdir(self.tempDir.name)
 
     def tearDown(self):
+        os.chdir(self.setupInitialDir)
         self.tempDir.cleanup()
 
     #-------------------------------------------------------------------------
@@ -105,10 +107,12 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
     #   - cd into it on creation
     #-------------------------------------------------------------------------
     def setUp(self):
+        self.setupInitialDir = os.getcwd()
         self.tempDir = tempfile.TemporaryDirectory()
         os.chdir(self.tempDir.name)
 
     def tearDown(self):
+        os.chdir(self.setupInitialDir)
         self.tempDir.cleanup()
 
     #-------------------------------------------------------------------------
@@ -193,10 +197,12 @@ class Test_gitGetCurrentBranch(unittest.TestCase):
     #   - cd into it on creation
     #-------------------------------------------------------------------------
     def setUp(self):
+        self.setupInitialDir = os.getcwd()
         self.tempDir = tempfile.TemporaryDirectory()
         os.chdir(self.tempDir.name)
 
     def tearDown(self):
+        os.chdir(self.setupInitialDir)
         self.tempDir.cleanup()
 
     #-------------------------------------------------------------------------
@@ -224,10 +230,12 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     #   - cd into it on creation
     #-------------------------------------------------------------------------
     def setUp(self):
+        self.setupInitialDir = os.getcwd()
         self.tempDir = tempfile.TemporaryDirectory()
         os.chdir(self.tempDir.name)
 
     def tearDown(self):
+        os.chdir(self.setupInitialDir)
         self.tempDir.cleanup()
 
     #-------------------------------------------------------------------------
@@ -527,10 +535,12 @@ class Test_gitGetLocalBranches(unittest.TestCase):
     #   - cd into it on creation
     #-------------------------------------------------------------------------
     def setUp(self):
+        self.setupInitialDir = os.getcwd()
         self.tempDir = tempfile.TemporaryDirectory()
         os.chdir(self.tempDir.name)
 
     def tearDown(self):
+        os.chdir(self.setupInitialDir)
         self.tempDir.cleanup()
 
     #-------------------------------------------------------------------------
@@ -560,10 +570,12 @@ class Test_gitGetRemoteTrackingBranch(unittest.TestCase):
     #   - cd into it on creation
     #-------------------------------------------------------------------------
     def setUp(self):
+        self.setupInitialDir = os.getcwd()
         self.tempDir = tempfile.TemporaryDirectory()
         os.chdir(self.tempDir.name)
 
     def tearDown(self):
+        os.chdir(self.setupInitialDir)
         self.tempDir.cleanup()
 
     #-------------------------------------------------------------------------
@@ -593,10 +605,12 @@ class Test_gitGetStashes(unittest.TestCase):
     #   - cd into it on creation
     #-------------------------------------------------------------------------
     def setUp(self):
+        self.setupInitialDir = os.getcwd()
         self.tempDir = tempfile.TemporaryDirectory()
         os.chdir(self.tempDir.name)
 
     def tearDown(self):
+        os.chdir(self.setupInitialDir)
         self.tempDir.cleanup()
 
     #-------------------------------------------------------------------------
