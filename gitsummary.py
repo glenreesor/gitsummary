@@ -380,19 +380,26 @@ def gitUtilFolderIsTracked():
     """
     isGitTracked = True
 
-    # Something simple. We don't use gitUtilGetOutput() because it doesn't tell
-    # us if it's tracked or not -- it'll throw an error
+    # Something simple. We don't use gitUtilGetOutput() because it's called
+    # in contexts where we know (or think we know) a folder is git tracked,
+    # and will exit immediately if not.
     try:
-        subprocess.run(
+        output = subprocess.check_output(
             ['git', 'for-each-ref', '--count=1', '--format=42'],
-            stderr = subprocess.DEVNULL,
-            stdout = subprocess.DEVNULL,
+            stderr = subprocess.STDOUT,
             universal_newlines = True
         )
+
+        # We're expecting an exception to be raised due to a non-zero exit
+        # code. Check here as well, since it'll shut up the linter
+        if gitUtilOutputSaysNotTracked(output):
+            isGitTracked = False
 
     except subprocess.CalledProcessError as e:
         if gitUtilOutputSaysNotTracked(e.output):
             isGitTracked = False
+        else:
+            raise
 
     return isGitTracked
 

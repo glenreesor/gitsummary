@@ -709,5 +709,31 @@ class Test_gitGetStashes(unittest.TestCase):
             self.assertTrue(isinstance(oneStash[gs.KEY_STASH_DESCRIPTION], str))
 
 #-----------------------------------------------------------------------------
+class Test_gitUtilFolderIsTracked(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def test_notGitTracked(self):
+        self.assertFalse(gs.gitUtilFolderIsTracked())
+
+    def test_isGitTracked(self):
+        createNonEmptyGitRepository()
+        self.assertTrue(gs.gitUtilFolderIsTracked())
+
+#-----------------------------------------------------------------------------
 if __name__ == '__main__':
     unittest.main()
