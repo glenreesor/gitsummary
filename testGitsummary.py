@@ -735,5 +735,39 @@ class Test_gitUtilFolderIsTracked(unittest.TestCase):
         self.assertTrue(gs.gitUtilFolderIsTracked())
 
 #-----------------------------------------------------------------------------
+# Placeholders for:
+#   gitUtilGetOutput()            - No tests since it's implicitly tested by
+#                                   everything else
+#   gitUtilOutputSaysNotTracked() - No tests since it's tested indirectly
+#                                   through gitUtilFolderIsTracked()
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+class Test_gitUtilRepositoryIsInInitialState(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def test_isInInitialState(self):
+        execute(['git', 'init'])
+        self.assertTrue(gs.gitUtilRepositoryIsInInitialState())
+
+    def test_isNotInInitialState(self):
+        createNonEmptyGitRepository()
+        self.assertFalse(gs.gitUtilRepositoryIsInInitialState())
+
 if __name__ == '__main__':
     unittest.main()

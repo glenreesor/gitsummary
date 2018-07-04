@@ -453,7 +453,7 @@ def gitUtilOutputSaysNotTracked(gitOutput):
     return True if MAGIC_OUTPUT in gitOutput else False
 
 #-----------------------------------------------------------------------------
-def gitUtilRepositoryIsInitialState():
+def gitUtilRepositoryIsInInitialState():
     """
     Return whether the git repository is in the initial state immediately
     after 'git init'.
