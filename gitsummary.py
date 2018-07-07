@@ -1109,7 +1109,7 @@ def utilGetStashAsTwoColumns(stash):
 
 #-----------------------------------------------------------------------------
 def main():
-    if not gitUtilFolderIsTracked:
+    if not gitUtilFolderIsTracked():
         print('This folder is not tracked by git.')
         sys.exit(1)
 
