@@ -769,6 +769,514 @@ class Test_gitUtilRepositoryIsInInitialState(unittest.TestCase):
         createNonEmptyGitRepository()
         self.assertFalse(gs.gitUtilRepositoryIsInInitialState())
 
+#-----------------------------------------------------------------------------
+class Test_utilGetAheadBehindString(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def test(self):
+        AHEAD = 'ahead'
+        BEHIND = 'behind'
+        RESULT = 'result'
+        SEP = '  '
+
+        testCases = [
+            { AHEAD: ''  , BEHIND: ''  , RESULT: '    ' + SEP + '    ', },
+            { AHEAD: 0   , BEHIND: 0   , RESULT: '   .' + SEP + '.   ', },
+            { AHEAD: 1   , BEHIND: 1   , RESULT: '  +1' + SEP + '-1  ', },
+            { AHEAD: 100 , BEHIND: 100 , RESULT: '+100' + SEP + '-100', },
+            { AHEAD: 999 , BEHIND: 999 , RESULT: '+999' + SEP + '-999', },
+            { AHEAD: 1000, BEHIND: 1000, RESULT: '>999' + SEP + '>999', },
+        ]
+
+        for case in testCases:
+            self.assertEqual(
+                case[RESULT],
+                gs.utilGetAheadBehindString(case[AHEAD], case[BEHIND])
+            )
+
+class Test_utilGetBranchAsFiveColumns(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #
+    # Obviously we don't test all combinations of column values.
+    # Since the function being tested is mostly assembling info from other
+    # already-tested functions, we just need to confirm that proper info gets
+    # into the proper columns.
+    #-------------------------------------------------------------------------
+    def testCurrentBranchYes(self):
+        # We're only testing current branch indicator
+        CURRENT_BRANCH = 'dev'
+        createNonEmptyGitRepository()
+        execute(['git', 'checkout', '-b', CURRENT_BRANCH])
+
+        result = gs.utilGetBranchAsFiveColumns(
+            CURRENT_BRANCH,
+            CURRENT_BRANCH,
+            ''
+        )
+
+        self.assertEqual('*', result[0])
+        self.assertEqual(CURRENT_BRANCH, result[1])
+        self.assertEqual(gs.utilGetAheadBehindString('', ''), result[2])
+        self.assertEqual(gs.utilGetAheadBehindString('', ''), result[3])
+        self.assertEqual('', result[4])
+
+    def testCurrentBranchNo(self):
+        # We're only testing current branch indicator
+        CURRENT_BRANCH = 'master'
+        createNonEmptyGitRepository()
+        execute(['git', 'checkout', '-b', 'dev'])
+
+        result = gs.utilGetBranchAsFiveColumns(
+            'dev',
+            CURRENT_BRANCH,
+            ''
+        )
+
+        self.assertEqual('', result[0])
+        self.assertEqual(CURRENT_BRANCH, result[1])
+        self.assertEqual(gs.utilGetAheadBehindString('', ''), result[2])
+        self.assertEqual(gs.utilGetAheadBehindString('', ''), result[3])
+        self.assertEqual('', result[4])
+
+    def testRemote(self):
+        # Test the ahead/behind functionality for a remote branch.
+        # Branch will be ahead 1 and behind 2 relative to remote
+
+        # LOCAL1 will be the branch we test the function with.
+        # LOCAL2 is used to make REMOTE ahead of LOCAL1
+        LOCAL1 = 'local1'
+        LOCAL2 = 'local2'
+        REMOTE = 'remote'
+
+        createNonEmptyRemoteLocalPair(REMOTE, LOCAL1)
+
+        # Create LOCAL2 and use it to make LOCAL1 behind REMOTE by 2 commits
+        execute(['git', 'clone', REMOTE, LOCAL2])
+        os.chdir(LOCAL2)
+        createAndCommitFile('testRemote-local2-file1')
+        createAndCommitFile('testRemote-local2-file2')
+        execute(['git', 'push'])
+
+        # Make LOCAL1 ahead of REMOTE by 1 commit
+        os.chdir('..')
+        os.chdir(LOCAL1)
+        createAndCommitFile('testRemote-local1-file1')
+
+        # Update remote tracking branch
+        execute(['git', 'fetch'])
+
+        result = gs.utilGetBranchAsFiveColumns(
+            'master',
+            'master',
+            ''
+        )
+
+        self.assertEqual('*', result[0])
+        self.assertEqual('master', result[1])
+        self.assertEqual(gs.utilGetAheadBehindString(1, 2), result[2])
+        self.assertEqual(gs.utilGetAheadBehindString('', ''), result[3])
+        self.assertEqual('', result[4])
+
+    def testTarget(self):
+        # Test the ahead/behind functionality for a target branch.
+        # Branch will be ahead 1 and behind 2 relative to target
+
+        # TEST_BRANCH will be the branch we test the function with.
+        # TARGET will be the, uh, target branch.
+        TEST_BRANCH = 'testBranch'
+        TARGET = 'master'
+
+        createNonEmptyGitRepository()
+
+        # Create our test branch and make it 1 commit ahead of the target
+        execute(['git', 'checkout', '-b', TEST_BRANCH])
+        createAndCommitFile('testBranch-file1')
+
+        # Go back to the target and make it ahead of our test branch by 2
+        # commits
+        execute(['git', 'checkout', TARGET])
+        createAndCommitFile('targetBranch-file1')
+        createAndCommitFile('targetBranch-file2')
+
+        result = gs.utilGetBranchAsFiveColumns(
+            'master',
+            TEST_BRANCH,
+            TARGET
+        )
+
+        self.assertEqual('', result[0])
+        self.assertEqual(TEST_BRANCH, result[1])
+        self.assertEqual(gs.utilGetAheadBehindString('', ''), result[2])
+        self.assertEqual(gs.utilGetAheadBehindString(1, 2), result[3])
+        self.assertEqual(TARGET, result[4])
+
+class Test_utilGetStyledText(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def testNoStyles(self):
+        self.assertEqual('test', gs.utilGetStyledText([], 'test'))
+
+    def testOneStyle(self):
+        self.assertEqual(
+            '\033[1mtest\033[0m',
+            gs.utilGetStyledText([gs.TEXT_BOLD], 'test')
+        )
+
+    def testMultipleStyles(self):
+        self.assertEqual(
+            '\033[1;5mtest\033[0m',
+            gs.utilGetStyledText([gs.TEXT_BOLD, gs.TEXT_FLASHING], 'test')
+        )
+
+class Test_utilGetColumnAlignedLines(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def testNoLines(self):
+        REQUIRED_WIDTH = 80
+        TRUNC_INDICATOR = '...'
+        VARIABLE_COLUMN = 3
+        COLUMN_WIDTHS = [10, 10, 10, 10]
+        LINES = []
+
+        EXPECTED = []
+
+        self.assertEqual(
+            EXPECTED,
+            gs.utilGetColumnAlignedLines(
+                REQUIRED_WIDTH,
+                TRUNC_INDICATOR,
+                VARIABLE_COLUMN,
+                COLUMN_WIDTHS,
+                LINES
+            )
+        )
+
+    def testNoModificationsRequired(self):
+        REQUIRED_WIDTH = 43     # Remember column separators
+        TRUNC_INDICATOR = '...'
+        VARIABLE_COLUMN = 3
+        COLUMN_WIDTHS = [10, 10, 10, 10]
+        LINES = [
+            ['1234567890', '1234567890', '1234567890', '1234567890'],
+            ['1234567890', '1234567890', '1234567890', '1234567890'],
+        ]
+
+        EXPECTED = [
+            ['1234567890', '1234567890', '1234567890', '1234567890'],
+            ['1234567890', '1234567890', '1234567890', '1234567890'],
+        ]
+
+        self.assertEqual(
+            EXPECTED,
+            gs.utilGetColumnAlignedLines(
+                REQUIRED_WIDTH,
+                TRUNC_INDICATOR,
+                VARIABLE_COLUMN,
+                COLUMN_WIDTHS,
+                LINES
+            )
+        )
+
+    def testNonVariableGetPadded(self):
+        REQUIRED_WIDTH = 43     # Remember column separators
+        TRUNC_INDICATOR = '...'
+        VARIABLE_COLUMN = 3
+        COLUMN_WIDTHS = [10, 10, 10, 10]
+        LINES = [
+            ['1234567890', '123456789', '12345678', '1234567890'],
+            ['1234567890', '123456789', '12345678', '1234567890'],
+        ]
+
+        EXPECTED = [
+            ['1234567890', '123456789 ', '12345678  ', '1234567890'],
+            ['1234567890', '123456789 ', '12345678  ', '1234567890'],
+        ]
+
+        self.assertEqual(
+            EXPECTED,
+            gs.utilGetColumnAlignedLines(
+                REQUIRED_WIDTH,
+                TRUNC_INDICATOR,
+                VARIABLE_COLUMN,
+                COLUMN_WIDTHS,
+                LINES
+            )
+        )
+
+    def testVariablePadAndTrunc(self):
+        REQUIRED_WIDTH = 43     # Remember column separators
+        TRUNC_INDICATOR = '...'
+        VARIABLE_COLUMN = 3
+        COLUMN_WIDTHS = [10, 10, 10, 10]
+        LINES = [
+            ['1234567890', '1234567890', '1234567890', '123456789'],
+            ['1234567890', '1234567890', '1234567890', '1234567890a'],
+        ]
+
+        EXPECTED = [
+            ['1234567890', '1234567890', '1234567890', '123456789 '],
+            ['1234567890', '1234567890', '1234567890', '1234567...'],
+        ]
+
+        self.assertEqual(
+            EXPECTED,
+            gs.utilGetColumnAlignedLines(
+                REQUIRED_WIDTH,
+                TRUNC_INDICATOR,
+                VARIABLE_COLUMN,
+                COLUMN_WIDTHS,
+                LINES
+            )
+        )
+
+    def testZeroLengthTruncIndicator(self):
+        REQUIRED_WIDTH = 43     # Remember column separators
+        TRUNC_INDICATOR = ''
+        VARIABLE_COLUMN = 3
+        COLUMN_WIDTHS = [10, 10, 10, 10]
+        LINES = [
+            ['1234567890', '1234567890', '1234567890', '123456789'],
+            ['1234567890', '1234567890', '1234567890', '1234567890a'],
+        ]
+
+        EXPECTED = [
+            ['1234567890', '1234567890', '1234567890', '123456789 '],
+            ['1234567890', '1234567890', '1234567890', '1234567890'],
+        ]
+
+        self.assertEqual(
+            EXPECTED,
+            gs.utilGetColumnAlignedLines(
+                REQUIRED_WIDTH,
+                TRUNC_INDICATOR,
+                VARIABLE_COLUMN,
+                COLUMN_WIDTHS,
+                LINES
+            )
+        )
+
+class Test_utilGetMaxColumnWidths(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def testNoLines(self):
+        self.assertEqual(
+            [],
+            gs.utilGetMaxColumnWidths([])
+        )
+
+    def test(self):
+        self.assertEqual(
+            [ 2, 3, 10],
+            gs.utilGetMaxColumnWidths(
+                [
+                    ['12', '1'  , '123456789'],
+                    ['1' , '123', '1234'],
+                    ['1' , '1'  , '1234567890'],
+                ]
+            )
+        )
+
+class Test_utilGetModifiedFileAsTwoColumns(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def test(self):
+        TEST_FILE = 'test'
+        createNonEmptyGitRepository()
+        createAndCommitFile(TEST_FILE)
+        modifiedFile = open(TEST_FILE, 'w')
+        modifiedFile.write('a')
+        modifiedFile.close()
+
+        fileStatuses = gs.gitGetFileStatuses()
+        modifiedFileStatus = fileStatuses[gs.KEY_FILE_STATUSES_MODIFIED][0]
+        self.assertEqual(
+            [
+                modifiedFileStatus[gs.KEY_FILE_STATUSES_TYPE],
+                modifiedFileStatus[gs.KEY_FILE_STATUSES_FILENAME],
+            ],
+            gs.utilGetModifiedFileAsTwoColumns(modifiedFileStatus)
+        )
+
+class Test_utilGetStagedFileAsTwoColumns(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def testNoHeuristic(self):
+        TEST_FILE = 'test'
+        createNonEmptyGitRepository()
+        newFile = open(TEST_FILE, 'w')
+        newFile.write('a')
+        newFile.close()
+        execute(['git', 'add', TEST_FILE])
+
+        fileStatuses = gs.gitGetFileStatuses()
+        stagedFileStatus = fileStatuses[gs.KEY_FILE_STATUSES_STAGED][0]
+        self.assertEqual(
+            [
+                stagedFileStatus[gs.KEY_FILE_STATUSES_TYPE],
+                stagedFileStatus[gs.KEY_FILE_STATUSES_FILENAME],
+            ],
+            gs.utilGetStagedFileAsTwoColumns(stagedFileStatus)
+        )
+
+    def testWithHeuristic(self):
+        TEST_FILE = 'test'
+        NEW_FILE = 'test-new'
+
+        createNonEmptyGitRepository()
+        createAndCommitFile(TEST_FILE)
+        execute(['git', 'mv', TEST_FILE, NEW_FILE])
+
+        fileStatuses = gs.gitGetFileStatuses()
+        stagedFileStatus = fileStatuses[gs.KEY_FILE_STATUSES_STAGED][0]
+        self.assertEqual(
+            [
+                stagedFileStatus[gs.KEY_FILE_STATUSES_TYPE] + '(100)',
+                stagedFileStatus[gs.KEY_FILE_STATUSES_FILENAME] + ' -> ' + NEW_FILE,
+            ],
+            gs.utilGetStagedFileAsTwoColumns(stagedFileStatus)
+        )
+
+class Test_utilGetStashAsTwoColumns(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def test(self):
+        TEST_FILE = 'test'
+        createNonEmptyGitRepository()
+        newFile = open(TEST_FILE, 'w')
+        newFile.write('a')
+        newFile.close()
+        execute(['git', 'add', TEST_FILE])
+        execute(['git', 'stash'])
+
+        stashStatus = gs.gitGetStashes()[0]
+        self.assertEqual(
+            [
+                stashStatus[gs.KEY_STASH_NAME],
+                stashStatus[gs.KEY_STASH_DESCRIPTION],
+            ],
+            gs.utilGetStashAsTwoColumns(stashStatus)
+        )
+
 if __name__ == '__main__':
     # Since we have a pile of testings hitting the filesystem, change to a
     # temporary directory up front, just in case we forget to for an individual
