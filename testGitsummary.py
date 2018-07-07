@@ -770,4 +770,16 @@ class Test_gitUtilRepositoryIsInInitialState(unittest.TestCase):
         self.assertFalse(gs.gitUtilRepositoryIsInInitialState())
 
 if __name__ == '__main__':
+    # Since we have a pile of testings hitting the filesystem, change to a
+    # temporary directory up front, just in case we forget to for an individual
+    # test (and end up botching stuff in our dev folder)
+    initialDir = os.getcwd()
+    tempDir = tempfile.TemporaryDirectory()
+    os.chdir(tempDir.name)
+
+    # Now it's safe to test!
     unittest.main()
+
+    # Cleanup
+    os.chdir(initialDir)
+    tempDir.cleanup()
