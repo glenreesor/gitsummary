@@ -21,6 +21,18 @@ def createAndCommitFile(filename, commitMsg = 'Commit Message'):
     execute(['git', 'commit', '-m', commitMsg])
 
 #-----------------------------------------------------------------------------
+def createEmptyRemoteLocalPair(remoteName, localName):
+    """
+    Create a remote/local pair with no commits in either
+
+    Args
+        String remoteName - The name of the folder to create for the remote
+        String localName  - The name of the folder to create for the local
+    """
+    execute(['git', 'init', '--bare', remoteName])
+    execute(['git', 'clone', remoteName, localName])
+
+#-----------------------------------------------------------------------------
 def createNonEmptyGitRepository():
     """
     Create a non-blank git repository using 'git init' in the current working
@@ -53,10 +65,17 @@ def execute(command):
     We redirect stderr as well because git sends some informative output there,
     which clutters the testing output.
 
+    An error will be thrown if the command has a non-zero exit code.
+
     Args
         List command - The command and args to execute
     """
-    subprocess.run(command, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+    subprocess.run(
+        command,
+        stdout = subprocess.DEVNULL,
+        stderr = subprocess.DEVNULL,
+        check=True
+    )
 
 #-----------------------------------------------------------------------------
 class Test_gitGetCommitDetails(unittest.TestCase):
@@ -118,6 +137,80 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
     #-------------------------------------------------------------------------
     # Tests
     #-------------------------------------------------------------------------
+    def test_initialRepositoryState(self):
+        execute(['git', 'init'])
+
+        self.assertEqual(
+            gs.gitGetCommitsInFirstNotSecond('master', 'origin/master', True),
+            [],
+        )
+
+        self.assertEqual(
+            gs.gitGetCommitsInFirstNotSecond('origin/master', 'master', True),
+            [],
+        )
+
+    def test_initialRepositoryStateClonedFromRemote1(self):
+        # This is the simple case where we:
+        #   - clone an empty repository
+        #   - immediately ask for the commits in one branch but not another
+        LOCAL = 'local'
+        createEmptyRemoteLocalPair('remote', LOCAL)
+        os.chdir(LOCAL)
+
+        self.assertEqual(
+            gs.gitGetCommitsInFirstNotSecond('master', 'origin/master', True),
+            [],
+        )
+
+        self.assertEqual(
+            gs.gitGetCommitsInFirstNotSecond('origin/master', 'master', True),
+            [],
+        )
+
+    def test_initialRepositoryStateClonedFromRemote2(self):
+        # This is case where:
+        #   - we clone an empty repository
+        #   - commits get added to the remote
+        #   - we fetch changes (but not pull)
+        #   - we ask for the commits in one branch but not another
+
+        # LOCAL1 will be the branch that is cloned from empty REMOTE
+        # LOCAL2 will be used to make REMOTE ahead of LOCAL1
+        LOCAL1 = 'local1'
+        LOCAL2 = 'local2'
+        REMOTE = 'remote'
+
+        createEmptyRemoteLocalPair(REMOTE, LOCAL1)
+
+        # Create LOCAL2 and use it to make REMOTE ahead of LOCAL1
+        execute(['git', 'clone', REMOTE, LOCAL2])
+        os.chdir(LOCAL2)
+        createAndCommitFile('testRemote-local2-file1')
+        execute(['git', 'push'])
+
+        # Get the hash so we can ensure we're getting the right output
+        expectedHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'master'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        # Back to LOCAL1 and fetch so we'll know that there are commits
+        # in the remote, but not local
+        os.chdir('..')
+        os.chdir(LOCAL1)
+        execute(['git', 'fetch'])
+
+        self.assertEqual(
+            gs.gitGetCommitsInFirstNotSecond('master', 'origin/master', True),
+            [],
+        )
+
+        self.assertEqual(
+            gs.gitGetCommitsInFirstNotSecond('origin/master', 'master', True),
+            [expectedHash],
+        )
+
     def test_noCommitsInFirstNotSecond(self):
         NEW_BRANCH = 'newBranch'
 
@@ -208,6 +301,26 @@ class Test_gitGetCurrentBranch(unittest.TestCase):
     #-------------------------------------------------------------------------
     # Tests
     #-------------------------------------------------------------------------
+    def test_initialRepositoryState(self):
+        EXPECTED_BRANCH = 'master'
+        execute(['git', 'init'])
+
+        self.assertEqual(gs.gitGetCurrentBranch(), EXPECTED_BRANCH)
+
+    def test_initialRepositoryStateFromClonedRemote(self):
+        LOCAL = 'local'
+        createEmptyRemoteLocalPair('remote', LOCAL)
+        os.chdir(LOCAL)
+
+        self.assertEqual(gs.gitGetCurrentBranch(), 'master')
+
+    def test_initialRepositoryStateNotMaster(self):
+        EXPECTED_BRANCH = 'dev'
+        execute(['git', 'init'])
+        execute(['git', 'checkout', '-b', EXPECTED_BRANCH])
+
+        self.assertEqual(gs.gitGetCurrentBranch(), EXPECTED_BRANCH)
+
     def test_oneBranchExists(self):
         EXPECTED_BRANCH = 'master'
 
@@ -256,10 +369,59 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     #-------------------------------------------------------------------------
     # Tests
     #   - Note: 'git status' docs suggest that it can detect copies in addition
-    #           to rename. However according to the following thread, it appears
+    #           to renames. However according to the following thread, it appears
     #           that it can't, hence no tests for it.
     #               https://marc.info/?l=git&m=141730775928542&w=2
     #-------------------------------------------------------------------------
+    def test_initialRepositoryStateNothingToReport(self):
+        execute(['git', 'init'])
+
+        statuses = gs.gitGetFileStatuses()
+        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_STAGED], [])
+        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_MODIFIED], [])
+        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_UNTRACKED], [])
+        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_UNKNOWN], [])
+
+    def test_initialRepositoryStateStageAddedFile(self):
+        TEST_FILE = 'testfile'
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGED: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'A',
+                    gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
+                },
+            ],
+            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        execute(['git', 'init'])
+
+        modifiedFile = open(TEST_FILE, 'w')
+        modifiedFile.write('a')
+        modifiedFile.close()
+        execute(['git', 'add', TEST_FILE])
+
+        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+
+    def test_initialRepositoryStateUntrackedFile(self):
+        TEST_FILE = 'testfile'
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGED: [],
+            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [TEST_FILE],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        execute(['git', 'init'])
+
+        newFile = open(TEST_FILE, 'w')
+        newFile.write('a')
+        newFile.close()
+
+        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+
     def test_nothingToReport(self):
         createNonEmptyGitRepository()
         statuses = gs.gitGetFileStatuses()
@@ -562,6 +724,12 @@ class Test_gitGetLocalBranches(unittest.TestCase):
     #-------------------------------------------------------------------------
     # Tests
     #-------------------------------------------------------------------------
+    def test_initialRepositoryState(self):
+        EXPECTED_BRANCHES = ['master']
+
+        execute(['git', 'init'])
+        self.assertEqual(gs.gitGetLocalBranches(), EXPECTED_BRANCHES)
+
     def test_oneBranch(self):
         EXPECTED_BRANCHES = ['master']
 
@@ -607,6 +775,20 @@ class Test_gitGetRemoteTrackingBranch(unittest.TestCase):
     #-------------------------------------------------------------------------
     # Tests
     #-------------------------------------------------------------------------
+    def test_initialRepositoryStateNoRemote(self):
+        execute(['git', 'init'])
+
+        self.assertEqual(gs.gitGetRemoteTrackingBranch(''), '')
+        self.assertEqual(gs.gitGetRemoteTrackingBranch('master'), '')
+
+    def test_initialRepositoryStateWithRemote(self):
+        LOCAL = 'local'
+        createEmptyRemoteLocalPair('remote', LOCAL)
+        os.chdir(LOCAL)
+
+        self.assertEqual(gs.gitGetRemoteTrackingBranch(''), '')
+        self.assertEqual(gs.gitGetRemoteTrackingBranch('master'), 'origin/master')
+
     def test_noRemoteRepository(self):
         createNonEmptyGitRepository()
         self.assertEqual(gs.gitGetRemoteTrackingBranch(''), '')
@@ -642,6 +824,10 @@ class Test_gitGetStashes(unittest.TestCase):
     #-------------------------------------------------------------------------
     # Tests
     #-------------------------------------------------------------------------
+    def test_initialRepositoryState(self):
+        execute(['git', 'init'])
+        self.assertEqual(gs.gitGetStashes(), [])
+
     def test_noStashes(self):
         createNonEmptyGitRepository()
         self.assertEqual(gs.gitGetStashes(), [])
@@ -730,6 +916,10 @@ class Test_gitUtilFolderIsTracked(unittest.TestCase):
     def test_notGitTracked(self):
         self.assertFalse(gs.gitUtilFolderIsTracked())
 
+    def test_initialRepositoryState(self):
+        execute(['git', 'init'])
+        self.assertTrue(gs.gitUtilFolderIsTracked())
+
     def test_isGitTracked(self):
         createNonEmptyGitRepository()
         self.assertTrue(gs.gitUtilFolderIsTracked())
@@ -741,33 +931,6 @@ class Test_gitUtilFolderIsTracked(unittest.TestCase):
 #   gitUtilOutputSaysNotTracked() - No tests since it's tested indirectly
 #                                   through gitUtilFolderIsTracked()
 #-----------------------------------------------------------------------------
-
-#-----------------------------------------------------------------------------
-class Test_gitUtilRepositoryIsInInitialState(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
-
-    #-------------------------------------------------------------------------
-    # Tests
-    #-------------------------------------------------------------------------
-    def test_isInInitialState(self):
-        execute(['git', 'init'])
-        self.assertTrue(gs.gitUtilRepositoryIsInInitialState())
-
-    def test_isNotInInitialState(self):
-        createNonEmptyGitRepository()
-        self.assertFalse(gs.gitUtilRepositoryIsInInitialState())
 
 #-----------------------------------------------------------------------------
 class Test_utilGetAheadBehindString(unittest.TestCase):

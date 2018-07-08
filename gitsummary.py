@@ -371,6 +371,10 @@ def gitGetCommitDetails(fullHash):
             KEY_COMMIT_SHORT_HASH : String
             KEY_COMMIT_DESCRIPTION: String
     """
+
+    # Strictly speaking, 'git show' isn't a plumbing command.
+    # But we're using it in a porcelain'ish way -- getting something formatted
+    # nicely. So we should be good.
     output = gitUtilGetOutput(
         ['git', 'show', fullHash, '--pretty=%h %s', '--no-patch']
     )[0]
@@ -390,6 +394,12 @@ def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
     """
     Get a list of commits that exist in branch1 but not branch2.
 
+    The returned list will be appropriate even if one or both of branch1 and
+    branch2 do not exist:
+        branch1 doesn't exist - return = []
+        branch2 doesn't exist - return = [ all commits in branch1 ]
+        both don't exist      - return = []
+
     Args
         String  branch1          - The fully qualified name of the first branch
                                        Examples: "myBranch", "origin/myBranch"
@@ -403,10 +413,42 @@ def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
         List of Strings - Each element is the full hash of a commit that exists
                           in branch1 but not branch2
     """
+    HEAD_REF_PREFIX = 'refs/heads/'
+    REMOTE_REF_PREFIX = 'refs/remotes/'
+
     topoFlag = '--topo-order' if topologicalOrder else ''
-    commitList = gitUtilGetOutput(
-        ['git', 'rev-list', topoFlag, branch1, '^' + branch2]
+
+    # We need to use this round-about for-each-ref approach since rev-list
+    # (our ultimate goal) returns a non-zero exit code if either branch1 or
+    # branch2 don't have any refs
+    localBranchRefs = gitUtilGetOutput(
+        ['git', 'for-each-ref', HEAD_REF_PREFIX, '--format=%(refname)']
     )
+
+    remoteBranchRefs = gitUtilGetOutput(
+        ['git', 'for-each-ref', REMOTE_REF_PREFIX, '--format=%(refname)']
+    )
+
+    branch1Exists = (
+        (HEAD_REF_PREFIX + branch1) in localBranchRefs or
+        (REMOTE_REF_PREFIX + branch1) in remoteBranchRefs
+    )
+
+    branch2Exists = (
+        (HEAD_REF_PREFIX + branch2) in localBranchRefs or
+        (REMOTE_REF_PREFIX + branch2) in remoteBranchRefs
+    )
+
+    if not branch1Exists:
+        commitList = []
+    elif not branch2Exists:
+        commitList = gitUtilGetOutput(
+            ['git', 'rev-list', topoFlag, branch1]
+        )
+    else:
+        commitList = gitUtilGetOutput(
+            ['git', 'rev-list', topoFlag, branch1, '^' + branch2]
+        )
     # Expected output:
     # [full hash1]
     # [full hash2]
@@ -424,11 +466,18 @@ def gitGetCurrentBranch():
                - '' if HEAD does not correspond to a branch
                  (i.e. detached HEAD state)
     """
-    output = gitUtilGetOutput(['git', 'rev-parse', '--abbrev-ref', '@'])
-    # Expected output:
-    # HEAD | [branchName]
+    output = gitUtilGetOutput(['git', 'status', '--branch', '--porcelain=2'])
+    # Expected output: a bunch of lines starting with '#', where we only care
+    # about:
+    #   # branch.head BRANCH
+    # BRANCH will be '(detached)' if detached head state
+    parsedBranch = ''
+    for line in output:
+        match = re.match('^# branch.head (.+)$', line)
+        if (match):
+            parsedBranch = match.group(1)
 
-    currentBranch = '' if output[0] == 'HEAD' else output[0]
+    currentBranch = parsedBranch if parsedBranch != '(detached)' else ''
 
     return currentBranch
 
@@ -581,13 +630,22 @@ def gitGetLocalBranches():
         List of String - The list of branch names
     """
 
-    localBranches = gitUtilGetOutput(
-        ['git', 'rev-parse', '--abbrev-ref', '--branches']
+    branchRefs = gitUtilGetOutput(
+        ['git', 'for-each-ref', 'refs/heads', '--format=%(refname)']
     )
     # Expected output:
-    # [branch1 name]
-    # [branch2 name]
-    # etc.
+    # refs/head/BRANCHNAME1
+    # refs/head/BRANCHNAME2
+    # <etc>
+
+    if len(branchRefs) == 0:
+        # This corresponds to the state immediately after 'git init', in which
+        # case the list of branches is just the current branch
+        return [ gitGetCurrentBranch() ]
+
+    localBranches = []
+    for ref in branchRefs:
+        localBranches.append(ref.replace('refs/heads/', ''))
 
     return localBranches
 
@@ -607,12 +665,29 @@ def gitGetRemoteTrackingBranch(localBranch):
                - '' if localBranch is ''
                - '' if localBranch has no remote tracking branch
     """
+    #-------------------------------------------------------------------------
     localBranches = gitGetLocalBranches()
+
     if localBranch not in localBranches:
         remoteTrackingBranch = ''
+    elif len(localBranches) == 1:
+        # There's only one branch -- the current one. So use 'git status' to
+        # determine it's remote (if any).
+        #
+        # We use this approach since it also works when there are no refs
+        # (which is the case immediately after 'git init')
+
+        output = gitUtilGetOutput(['git', 'status', '--branch', '--porcelain=2'])
+        # Expected output: a bunch of lines starting with '#', where we only care
+        # about:
+        #   # branch.upstream REMOTE/BRANCH
+        remoteTrackingBranch = ''
+        for line in output:
+            match = re.match('^# branch.upstream (.+)$', line)
+            if (match):
+                remoteTrackingBranch = match.group(1)
+
     else:
-        # We use 'git for-each-ref' rather than just 'rev-parse @' since the
-        # latter results in an error if there's no corresponding remote
         remoteTrackingBranch = gitUtilGetOutput(
             [
                 'git',
@@ -621,8 +696,8 @@ def gitGetRemoteTrackingBranch(localBranch):
                 'refs/heads/' + localBranch
             ]
         )[0]
-    # Expected output:
-    # [fully qualified branch name]
+        # Expected output:
+        # [fully qualified branch name]
 
     return remoteTrackingBranch
 
@@ -637,42 +712,47 @@ def gitGetStashes():
             KEY_STASH_NAME       : String - The name of the stash (i.e. stash@{n})
             KEY_STASH_DESCRIPTION: String - The descriptive text
     """
-    stashesExist = False
+    # We want to use 'git reflog refs/stash', but it exits with status 1 if
+    # there are no stashes.
+    #
+    # We can get around that by listing all refs and searching for 'refs/stash'
+    # so we know if any stashes exist, and thus whether it's safe to use
+    # 'git reflog refs/stash'
+    refs = gitUtilGetOutput(
+        [
+            'git',
+            'for-each-ref',
+            '--format=%(refname)',
+        ]
+    )
+
+    if not 'refs/stash' in refs:
+        # No stash ref exists, so there can't be any stashes.
+        return []
+
+    # refs/stash exists, so we can now do what we wanted to do in the first
+    # place -- list the stashes
     stashes = []
 
-    # 'git show-ref refs/stash' exits with status 1 if there are no stashes.
-    # So brute force it by listings all refs and seeing if there are any stashes
-    output = gitUtilGetOutput(['git', 'show-ref'])
+    output = gitUtilGetOutput(
+        ['git', 'reflog', '--no-abbrev-commit', 'refs/stash']
+    )
     # Expected output:
-    # [long hash] refs/[heads | remotes | tags]/[name]
-    # [long hash] refs/[heads | remotes | tags]/[name]
+    # [full hash] refs/stash@{0}: [description]
+    # [full hash] refs/stash@{1}: [description]
     # etc.
 
-    for outputLine in output:
-        if 'refs/stash' in outputLine:
-            stashesExist = True
-
-    if stashesExist:
-        # We know there's at least one stash, so now get the complete list
-        output = gitUtilGetOutput(
-            ['git', 'reflog', '--no-abbrev-commit', 'refs/stash']
+    for oneStash in output:
+        split = oneStash.split(' ', 2)
+        nameMatch = re.match('^refs/([^:]+})', split[1])
+        name = nameMatch.group(1)
+        stashes.append(
+            {
+                KEY_STASH_FULL_HASH  : split[0],
+                KEY_STASH_NAME       : name,
+                KEY_STASH_DESCRIPTION: split[2],
+            }
         )
-        # Expected output:
-        # [full hash] refs/stash@{0}: [description]
-        # [full hash] refs/stash@{1}: [description]
-        # etc.
-
-        for oneStash in output:
-            split = oneStash.split(' ', 2)
-            nameMatch = re.match('^refs/([^:]+})', split[1])
-            name = nameMatch.group(1)
-            stashes.append(
-                {
-                    KEY_STASH_FULL_HASH  : split[0],
-                    KEY_STASH_NAME       : name,
-                    KEY_STASH_DESCRIPTION: split[2],
-                }
-            )
 
     return stashes
 
@@ -718,6 +798,8 @@ def gitUtilGetOutput(command):
     function will call sys.exit() if it's not, indicating that this is a
     programming error.
 
+    Non-zero exit codes will result in an error being thrown.
+
     Args
         List command - The git command to run, including the 'git' part
 
@@ -757,29 +839,6 @@ def gitUtilOutputSaysNotTracked(gitOutput):
     MAGIC_OUTPUT = 'Not a git repository'
 
     return True if MAGIC_OUTPUT in gitOutput else False
-
-#-----------------------------------------------------------------------------
-def gitUtilRepositoryIsInInitialState():
-    """
-    Return whether the git repository is in the initial state immediately
-    after 'git init'.
-
-    This is important to know because there are no refs at this point, and
-    most (all?) of our gitGet* functions use git commands that operate on refs.
-
-    Return
-        Boolean - Whether the current repository is in that state
-    """
-    output = gitUtilGetOutput(
-        [
-            'git',
-            'for-each-ref',
-            '--count=1',
-            '--format=%(*refname)'
-        ]
-    )
-
-    return True if len(output) == 0 else False
 
 #-----------------------------------------------------------------------------
 def utilGetAheadBehindString(ahead, behind):
