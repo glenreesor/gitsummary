@@ -547,8 +547,6 @@ def gitGetFileStatuses():
     }
 
     for outputLine in output:
-        fields = outputLine.split(' ')
-
         #---------------------------------------------------------------------
         # Different types of changes have different output formats. Get the
         # data that we'll assemble later.
@@ -557,22 +555,31 @@ def gitGetFileStatuses():
         #   - heuristicScore (only renames or copies)
         #---------------------------------------------------------------------
         parseCode = TRACKED
-        if fields[0] == '1':
-            filename = fields[8]
 
-        elif fields[0] == '2':
-            pathSplit = fields[9].split('\t')
+        # Note that we can't just split on spaces, since our filename may have
+        # spaces in it
 
-            filename = pathSplit[1]
-            newFilename = pathSplit[0]
-            heuristicScore = fields[8][1:]
+        if outputLine[0] == '1':
+            # 1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
+            match = re.match('([^ ]+ ){8}(.+)$', outputLine)
+            filename = match.group(2)
 
-        elif fields[0] == 'u':
-            filename = fields[10]
+        elif outputLine[0] == '2':
+            # 2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>[tab]<origPath>
+            match = re.match('^([^ ]+ ){8}[A-Z]([^ ]+) (.+)\t(.+)$', outputLine)
+            heuristicScore = match.group(2)
+            newFilename = match.group(3)
+            filename = match.group(4)
 
-        elif fields[0] == '?':
+        elif outputLine[0] == 'u':
+            # u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
+            match = re.match('^([^ ]+ ){10}(.+)$', outputLine)
+            filename = match.group(2)
+
+        elif outputLine[0] == '?':
+            # ? <path>
             parseCode = UNTRACKED
-            filename = fields[1]
+            filename = outputLine[2:]
 
         else:
             parseCode = UNKNOWN_FORMAT
@@ -587,14 +594,14 @@ def gitGetFileStatuses():
         elif parseCode == UNTRACKED:
             fileStatuses[KEY_FILE_STATUSES_UNTRACKED].append(filename)
         else:
-            # We're looking at an output line where field[1] is the 'XY' that
-            # indicates how the committed file differs from the stage ('X') and
-            # the working dir ('Y').
+            # We're looking at an output line where outputLine[2:3] is the 'XY'
+            # that indicates how the committed file differs from the stage ('X')
+            # and the working dir ('Y').
             #
             # So append this file info to the appropriate list, based on the XY
             # value.
-            for position in [0, 1]:
-                code = fields[1][position: position + 1]
+            for position in [2, 3]:
+                code = outputLine[position: position + 1]
 
                 # A code of '.' means this file is unchanged
                 if code != '.':
@@ -614,7 +621,7 @@ def gitGetFileStatuses():
                         thisFileStatus[KEY_FILE_STATUSES_HEURISTIC_SCORE] = heuristicScore
 
                     keyToUse = (
-                        KEY_FILE_STATUSES_STAGED if position == 0
+                        KEY_FILE_STATUSES_STAGED if position == 2
                         else KEY_FILE_STATUSES_MODIFIED
                     )
                     fileStatuses[keyToUse].append(thisFileStatus)

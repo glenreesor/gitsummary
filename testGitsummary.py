@@ -367,6 +367,149 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         self.tempDir.cleanup()
 
     #-------------------------------------------------------------------------
+    # Helper functions that run a test for passed-in filename
+    #-------------------------------------------------------------------------
+    def util_testStageAddedFile(self, testFile):
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGED: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'A',
+                    gs.KEY_FILE_STATUSES_FILENAME: testFile
+                },
+            ],
+            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        createNonEmptyGitRepository()
+        modifiedFile = open(testFile, 'w')
+        modifiedFile.write('a')
+        modifiedFile.close()
+        execute(['git', 'add', testFile])
+
+        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+
+    def util_testStageDeletedFile(self, testFile):
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGED: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'D',
+                    gs.KEY_FILE_STATUSES_FILENAME: testFile,
+                },
+            ],
+            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        createNonEmptyGitRepository()
+        createAndCommitFile(testFile)
+        execute(['git', 'rm', testFile])
+
+        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+
+    def util_testStageModifiedFile(self, testFile):
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGED: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'M',
+                    gs.KEY_FILE_STATUSES_FILENAME: testFile,
+                },
+            ],
+            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        createNonEmptyGitRepository()
+        createAndCommitFile(testFile)
+        modifiedFile = open(testFile, 'w')
+        modifiedFile.write('a')
+        modifiedFile.close()
+        execute(['git', 'add', testFile])
+
+        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+
+    def util_testStageRenamedFile(self, testFile):
+        TEST_FILE_RENAMED = testFile + 'renamed'
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGED: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'R',
+                    gs.KEY_FILE_STATUSES_FILENAME: testFile,
+                    gs.KEY_FILE_STATUSES_NEW_FILENAME: TEST_FILE_RENAMED,
+                    gs.KEY_FILE_STATUSES_HEURISTIC_SCORE: '100',
+                },
+            ],
+            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        createNonEmptyGitRepository()
+        createAndCommitFile(testFile)
+        execute(['git', 'mv', testFile, TEST_FILE_RENAMED])
+
+        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+
+    def util_testWorkDirDeletedFile(self, testFile):
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGED: [],
+            gs.KEY_FILE_STATUSES_MODIFIED: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'D',
+                    gs.KEY_FILE_STATUSES_FILENAME: testFile,
+                },
+            ],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        createNonEmptyGitRepository()
+        createAndCommitFile(testFile)
+        os.remove(testFile)
+
+        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+
+    def util_testWorkDirModifiedFile(self, testFile):
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGED: [],
+            gs.KEY_FILE_STATUSES_MODIFIED: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'M',
+                    gs.KEY_FILE_STATUSES_FILENAME: testFile,
+                },
+            ],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        createNonEmptyGitRepository()
+        createAndCommitFile(testFile)
+
+        modifiedFile = open(testFile, 'w')
+        modifiedFile.write('a')
+        modifiedFile.close()
+
+        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+
+    def util_testUntrackedFile(self, testFile):
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGED: [],
+            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [testFile],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        createNonEmptyGitRepository()
+        newFile = open(testFile, 'w')
+        newFile.write('a')
+        newFile.close()
+
+        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+
+    #-------------------------------------------------------------------------
     # Tests
     #   - Note: 'git status' docs suggest that it can detect copies in addition
     #           to renames. However according to the following thread, it appears
@@ -430,152 +573,49 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         self.assertEqual(statuses[gs.KEY_FILE_STATUSES_UNTRACKED], [])
         self.assertEqual(statuses[gs.KEY_FILE_STATUSES_UNKNOWN], [])
 
+    # Tests for each type of file status
     def test_stageAddedFile(self):
-        TEST_FILE = 'testfile'
-        EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
-                {
-                    gs.KEY_FILE_STATUSES_TYPE: 'A',
-                    gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
-                },
-            ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
-            gs.KEY_FILE_STATUSES_UNTRACKED: [],
-            gs.KEY_FILE_STATUSES_UNKNOWN: [],
-        }
-
-        createNonEmptyGitRepository()
-        modifiedFile = open(TEST_FILE, 'w')
-        modifiedFile.write('a')
-        modifiedFile.close()
-        execute(['git', 'add', TEST_FILE])
-
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.util_testStageAddedFile('testfile')
 
     def test_stageDeletedFile(self):
-        TEST_FILE = 'testfile'
-        EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
-                {
-                    gs.KEY_FILE_STATUSES_TYPE: 'D',
-                    gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
-                },
-            ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
-            gs.KEY_FILE_STATUSES_UNTRACKED: [],
-            gs.KEY_FILE_STATUSES_UNKNOWN: [],
-        }
-
-        createNonEmptyGitRepository()
-        createAndCommitFile(TEST_FILE)
-        execute(['git', 'rm', TEST_FILE])
-
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.util_testStageDeletedFile('testfile')
 
     def test_stageModifiedFile(self):
-        TEST_FILE = 'testfile'
-        EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
-                {
-                    gs.KEY_FILE_STATUSES_TYPE: 'M',
-                    gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
-                },
-            ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
-            gs.KEY_FILE_STATUSES_UNTRACKED: [],
-            gs.KEY_FILE_STATUSES_UNKNOWN: [],
-        }
-
-        createNonEmptyGitRepository()
-        createAndCommitFile(TEST_FILE)
-        modifiedFile = open(TEST_FILE, 'w')
-        modifiedFile.write('a')
-        modifiedFile.close()
-        execute(['git', 'add', TEST_FILE])
-
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.util_testStageModifiedFile('testfile')
 
     def test_stageRenamedFile(self):
-        TEST_FILE = 'testfile'
-        TEST_FILE_RENAMED = 'testfile1'
-        EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
-                {
-                    gs.KEY_FILE_STATUSES_TYPE: 'R',
-                    gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
-                    gs.KEY_FILE_STATUSES_NEW_FILENAME: TEST_FILE_RENAMED,
-                    gs.KEY_FILE_STATUSES_HEURISTIC_SCORE: '100',
-                },
-            ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
-            gs.KEY_FILE_STATUSES_UNTRACKED: [],
-            gs.KEY_FILE_STATUSES_UNKNOWN: [],
-        }
-
-        createNonEmptyGitRepository()
-        createAndCommitFile(TEST_FILE)
-        execute(['git', 'mv', TEST_FILE, TEST_FILE_RENAMED])
-
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.util_testStageRenamedFile('testfile')
 
     def test_workDirDeletedFile(self):
-        TEST_FILE = 'testfile'
-        EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [],
-            gs.KEY_FILE_STATUSES_MODIFIED: [
-                {
-                    gs.KEY_FILE_STATUSES_TYPE: 'D',
-                    gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
-                },
-            ],
-            gs.KEY_FILE_STATUSES_UNTRACKED: [],
-            gs.KEY_FILE_STATUSES_UNKNOWN: [],
-        }
-
-        createNonEmptyGitRepository()
-        createAndCommitFile(TEST_FILE)
-        os.remove(TEST_FILE)
-
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.util_testWorkDirDeletedFile('testfile')
 
     def test_workDirModifiedFile(self):
-        TEST_FILE = 'testfile'
-        EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [],
-            gs.KEY_FILE_STATUSES_MODIFIED: [
-                {
-                    gs.KEY_FILE_STATUSES_TYPE: 'M',
-                    gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
-                },
-            ],
-            gs.KEY_FILE_STATUSES_UNTRACKED: [],
-            gs.KEY_FILE_STATUSES_UNKNOWN: [],
-        }
+        self.util_testWorkDirModifiedFile('testfile')
 
-        createNonEmptyGitRepository()
-        createAndCommitFile(TEST_FILE)
+    def test_untrackedFile(self):
+        self.util_testUntrackedFile('testfile')
 
-        modifiedFile = open(TEST_FILE, 'w')
-        modifiedFile.write('a')
-        modifiedFile.close()
+    # Tests for each type of file status, where filenames have spaces
+    def test_stageAddedFileWithSpaces(self):
+        self.util_testStageAddedFile('testfile with spaces')
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+    def test_stageDeletedFileWithSpaces(self):
+        self.util_testStageDeletedFile('testfile with spaces')
 
-    def test_UntrackedFile(self):
-        TEST_FILE = 'testfile'
-        EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
-            gs.KEY_FILE_STATUSES_UNTRACKED: [TEST_FILE],
-            gs.KEY_FILE_STATUSES_UNKNOWN: [],
-        }
+    def test_stageModifiedFileWithSpaces(self):
+        self.util_testStageModifiedFile('testfile with spaces')
 
-        createNonEmptyGitRepository()
-        newFile = open(TEST_FILE, 'w')
-        newFile.write('a')
-        newFile.close()
+    def test_stageRenamedFileWithSpaces(self):
+        self.util_testStageRenamedFile('testfile with spaces')
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+    def test_workDirDeletedFileWithSpaces(self):
+        self.util_testWorkDirDeletedFile('testfile with spaces')
+
+    def test_workDirModifiedFileWithSpaces(self):
+        self.util_testWorkDirModifiedFile('testfile with spaces')
+
+    def test_untrackedFileWithSpaces(self):
+        self.util_testUntrackedFile('testfile with spaces')
 
     def test_multipleStatusesOnOneFile(self):
         # This is a test where one file has changes in both the working
