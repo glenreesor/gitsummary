@@ -141,13 +141,13 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
         execute(['git', 'init'])
 
         self.assertEqual(
-            gs.gitGetCommitsInFirstNotSecond('master', 'origin/master', True),
             [],
+            gs.gitGetCommitsInFirstNotSecond('master', 'origin/master', True),
         )
 
         self.assertEqual(
-            gs.gitGetCommitsInFirstNotSecond('origin/master', 'master', True),
             [],
+            gs.gitGetCommitsInFirstNotSecond('origin/master', 'master', True),
         )
 
     def test_initialRepositoryStateClonedFromRemote1(self):
@@ -159,13 +159,13 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
         os.chdir(LOCAL)
 
         self.assertEqual(
-            gs.gitGetCommitsInFirstNotSecond('master', 'origin/master', True),
             [],
+            gs.gitGetCommitsInFirstNotSecond('master', 'origin/master', True),
         )
 
         self.assertEqual(
-            gs.gitGetCommitsInFirstNotSecond('origin/master', 'master', True),
             [],
+            gs.gitGetCommitsInFirstNotSecond('origin/master', 'master', True),
         )
 
     def test_initialRepositoryStateClonedFromRemote2(self):
@@ -202,13 +202,13 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
         execute(['git', 'fetch'])
 
         self.assertEqual(
-            gs.gitGetCommitsInFirstNotSecond('master', 'origin/master', True),
             [],
+            gs.gitGetCommitsInFirstNotSecond('master', 'origin/master', True),
         )
 
         self.assertEqual(
-            gs.gitGetCommitsInFirstNotSecond('origin/master', 'master', True),
             [expectedHash],
+            gs.gitGetCommitsInFirstNotSecond('origin/master', 'master', True),
         )
 
     def test_noCommitsInFirstNotSecond(self):
@@ -218,8 +218,8 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
         execute(['git', 'checkout', '-b', NEW_BRANCH])
 
         self.assertEqual(
-            gs.gitGetCommitsInFirstNotSecond('master', NEW_BRANCH, True),
             [],
+            gs.gitGetCommitsInFirstNotSecond('master', NEW_BRANCH, True),
         )
 
     def test_oneCommitInFirstNotSecond(self):
@@ -238,8 +238,8 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
         ).splitlines()[0]
 
         commitList = gs.gitGetCommitsInFirstNotSecond(NEW_BRANCH, 'master', True)
-        self.assertEqual(len(commitList), 1)
-        self.assertEqual(commitList[0], expectedHash)
+        self.assertEqual(1, len(commitList))
+        self.assertEqual(expectedHash, commitList[0])
 
     def test_multipleCommitsInFirstNotSecond(self):
         NEW_BRANCH = 'newBranch'
@@ -257,7 +257,7 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
 
         commitList = gs.gitGetCommitsInFirstNotSecond(NEW_BRANCH, 'master', True)
 
-        self.assertEqual(len(commitList), 2)
+        self.assertEqual(2, len(commitList))
         for index in 0, 1:
             self.assertEqual(expectedHashes[index], commitList[index])
 
@@ -278,7 +278,7 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
 
         commitList = gs.gitGetCommitsInFirstNotSecond('master', 'origin/master', True)
 
-        self.assertEqual(len(commitList), 2)
+        self.assertEqual(2, len(commitList))
         for index in 0, 1:
             self.assertEqual(expectedHashes[index], commitList[index])
 
@@ -305,27 +305,27 @@ class Test_gitGetCurrentBranch(unittest.TestCase):
         EXPECTED_BRANCH = 'master'
         execute(['git', 'init'])
 
-        self.assertEqual(gs.gitGetCurrentBranch(), EXPECTED_BRANCH)
+        self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
 
     def test_initialRepositoryStateFromClonedRemote(self):
         LOCAL = 'local'
         createEmptyRemoteLocalPair('remote', LOCAL)
         os.chdir(LOCAL)
 
-        self.assertEqual(gs.gitGetCurrentBranch(), 'master')
+        self.assertEqual('master', gs.gitGetCurrentBranch())
 
     def test_initialRepositoryStateNotMaster(self):
         EXPECTED_BRANCH = 'dev'
         execute(['git', 'init'])
         execute(['git', 'checkout', '-b', EXPECTED_BRANCH])
 
-        self.assertEqual(gs.gitGetCurrentBranch(), EXPECTED_BRANCH)
+        self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
 
     def test_oneBranchExists(self):
         EXPECTED_BRANCH = 'master'
 
         createNonEmptyGitRepository()
-        self.assertEqual(gs.gitGetCurrentBranch(), EXPECTED_BRANCH)
+        self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
 
     def test_multipleBranchesExist(self):
         EXPECTED_BRANCH = 'dev'
@@ -333,7 +333,7 @@ class Test_gitGetCurrentBranch(unittest.TestCase):
         createNonEmptyGitRepository()
         execute(['git', 'checkout', '-b', EXPECTED_BRANCH])
 
-        self.assertEqual(gs.gitGetCurrentBranch(), EXPECTED_BRANCH)
+        self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
 
     def test_detachedHeadState(self):
         EXPECTED_BRANCH = ''
@@ -348,7 +348,7 @@ class Test_gitGetCurrentBranch(unittest.TestCase):
         createAndCommitFile('newFile2')
         execute(['git', 'checkout', firstHash])
 
-        self.assertEqual(gs.gitGetCurrentBranch(), EXPECTED_BRANCH)
+        self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
 
 #-----------------------------------------------------------------------------
 class Test_gitGetFileStatuses(unittest.TestCase):
@@ -388,7 +388,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         modifiedFile.close()
         execute(['git', 'add', testFile])
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     def util_testStageDeletedFile(self, testFile):
         EXPECTED_RESULT = {
@@ -407,7 +407,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         createAndCommitFile(testFile)
         execute(['git', 'rm', testFile])
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     def util_testStageModifiedFile(self, testFile):
         EXPECTED_RESULT = {
@@ -429,7 +429,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         modifiedFile.close()
         execute(['git', 'add', testFile])
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     def util_testStageRenamedFile(self, testFile):
         TEST_FILE_RENAMED = testFile + 'renamed'
@@ -451,7 +451,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         createAndCommitFile(testFile)
         execute(['git', 'mv', testFile, TEST_FILE_RENAMED])
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     def util_testWorkDirDeletedFile(self, testFile):
         EXPECTED_RESULT = {
@@ -470,7 +470,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         createAndCommitFile(testFile)
         os.remove(testFile)
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     def util_testWorkDirModifiedFile(self, testFile):
         EXPECTED_RESULT = {
@@ -492,7 +492,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         modifiedFile.write('a')
         modifiedFile.close()
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     def util_testUnmergedFile(self, testFile):
         # Unmerged files are created by merge conflicts, and git always
@@ -563,7 +563,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
             check=False
         )
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     def util_testUntrackedFile(self, testFile):
         EXPECTED_RESULT = {
@@ -578,7 +578,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         newFile.write('a')
         newFile.close()
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     #-------------------------------------------------------------------------
     # Tests
@@ -591,10 +591,10 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         execute(['git', 'init'])
 
         statuses = gs.gitGetFileStatuses()
-        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_STAGED], [])
-        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_MODIFIED], [])
-        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_UNTRACKED], [])
-        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_UNKNOWN], [])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_STAGED])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_MODIFIED])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNTRACKED])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNKNOWN])
 
     def test_initialRepositoryStateStageAddedFile(self):
         TEST_FILE = 'testfile'
@@ -617,7 +617,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         modifiedFile.close()
         execute(['git', 'add', TEST_FILE])
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     def test_initialRepositoryStateUntrackedFile(self):
         TEST_FILE = 'testfile'
@@ -634,15 +634,15 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         newFile.write('a')
         newFile.close()
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     def test_nothingToReport(self):
         createNonEmptyGitRepository()
         statuses = gs.gitGetFileStatuses()
-        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_STAGED], [])
-        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_MODIFIED], [])
-        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_UNTRACKED], [])
-        self.assertEqual(statuses[gs.KEY_FILE_STATUSES_UNKNOWN], [])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_STAGED])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_MODIFIED])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNTRACKED])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNKNOWN])
 
     # Tests for each type of file status
     def test_stageAddedFile(self):
@@ -735,7 +735,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         modifiedFile.write('b')
         modifiedFile.close()
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
     def test_multipleFiles(self):
         # This is a test with multiple files in each category. No pattern other
@@ -820,7 +820,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
             untrackedFile = open(newFile, 'w')
             untrackedFile.close()
 
-        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
 #-----------------------------------------------------------------------------
 class Test_gitGetLocalBranches(unittest.TestCase):
@@ -845,13 +845,13 @@ class Test_gitGetLocalBranches(unittest.TestCase):
         EXPECTED_BRANCHES = ['master']
 
         execute(['git', 'init'])
-        self.assertEqual(gs.gitGetLocalBranches(), EXPECTED_BRANCHES)
+        self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
 
     def test_oneBranch(self):
         EXPECTED_BRANCHES = ['master']
 
         createNonEmptyGitRepository()
-        self.assertEqual(gs.gitGetLocalBranches(), EXPECTED_BRANCHES)
+        self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
 
     def test_moreThanOneBranch(self):
         NEW_BRANCH = 'dev'
@@ -861,7 +861,7 @@ class Test_gitGetLocalBranches(unittest.TestCase):
         createNonEmptyGitRepository()
         execute(['git', 'checkout', '-b', NEW_BRANCH])
 
-        self.assertEqual(gs.gitGetLocalBranches(), EXPECTED_BRANCHES)
+        self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
 
     def test_remoteTrackingBranchExists(self):
         LOCAL = 'local'
@@ -870,7 +870,7 @@ class Test_gitGetLocalBranches(unittest.TestCase):
         createNonEmptyRemoteLocalPair('remote', LOCAL)
         os.chdir(LOCAL)
 
-        self.assertEqual(gs.gitGetLocalBranches(), EXPECTED_BRANCHES)
+        self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
 
 
 #-----------------------------------------------------------------------------
@@ -895,21 +895,21 @@ class Test_gitGetRemoteTrackingBranch(unittest.TestCase):
     def test_initialRepositoryStateNoRemote(self):
         execute(['git', 'init'])
 
-        self.assertEqual(gs.gitGetRemoteTrackingBranch(''), '')
-        self.assertEqual(gs.gitGetRemoteTrackingBranch('master'), '')
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch(''))
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch('master'))
 
     def test_initialRepositoryStateWithRemote(self):
         LOCAL = 'local'
         createEmptyRemoteLocalPair('remote', LOCAL)
         os.chdir(LOCAL)
 
-        self.assertEqual(gs.gitGetRemoteTrackingBranch(''), '')
-        self.assertEqual(gs.gitGetRemoteTrackingBranch('master'), 'origin/master')
+        self.assertEqual(''             , gs.gitGetRemoteTrackingBranch(''))
+        self.assertEqual('origin/master', gs.gitGetRemoteTrackingBranch('master'))
 
     def test_noRemoteRepository(self):
         createNonEmptyGitRepository()
-        self.assertEqual(gs.gitGetRemoteTrackingBranch(''), '')
-        self.assertEqual(gs.gitGetRemoteTrackingBranch('master'), '')
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch(''))
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch('master'))
 
     def test_withRemoteRepository(self):
         LOCAL = 'local'
@@ -918,9 +918,9 @@ class Test_gitGetRemoteTrackingBranch(unittest.TestCase):
         os.chdir(LOCAL)
         execute(['git', 'checkout', '-b', 'dev'])
 
-        self.assertEqual(gs.gitGetRemoteTrackingBranch(''), '')
-        self.assertEqual(gs.gitGetRemoteTrackingBranch('dev'), '')
-        self.assertEqual(gs.gitGetRemoteTrackingBranch('master'), 'origin/master')
+        self.assertEqual(''             , gs.gitGetRemoteTrackingBranch(''))
+        self.assertEqual(''             , gs.gitGetRemoteTrackingBranch('dev'))
+        self.assertEqual('origin/master', gs.gitGetRemoteTrackingBranch('master'))
 
 #-----------------------------------------------------------------------------
 class Test_gitGetStashes(unittest.TestCase):
@@ -943,11 +943,11 @@ class Test_gitGetStashes(unittest.TestCase):
     #-------------------------------------------------------------------------
     def test_initialRepositoryState(self):
         execute(['git', 'init'])
-        self.assertEqual(gs.gitGetStashes(), [])
+        self.assertEqual([], gs.gitGetStashes())
 
     def test_noStashes(self):
         createNonEmptyGitRepository()
-        self.assertEqual(gs.gitGetStashes(), [])
+        self.assertEqual([], gs.gitGetStashes())
 
     def test_oneStash(self):
         TEST_FILENAME = 'testfile'
@@ -964,17 +964,17 @@ class Test_gitGetStashes(unittest.TestCase):
         execute(['git', 'stash'])
 
         stashes = gs.gitGetStashes()
-        self.assertEqual(len(stashes), 1)
+        self.assertEqual(1, len(stashes))
 
         # Test the contents, but be a bit lazy
         #   hash        - just make sure it's 40 alphanumeric character
         #   description - This seems like it could change with later git
         #                 versions, so just confirm it's a string
         oneStash = stashes[0]
-        self.assertEqual(len(oneStash[gs.KEY_STASH_FULL_HASH]), 40)
+        self.assertEqual(40, len(oneStash[gs.KEY_STASH_FULL_HASH]))
         self.assertTrue(re.match('^[0-9a-z]+$', oneStash[gs.KEY_STASH_FULL_HASH]))
 
-        self.assertEqual(oneStash[gs.KEY_STASH_NAME], 'stash@{0}')
+        self.assertEqual('stash@{0}', oneStash[gs.KEY_STASH_NAME])
         self.assertTrue(isinstance(oneStash[gs.KEY_STASH_DESCRIPTION], str))
 
     def test_multipleStashes(self):
@@ -998,14 +998,14 @@ class Test_gitGetStashes(unittest.TestCase):
         execute(['git', 'stash'])
 
         stashes = gs.gitGetStashes()
-        self.assertEqual(len(stashes), 2)
+        self.assertEqual(2, len(stashes))
 
         # Test the contents, but be a bit lazy
         #   hash        - just make sure it's 40 alphanumeric character
         #   description - This seems like it could change with later git
         #                 versions, so just confirm it's a string
         for oneStash in stashes:
-            self.assertEqual(len(oneStash[gs.KEY_STASH_FULL_HASH]), 40)
+            self.assertEqual(40, len(oneStash[gs.KEY_STASH_FULL_HASH]))
             self.assertTrue(re.match('^[0-9a-z]+$', oneStash[gs.KEY_STASH_FULL_HASH]))
 
             self.assertTrue(re.match('^stash@{[0-9]+}$', oneStash[gs.KEY_STASH_NAME]))
