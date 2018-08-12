@@ -185,6 +185,17 @@ def cmdRepo():
                 )
             )
 
+    # If we're in detached head state, add a branch line that indicates we're
+    # in detached head state
+    if currentBranch == '':
+        rawBranchLines.append(
+            utilGetBranchAsFiveColumns(
+                'Detached Head',
+                'Detached Head',
+                ''
+            )
+        )
+
     #-------------------------------------------------------------------------
     # For each section of output (stashes, staged, etc):
     #   - Determine maximum widths for each column of each line, so we can

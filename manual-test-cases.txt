@@ -1,2 +1,3 @@
 Manual testing that is not covered by testGitsummary.py
     - Current folder is not tracked by git
+    - Repo command shows "Detached Head" when user is in detached head state
