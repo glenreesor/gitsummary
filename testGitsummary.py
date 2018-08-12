@@ -494,6 +494,77 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
         self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
 
+    def util_testUnmergedFile(self, testFile):
+        # Unmerged files are created by merge conflicts, and git always
+        # says both the stage and workdir are unmerged
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGED: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'U',
+                    gs.KEY_FILE_STATUSES_FILENAME: testFile,
+                },
+            ],
+            gs.KEY_FILE_STATUSES_MODIFIED: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'U',
+                    gs.KEY_FILE_STATUSES_FILENAME: testFile,
+                },
+            ],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        # LOCAL1 and LOCAL2 will both modify the same file, thus resulting
+        # in a merge conflict
+        LOCAL1 = 'local1'
+        LOCAL2 = 'local2'
+        REMOTE = 'remote'
+
+        createEmptyRemoteLocalPair(REMOTE, LOCAL1)
+        execute(['git', 'clone', REMOTE, LOCAL2])
+
+        # LOCAL1 and LOCAL2 need to operate on the same git history, thus
+        # need to create a common empty file for them to work on first
+        os.chdir(LOCAL1)
+        createAndCommitFile(testFile, 'Created in local1')
+        execute(['git', 'push'])
+
+        os.chdir('..')
+        os.chdir(LOCAL2)
+        execute(['git', 'pull'])
+
+        # Make the changes in LOCAL1, which will conflict with changes to be
+        # done in LOCAL2
+        os.chdir('..')
+        os.chdir(LOCAL1)
+        testFileHandle = open(testFile, 'w')
+        testFileHandle.write('Changes from local1')
+        testFileHandle.close()
+        execute(['git', 'add', testFile])
+        execute(['git', 'commit', '-m', 'commit from local1'])
+        execute(['git', 'push'])
+
+        # Make the conflicting changes in LOCAL2
+        os.chdir('..')
+        os.chdir(LOCAL2)
+        testFileHandle = open(testFile, 'w')
+        testFileHandle.write('The front fell off')
+        testFileHandle.close()
+        execute(['git', 'add', testFile])
+        execute(['git', 'commit', '-m', 'commit from local2'])
+
+        # Force the merge conflict
+        # Can't use execute() helper since 'git pull' will return a non-zero
+        # exit status
+        subprocess.run(
+            ['git', 'pull'],
+            stdout = subprocess.DEVNULL,
+            stderr = subprocess.DEVNULL,
+            check=False
+        )
+
+        self.assertEqual(gs.gitGetFileStatuses(), EXPECTED_RESULT)
+
     def util_testUntrackedFile(self, testFile):
         EXPECTED_RESULT = {
             gs.KEY_FILE_STATUSES_STAGED: [],
@@ -592,6 +663,9 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     def test_workDirModifiedFile(self):
         self.util_testWorkDirModifiedFile('testfile')
 
+    def test_unmergedFile(self):
+        self.util_testUnmergedFile('testfile')
+
     def test_untrackedFile(self):
         self.util_testUntrackedFile('testfile')
 
@@ -613,6 +687,9 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
     def test_workDirModifiedFileWithSpaces(self):
         self.util_testWorkDirModifiedFile('testfile with spaces')
+
+    def test_unmergedFileWithSpaces(self):
+        self.util_testUnmergedFile('testfile with spaces')
 
     def test_untrackedFileWithSpaces(self):
         self.util_testUntrackedFile('testfile with spaces')
