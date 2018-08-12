@@ -940,44 +940,6 @@ def utilGetBranchAsFiveColumns(currentBranch, branch, targetBranch):
     ]
 
 #-----------------------------------------------------------------------------
-def utilGetStyledText(styles, text):
-    """
-    Return the specified text in the specified style. As a convenience, 'text'
-    is returned with no change if 'styles' is an empty list.
-
-    Args
-        List   styles - List of global TEXT_* constants corresponding to
-                        styles that should be applied
-        String text   - The text to format
-
-    Return
-        String The specified text wrapped in ANSI formatting escape characters.
-               The original text is returned unchanged if 'styles' is empty
-    """
-
-    ESCAPE_MAPPING = {
-        TEXT_BOLD: '1',
-        TEXT_FLASHING: '5',
-        TEXT_GREEN: '32',
-        TEXT_MAGENTA: '35',
-        TEXT_NORMAL: '0',
-        TEXT_RED: '31',
-        TEXT_YELLOW: '33'
-    }
-
-    if len(styles) == 0:
-        return text
-
-    styleList = ''
-    for i, style in enumerate(styles):
-        styleList += ('' if i == 0 else ';') + ESCAPE_MAPPING[style]
-
-    escapeStart = '\033[' + styleList + 'm'
-    escapeEnd = '\033[' + ESCAPE_MAPPING[TEXT_NORMAL] + 'm'
-
-    return escapeStart + text + escapeEnd
-
-#-----------------------------------------------------------------------------
 def utilGetColumnAlignedLines(
     requiredWidth,
     truncIndicator,
@@ -1172,6 +1134,44 @@ def utilGetStashAsTwoColumns(stash):
         stash[KEY_STASH_NAME],
         stash[KEY_STASH_DESCRIPTION],
     ]
+
+#-----------------------------------------------------------------------------
+def utilGetStyledText(styles, text):
+    """
+    Return the specified text in the specified style. As a convenience, 'text'
+    is returned with no change if 'styles' is an empty list.
+
+    Args
+        List   styles - List of global TEXT_* constants corresponding to
+                        styles that should be applied
+        String text   - The text to format
+
+    Return
+        String The specified text wrapped in ANSI formatting escape characters.
+               The original text is returned unchanged if 'styles' is empty
+    """
+
+    ESCAPE_MAPPING = {
+        TEXT_BOLD: '1',
+        TEXT_FLASHING: '5',
+        TEXT_GREEN: '32',
+        TEXT_MAGENTA: '35',
+        TEXT_NORMAL: '0',
+        TEXT_RED: '31',
+        TEXT_YELLOW: '33'
+    }
+
+    if len(styles) == 0:
+        return text
+
+    styleList = ''
+    for i, style in enumerate(styles):
+        styleList += ('' if i == 0 else ';') + ESCAPE_MAPPING[style]
+
+    escapeStart = '\033[' + styleList + 'm'
+    escapeEnd = '\033[' + ESCAPE_MAPPING[TEXT_NORMAL] + 'm'
+
+    return escapeStart + text + escapeEnd
 
 #-----------------------------------------------------------------------------
 def main():

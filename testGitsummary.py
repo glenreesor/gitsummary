@@ -1220,39 +1220,6 @@ class Test_utilGetBranchAsFiveColumns(unittest.TestCase):
         self.assertEqual(gs.utilGetAheadBehindString(1, 2), result[3])
         self.assertEqual(TARGET, result[4])
 
-class Test_utilGetStyledText(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
-
-    #-------------------------------------------------------------------------
-    # Tests
-    #-------------------------------------------------------------------------
-    def testNoStyles(self):
-        self.assertEqual('test', gs.utilGetStyledText([], 'test'))
-
-    def testOneStyle(self):
-        self.assertEqual(
-            '\033[1mtest\033[0m',
-            gs.utilGetStyledText([gs.TEXT_BOLD], 'test')
-        )
-
-    def testMultipleStyles(self):
-        self.assertEqual(
-            '\033[1;5mtest\033[0m',
-            gs.utilGetStyledText([gs.TEXT_BOLD, gs.TEXT_FLASHING], 'test')
-        )
-
 class Test_utilGetColumnAlignedLines(unittest.TestCase):
     #-------------------------------------------------------------------------
     # setUp and tearDown
@@ -1555,6 +1522,39 @@ class Test_utilGetStashAsTwoColumns(unittest.TestCase):
                 stashStatus[gs.KEY_STASH_DESCRIPTION],
             ],
             gs.utilGetStashAsTwoColumns(stashStatus)
+        )
+
+class Test_utilGetStyledText(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def testNoStyles(self):
+        self.assertEqual('test', gs.utilGetStyledText([], 'test'))
+
+    def testOneStyle(self):
+        self.assertEqual(
+            '\033[1mtest\033[0m',
+            gs.utilGetStyledText([gs.TEXT_BOLD], 'test')
+        )
+
+    def testMultipleStyles(self):
+        self.assertEqual(
+            '\033[1;5mtest\033[0m',
+            gs.utilGetStyledText([gs.TEXT_BOLD, gs.TEXT_FLASHING], 'test')
         )
 
 if __name__ == '__main__':
