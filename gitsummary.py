@@ -163,23 +163,26 @@ def cmdRepo():
     ]
 
     # Do master and dev first since they're the most important
-    if 'master' in localBranches:
-        rawBranchLines.append(
-            utilGetBranchAsFiveColumns(currentBranch, 'master', '')
-        )
-
-    if 'dev' in localBranches:
-        targetBranch = 'master' if 'master' in localBranches else ''
-        rawBranchLines.append(
-            utilGetBranchAsFiveColumns(currentBranch, 'dev', targetBranch)
-        )
+    importantBranches = ['master', 'dev']
+    for branch in importantBranches:
+        if branch in localBranches:
+            rawBranchLines.append(
+                utilGetBranchAsFiveColumns(
+                    currentBranch,
+                    branch,
+                    utilGetTargetBranch(branch, localBranches)
+                )
+            )
 
     # Now all the other branches
-    targetBranch = 'dev' if 'dev' in localBranches else ''
     for branch in localBranches:
-        if branch not in ['master', 'dev']:
+        if branch not in importantBranches:
             rawBranchLines.append(
-                utilGetBranchAsFiveColumns(currentBranch, branch, targetBranch)
+                utilGetBranchAsFiveColumns(
+                    currentBranch,
+                    branch,
+                    utilGetTargetBranch(branch, localBranches)
+                )
             )
 
     #-------------------------------------------------------------------------
@@ -1172,6 +1175,27 @@ def utilGetStyledText(styles, text):
     escapeEnd = '\033[' + ESCAPE_MAPPING[TEXT_NORMAL] + 'm'
 
     return escapeStart + text + escapeEnd
+
+#-----------------------------------------------------------------------------
+def utilGetTargetBranch(branch, localBranches):
+    """
+    Return the name of the target branch associated with 'branch'.
+
+    Args
+        String         branch        - The name of the branch we're interested in
+        List of String localBranches - List of all local branches
+
+    Return
+        String The target branch. '' if no target branch
+    """
+    if branch == 'master':
+        targetBranch = ''
+    elif branch == 'dev':
+        targetBranch = 'master' if 'master' in localBranches else ''
+    else:
+        targetBranch = 'dev' if 'dev' in localBranches else ''
+
+    return targetBranch
 
 #-----------------------------------------------------------------------------
 def main():

@@ -1557,6 +1557,38 @@ class Test_utilGetStyledText(unittest.TestCase):
             gs.utilGetStyledText([gs.TEXT_BOLD, gs.TEXT_FLASHING], 'test')
         )
 
+class Test_utilGetTargetBranch(unittest.TestCase):
+    #-------------------------------------------------------------------------
+    # setUp and tearDown
+    #   - Create/delete a temporary folder where we can do git stuff
+    #   - cd into it on creation
+    #-------------------------------------------------------------------------
+    def setUp(self):
+        self.setupInitialDir = os.getcwd()
+        self.tempDir = tempfile.TemporaryDirectory()
+        os.chdir(self.tempDir.name)
+
+    def tearDown(self):
+        os.chdir(self.setupInitialDir)
+        self.tempDir.cleanup()
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def test(self):
+        self.assertEqual('', gs.utilGetTargetBranch('master', []))
+        self.assertEqual('', gs.utilGetTargetBranch('master', ['master']))
+        self.assertEqual('', gs.utilGetTargetBranch('master', ['master', 'dev']))
+
+        self.assertEqual(''      , gs.utilGetTargetBranch('dev', []))
+        self.assertEqual('master', gs.utilGetTargetBranch('dev', ['master']))
+        self.assertEqual('master', gs.utilGetTargetBranch('dev', ['master', 'dev']))
+        self.assertEqual(''      , gs.utilGetTargetBranch('dev', ['dev']))
+
+        self.assertEqual(''   , gs.utilGetTargetBranch('feature-branch', []))
+        self.assertEqual(''   , gs.utilGetTargetBranch('feature-branch', ['master']))
+        self.assertEqual('dev', gs.utilGetTargetBranch('feature-branch', ['master', 'dev']))
+
 if __name__ == '__main__':
     # Since we have a pile of testings hitting the filesystem, change to a
     # temporary directory up front, just in case we forget to for an individual
