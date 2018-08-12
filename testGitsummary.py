@@ -8,6 +8,20 @@ import tempfile
 import unittest
 
 #-----------------------------------------------------------------------------
+# setUp() and tearDown() common to all tests
+#   - Create/delete a temporary folder where we can do git stuff
+#   - cd into it on creation
+#-----------------------------------------------------------------------------
+def commonTestSetUp(self):
+    self.setupInitialDir = os.getcwd()
+    self.tempDir = tempfile.TemporaryDirectory()
+    os.chdir(self.tempDir.name)
+
+def commonTestTearDown(self):
+    os.chdir(self.setupInitialDir)
+    self.tempDir.cleanup()
+
+#-----------------------------------------------------------------------------
 # Helpers
 #-----------------------------------------------------------------------------
 def createAndCommitFile(filename, commitMsg = 'Commit Message'):
@@ -79,19 +93,8 @@ def execute(command):
 
 #-----------------------------------------------------------------------------
 class Test_gitGetCommitDetails(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -120,19 +123,8 @@ class Test_gitGetCommitDetails(unittest.TestCase):
 
 #-----------------------------------------------------------------------------
 class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -284,19 +276,8 @@ class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
 
 #-----------------------------------------------------------------------------
 class Test_gitGetCurrentBranch(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -352,19 +333,8 @@ class Test_gitGetCurrentBranch(unittest.TestCase):
 
 #-----------------------------------------------------------------------------
 class Test_gitGetFileStatuses(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Helper functions that run a test for passed-in filename
@@ -824,19 +794,8 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
 #-----------------------------------------------------------------------------
 class Test_gitGetLocalBranches(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -875,19 +834,8 @@ class Test_gitGetLocalBranches(unittest.TestCase):
 
 #-----------------------------------------------------------------------------
 class Test_gitGetRemoteTrackingBranch(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -924,19 +872,8 @@ class Test_gitGetRemoteTrackingBranch(unittest.TestCase):
 
 #-----------------------------------------------------------------------------
 class Test_gitGetStashes(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1013,19 +950,8 @@ class Test_gitGetStashes(unittest.TestCase):
 
 #-----------------------------------------------------------------------------
 class Test_gitUtilFolderIsTracked(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1051,19 +977,8 @@ class Test_gitUtilFolderIsTracked(unittest.TestCase):
 
 #-----------------------------------------------------------------------------
 class Test_utilGetAheadBehindString(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1090,19 +1005,8 @@ class Test_utilGetAheadBehindString(unittest.TestCase):
             )
 
 class Test_utilGetBranchAsFiveColumns(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1221,19 +1125,8 @@ class Test_utilGetBranchAsFiveColumns(unittest.TestCase):
         self.assertEqual(TARGET, result[4])
 
 class Test_utilGetColumnAlignedLines(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1363,19 +1256,8 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
         )
 
 class Test_utilGetMaxColumnWidths(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1399,19 +1281,8 @@ class Test_utilGetMaxColumnWidths(unittest.TestCase):
         )
 
 class Test_utilGetModifiedFileAsTwoColumns(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1435,19 +1306,8 @@ class Test_utilGetModifiedFileAsTwoColumns(unittest.TestCase):
         )
 
 class Test_utilGetStagedFileAsTwoColumns(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1489,19 +1349,8 @@ class Test_utilGetStagedFileAsTwoColumns(unittest.TestCase):
         )
 
 class Test_utilGetStashAsTwoColumns(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1525,19 +1374,8 @@ class Test_utilGetStashAsTwoColumns(unittest.TestCase):
         )
 
 class Test_utilGetStyledText(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1558,19 +1396,8 @@ class Test_utilGetStyledText(unittest.TestCase):
         )
 
 class Test_utilGetTargetBranch(unittest.TestCase):
-    #-------------------------------------------------------------------------
-    # setUp and tearDown
-    #   - Create/delete a temporary folder where we can do git stuff
-    #   - cd into it on creation
-    #-------------------------------------------------------------------------
-    def setUp(self):
-        self.setupInitialDir = os.getcwd()
-        self.tempDir = tempfile.TemporaryDirectory()
-        os.chdir(self.tempDir.name)
-
-    def tearDown(self):
-        os.chdir(self.setupInitialDir)
-        self.tempDir.cleanup()
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
@@ -1590,7 +1417,7 @@ class Test_utilGetTargetBranch(unittest.TestCase):
         self.assertEqual('dev', gs.utilGetTargetBranch('feature-branch', ['master', 'dev']))
 
 if __name__ == '__main__':
-    # Since we have a pile of testings hitting the filesystem, change to a
+    # Since we have a pile of tests hitting the filesystem, change to a
     # temporary directory up front, just in case we forget to for an individual
     # test (and end up botching stuff in our dev folder)
     initialDir = os.getcwd()
