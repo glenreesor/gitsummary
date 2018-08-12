@@ -1010,10 +1010,15 @@ def utilGetColumnAlignedLines(
     # left for the variable width columns
     staticWidth = sum(columnWidths) - columnWidths[variableColumn]
     numColumns = len(columnWidths)
+    availableWidth = requiredWidth - staticWidth - (numColumns - 1)
+
+    # Gracefully handle tiny screen width
+    if availableWidth < 0:
+        availableWidth = 0
 
     for line in lines:
         columns = []
-        availableWidth = requiredWidth - staticWidth - (numColumns - 1)
+
         for i, column in enumerate(line):
             if i != variableColumn:
                 # This is a column to be padded out to the required max width

@@ -1177,7 +1177,33 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
             )
         )
 
-    def testNonVariableGetPadded(self):
+    def testRequiredWidthTooNarrow(self):
+        REQUIRED_WIDTH = 30     # Remember column separators
+        TRUNC_INDICATOR = '...'
+        VARIABLE_COLUMN = 3
+        COLUMN_WIDTHS = [10, 10, 10, 10]
+        LINES = [
+            ['1234567890', '1234567890', '1234567890', '1234567890'],
+            ['1234567890', '1234567890', '1234567890', '1234567890'],
+        ]
+
+        EXPECTED = [
+            ['1234567890', '1234567890', '1234567890', '...'],
+            ['1234567890', '1234567890', '1234567890', '...'],
+        ]
+
+        self.assertEqual(
+            EXPECTED,
+            gs.utilGetColumnAlignedLines(
+                REQUIRED_WIDTH,
+                TRUNC_INDICATOR,
+                VARIABLE_COLUMN,
+                COLUMN_WIDTHS,
+                LINES
+            )
+        )
+
+    def testNonVariableWidthColumnGetsPadded(self):
         REQUIRED_WIDTH = 43     # Remember column separators
         TRUNC_INDICATOR = '...'
         VARIABLE_COLUMN = 3
@@ -1203,7 +1229,7 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
             )
         )
 
-    def testVariablePadAndTrunc(self):
+    def testVariableWidthColumnPadAndTrunc(self):
         REQUIRED_WIDTH = 43     # Remember column separators
         TRUNC_INDICATOR = '...'
         VARIABLE_COLUMN = 3
