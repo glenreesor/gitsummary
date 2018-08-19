@@ -1331,6 +1331,131 @@ class Test_utilGetModifiedFileAsTwoColumns(unittest.TestCase):
             gs.utilGetModifiedFileAsTwoColumns(modifiedFileStatus)
         )
 
+class Test_utilGetRawBranchesLines(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #   - utilGetRawBranchesLines() just calls other functions that are fully
+    #     tested
+    #   - so just a minimal test that it works properly with >1 branches
+    #-------------------------------------------------------------------------
+
+    def test(self):
+        createNonEmptyGitRepository()
+        execute(['git', 'checkout', '-b', 'dev'])
+
+        self.assertEqual(3,
+            len(gs.utilGetRawBranchesLines('dev', gs.gitGetLocalBranches()))
+        )
+
+class Test_utilGetRawModifiedLines(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #   - utilGetRawModifiedLines() just calls other functions that are fully
+    #     tested
+    #   - so just a minimal test that it works properly with >1 modified files
+    #-------------------------------------------------------------------------
+
+    def test(self):
+        TEST_FILE_1 = 'testfile_1'
+        TEST_FILE_2 = 'testfile_2'
+        createNonEmptyGitRepository()
+
+        for testFile in [TEST_FILE_1, TEST_FILE_2]:
+            createAndCommitFile(testFile)
+            modifiedFile = open(testFile, 'w')
+            modifiedFile.write('a')
+            modifiedFile.close()
+
+        self.assertEqual(2,
+            len(gs.utilGetRawModifiedLines(gs.gitGetFileStatuses()))
+        )
+
+class Test_utilGetRawStagedLines(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #   - utilGetRawStagedLines() just calls other functions that are fully
+    #     tested
+    #   - so just a minimal test that it works properly with >1 staged files
+    #-------------------------------------------------------------------------
+
+    def test(self):
+        TEST_FILE_1 = 'testfile_1'
+        TEST_FILE_2 = 'testfile_2'
+        createNonEmptyGitRepository()
+
+        for testFile in [TEST_FILE_1, TEST_FILE_2]:
+            modifiedFile = open(testFile, 'w')
+            modifiedFile.write('a')
+            modifiedFile.close()
+            execute(['git', 'add', testFile])
+
+        self.assertEqual(2,
+            len(gs.utilGetRawStagedLines(gs.gitGetFileStatuses()))
+        )
+
+class Test_utilGetRawStashLines(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #   - utilGetRawStashLines() just calls other functions that are fully
+    #     tested
+    #   - so just a minimal test that it works properly with >1 stashes
+    #-------------------------------------------------------------------------
+
+    def test(self):
+        TEST_FILE_1 = 'testfile_1'
+        TEST_FILE_2 = 'testfile_2'
+        createNonEmptyGitRepository()
+
+        for testFile in [TEST_FILE_1, TEST_FILE_2]:
+            createAndCommitFile(testFile)
+
+        for testFile in [TEST_FILE_1, TEST_FILE_2]:
+            modifiedFile = open(testFile, 'w')
+            modifiedFile.write('a')
+            modifiedFile.close()
+            execute(['git', 'stash'])
+
+        self.assertEqual(2,
+            len(gs.utilGetRawStashLines())
+        )
+
+class Test_utilGetRawUntrackedLines(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #   - utilGetRawUntrackedLines() just calls other functions that are fully
+    #     tested
+    #   - so just a minimal test that it works properly with >1 untracked files
+    #-------------------------------------------------------------------------
+
+    def test(self):
+        TEST_FILE_1 = 'testfile_1'
+        TEST_FILE_2 = 'testfile_2'
+        createNonEmptyGitRepository()
+
+        for testFile in [TEST_FILE_1, TEST_FILE_2]:
+            modifiedFile = open(testFile, 'w')
+            modifiedFile.write('a')
+            modifiedFile.close()
+
+        self.assertEqual(2,
+            len(gs.utilGetRawUntrackedLines(gs.gitGetFileStatuses()))
+        )
+
 class Test_utilGetStagedFileAsTwoColumns(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)

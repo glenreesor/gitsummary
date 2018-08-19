@@ -28,10 +28,12 @@ KEY_FILE_STATUSES_MODIFIED = 'modified'
 KEY_FILE_STATUSES_UNTRACKED = 'untracked'
 KEY_FILE_STATUSES_UNKNOWN = 'unknown'
 
-KEY_FILE_STATUSES_TYPE = "type"
-KEY_FILE_STATUSES_FILENAME = "filename"
-KEY_FILE_STATUSES_NEW_FILENAME = "newFilename"
-KEY_FILE_STATUSES_HEURISTIC_SCORE = "heuristicScore"
+KEY_FILE_STATUSES_TYPE = 'type'
+KEY_FILE_STATUSES_FILENAME = 'filename'
+KEY_FILE_STATUSES_NEW_FILENAME = 'newFilename'
+KEY_FILE_STATUSES_HEURISTIC_SCORE = 'heuristicScore'
+
+KEY_OPTIONS_SECTION_LIST = 'optionsCustomList'
 
 KEY_STASH_FULL_HASH = 'fullHash'
 KEY_STASH_NAME = 'name'
@@ -40,6 +42,20 @@ KEY_STASH_DESCRIPTION = 'description'
 #-----------------------------------------------------------------------------
 # Other constants so we can catch typos by linting
 #-----------------------------------------------------------------------------
+OPTIONS_SECTION_BRANCHES = 'branches'
+OPTIONS_SECTION_MODIFIED = 'modified'
+OPTIONS_SECTION_STAGED = 'staged'
+OPTIONS_SECTION_STASHES = 'stashes'
+OPTIONS_SECTION_UNTRACKED = 'untracked'
+
+OPTIONS_SECTIONS = [
+    OPTIONS_SECTION_BRANCHES,
+    OPTIONS_SECTION_MODIFIED,
+    OPTIONS_SECTION_STAGED,
+    OPTIONS_SECTION_STASHES,
+    OPTIONS_SECTION_UNTRACKED,
+]
+
 TEXT_BOLD = 'bold'
 TEXT_FLASHING = 'flashing'
 TEXT_GREEN = 'green'
@@ -53,9 +69,15 @@ TEXT_RED = 'red'
 #
 # These functions orchestrate the output for top level gitsummary commands
 #-----------------------------------------------------------------------------
-def cmdRepo():
+def cmdRepo(options):
     """
-    Print the output corresponding to the 'repo' command. Example:
+    Print the output corresponding to the 'repo' command.
+
+    Args
+        Dictionary options - A dictionary with the following key:
+                                KEY_OPTIONS_SECTION_LIST   : List of String
+
+    Example:
 
     Stashes   stash@{0} This is a stash
               stash@{1} This is another stash
@@ -87,113 +109,34 @@ def cmdRepo():
     #   - add colors
     #-------------------------------------------------------------------------
 
-    # Stashes
-    #   3 columns: 'Stashes' title (optional), name, description
-    #   Example  : 'Stashes', 'stash@{0}', 'WIP on branch xyz'
-    #              ''       , 'stash@{1}', 'WIP on branch abc'
-    rawStashList = gitGetStashes()
-    rawStashLines = []
-
-    for i, oneStash in enumerate(rawStashList):
-        rawStashLines.append(
-            ['Stashes' if i == 0 else ''] +
-            utilGetStashAsTwoColumns(oneStash)
-        )
-
     fileStatuses = gitGetFileStatuses()
-
-    # Staged Files
-    #   3 columns: 'Staged' title (optional), changeType, filename
-    #   Example  : 'Staged', 'M'     , 'file1'
-    #              ''      , 'A'     , 'file2'
-    #              '  '    , 'R(100)', 'file3 -> newFile3'
-    rawStagedList = fileStatuses[KEY_FILE_STATUSES_STAGED]
-    rawStagedLines = []
-
-    for i, stagedFile in enumerate(rawStagedList):
-        rawStagedLines.append(
-            ['Staged' if i == 0 else ''] +
-            utilGetStagedFileAsTwoColumns(stagedFile)
-        )
-
-    # Modified Files
-    #   3 columns: 'Modified' title, changeType, filename
-    #   Example  : 'Modified', 'M', 'file1'
-    #              ''        , 'D', 'file2'
-    rawModifiedList = fileStatuses[KEY_FILE_STATUSES_MODIFIED]
-    rawModifiedLines = []
-
-    for i, modifiedFile in enumerate(rawModifiedList):
-        rawModifiedLines.append(
-            ['Modified' if i == 0 else ''] +
-            utilGetModifiedFileAsTwoColumns(modifiedFile)
-        )
-
-    # Untracked Files
-    #   2 columns: 'Untracked' title, filename
-    #   Example  : 'Untracked', 'file1'
-    #              ''         , 'file2'
-    rawUntrackedList = fileStatuses[KEY_FILE_STATUSES_UNTRACKED]
-    rawUntrackedLines = []
-
-    for i, untrackedFile in enumerate(rawUntrackedList):
-        rawUntrackedLines.append(
-            [
-                'Untracked' if i == 0 else '',
-                untrackedFile,
-            ]
-        )
-
-    # Branch List
-    #   5 columns:
-    #       current-branch indicator (optional),
-    #       name,
-    #       remote +/-,
-    #       target +/-,
-    #       target name
-    #   Example  : '*', 'dev'    , '+1  -2', '+3  -4', 'master'
-    #              '' , 'branch1', '+1  -2', '+3  -4', 'dev'
-    localBranches = gitGetLocalBranches()
     currentBranch = gitGetCurrentBranch()
+    localBranches = gitGetLocalBranches()
 
-    # Title line
-    # Leading spaces so they're centered
-    rawBranchLines = [
-        ['', '', '  Remote', '  Target', ''],
-    ]
-
-    # Do master and dev first since they're the most important
-    importantBranches = ['master', 'dev']
-    for branch in importantBranches:
-        if branch in localBranches:
-            rawBranchLines.append(
-                utilGetBranchAsFiveColumns(
-                    currentBranch,
-                    branch,
-                    utilGetTargetBranch(branch, localBranches)
-                )
-            )
-
-    # Now all the other branches
-    for branch in localBranches:
-        if branch not in importantBranches:
-            rawBranchLines.append(
-                utilGetBranchAsFiveColumns(
-                    currentBranch,
-                    branch,
-                    utilGetTargetBranch(branch, localBranches)
-                )
-            )
-
-    # If we're in detached head state, add a branch line that indicates we're
-    # in detached head state
-    if currentBranch == '':
-        rawBranchLines.append(
-            utilGetBranchAsFiveColumns(
-                'Detached Head',
-                'Detached Head',
-                ''
-            )
+    rawStashLines = (
+        utilGetRawStashLines()
+            if OPTIONS_SECTION_STASHES in options[KEY_OPTIONS_SECTION_LIST]
+            else []
+        )
+    rawStagedLines = (
+        utilGetRawStagedLines(fileStatuses)
+            if OPTIONS_SECTION_STAGED in options[KEY_OPTIONS_SECTION_LIST]
+            else []
+        )
+    rawModifiedLines = (
+        utilGetRawModifiedLines(fileStatuses)
+            if OPTIONS_SECTION_MODIFIED in options[KEY_OPTIONS_SECTION_LIST]
+            else []
+        )
+    rawUntrackedLines = (
+        utilGetRawUntrackedLines(fileStatuses)
+            if OPTIONS_SECTION_UNTRACKED in options[KEY_OPTIONS_SECTION_LIST]
+            else []
+        )
+    rawBranchLines = (
+        utilGetRawBranchesLines(currentBranch, localBranches)
+            if OPTIONS_SECTION_BRANCHES in options[KEY_OPTIONS_SECTION_LIST]
+            else []
         )
 
     #-------------------------------------------------------------------------
@@ -330,18 +273,26 @@ def cmdRepo():
     # Print all our beautifully formatted output
     #-------------------------------------------------------------------------
     previousSectionHadOutput = False
-    for section in [
-        styledStashLines,
-        styledStagedLines,
-        styledModifiedLines,
-        styledUntrackedLines,
-        styledBranchLines
-    ]:
+    for section in options[KEY_OPTIONS_SECTION_LIST]:
+        if section == OPTIONS_SECTION_BRANCHES:
+            sectionLines = styledBranchLines
+        elif section == OPTIONS_SECTION_MODIFIED:
+            sectionLines = styledModifiedLines
+        elif section == OPTIONS_SECTION_STAGED:
+            sectionLines = styledStagedLines
+        elif section == OPTIONS_SECTION_STASHES:
+            sectionLines = styledStashLines
+        elif section == OPTIONS_SECTION_UNTRACKED:
+            sectionLines = styledUntrackedLines
+        else:
+            print('Whoa! Something went wrong! Unknown section: ' + section)
+            sys.exit(1)
+
         if previousSectionHadOutput:
             print()
-        for line in section:
+        for line in sectionLines:
             print(line)
-        previousSectionHadOutput = True if len(section) > 0 else False
+        previousSectionHadOutput = True if len(sectionLines) > 0 else False
 
     #-------------------------------------------------------------------------
     # Notify user if git returned something we didn't know how to handle
@@ -1104,6 +1055,224 @@ def utilGetModifiedFileAsTwoColumns(modifiedFile):
     ]
 
 #-----------------------------------------------------------------------------
+def utilGetRawBranchesLines(currentBranch, localBranches):
+    """
+    Get the "raw" lines for all branches, including the headings line.
+
+    Args
+        String         currentBranch - The name of the current branch.
+                                       Used to determine which branch line should
+                                       have the '*' indicator
+        List of String localBranches - List of all local branches
+
+    Return
+        List of 'lines', where each line is itself a List of columns
+
+        Each line has 5 columns:
+            current-branch indicator,
+            name,
+            remote +/-,
+            target +/-,
+            target name
+
+        Example:
+            [
+              [ '' , ''       , '  Remote', '  Target', ''],
+              [ '*', 'dev'    , '+1  -2'  , '+3  -4'  , 'master' ],
+              [ '' , 'branch1', '+1  -2'  , '+3  -4'  , 'dev' ],
+            ]
+    """
+    # Title line
+    # Leading spaces so they're centered
+    rawBranchLines = [
+        ['', '', '  Remote', '  Target', ''],
+    ]
+
+    # Do master and dev first since they're the most important
+    importantBranches = ['master', 'dev']
+    for branch in importantBranches:
+        if branch in localBranches:
+            rawBranchLines.append(
+                utilGetBranchAsFiveColumns(
+                    currentBranch,
+                    branch,
+                    utilGetTargetBranch(branch, localBranches)
+                )
+            )
+
+    # Now all the other branches
+    for branch in localBranches:
+        if branch not in importantBranches:
+            rawBranchLines.append(
+                utilGetBranchAsFiveColumns(
+                    currentBranch,
+                    branch,
+                    utilGetTargetBranch(branch, localBranches)
+                )
+            )
+
+    # If we're in detached head state, add a branch line that indicates we're
+    # in detached head state
+    if currentBranch == '':
+        rawBranchLines.append(
+            utilGetBranchAsFiveColumns(
+                'Detached Head',
+                'Detached Head',
+                ''
+            )
+        )
+
+    return rawBranchLines
+
+#-----------------------------------------------------------------------------
+def utilGetRawModifiedLines(fileStatuses):
+    """
+    Get the "raw" lines for all modified files.
+
+    Args
+        Dictionary with the following contents:
+            KEY_FILE_STATUSES_STAGED:    []   - staged files
+            KEY_FILE_STATUSES_MODIFIED:  []   - modified working dir files
+            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
+            KEY_FILE_STATUSES_UNKNOWN:   []   - unknown git output
+
+    Return
+        List of 'lines', where each line is itself a List of columns
+
+        Each line has 3 columns:
+            'Modified' title (first line only),
+            changeType,
+            filename
+
+        Example:
+            [
+              [ 'Modified', 'M', 'file1' ],
+              [ '',         'D', 'file2' ],
+            ]
+    """
+
+    rawModifiedLines = []
+
+    rawModifiedList = fileStatuses[KEY_FILE_STATUSES_MODIFIED]
+
+    for i, modifiedFile in enumerate(rawModifiedList):
+        rawModifiedLines.append(
+            ['Modified' if i == 0 else ''] +
+            utilGetModifiedFileAsTwoColumns(modifiedFile)
+        )
+
+    return rawModifiedLines
+
+#-----------------------------------------------------------------------------
+def utilGetRawStagedLines(fileStatuses):
+    """
+    Get the "raw" lines for all staged files.
+
+    Args
+        Dictionary with the following contents:
+            KEY_FILE_STATUSES_STAGED:    []   - staged files
+            KEY_FILE_STATUSES_MODIFIED:  []   - modified working dir files
+            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
+            KEY_FILE_STATUSES_UNKNOWN:   []   - unknown git output
+
+    Return
+        List of 'lines', where each line is itself a List of columns
+
+        Each line has 3 columns:
+            'Staged' title (first line only),
+            changeType,
+            filename
+
+        Example:
+            [
+                [ 'Staged', 'M'     , 'file1' ],
+                [ ''      , 'A'     , 'file2' ],
+                [ ''      , 'R(100)', 'file3 -> newFile3' ],
+            ]
+    """
+    rawStagedLines = []
+
+    rawStagedList = fileStatuses[KEY_FILE_STATUSES_STAGED]
+
+    for i, stagedFile in enumerate(rawStagedList):
+        rawStagedLines.append(
+            ['Staged' if i == 0 else ''] +
+            utilGetStagedFileAsTwoColumns(stagedFile)
+        )
+
+    return rawStagedLines
+
+#-----------------------------------------------------------------------------
+def utilGetRawStashLines():
+    """
+    Get the "raw" lines for all stashes.
+
+    Return
+        List of 'lines', where each line is itself a List of columns
+
+        Each line has 3 columns:
+            'Stashes' title (first line only),
+            name,
+            description
+
+        Example:
+            [
+                [ 'Stashes', 'stash@{0}', 'WIP on branch xyz' ],
+                [ ''       , 'stash@{1}', 'WIP on branch abc' ],
+            ]
+    """
+    rawStashLines = []
+
+    rawStashList = gitGetStashes()
+
+    for i, oneStash in enumerate(rawStashList):
+        rawStashLines.append(
+            ['Stashes' if i == 0 else ''] +
+            utilGetStashAsTwoColumns(oneStash)
+        )
+
+    return rawStashLines
+
+#-----------------------------------------------------------------------------
+def utilGetRawUntrackedLines(fileStatuses):
+    """
+    Get the "raw" lines for all untracked files.
+
+    Args
+        Dictionary with the following contents:
+            KEY_FILE_STATUSES_STAGED:    []   - staged files
+            KEY_FILE_STATUSES_MODIFIED:  []   - modified working dir files
+            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
+            KEY_FILE_STATUSES_UNKNOWN:   []   - unknown git output
+
+    Return
+        List of 'lines', where each line is itself a List of columns
+
+        Each line has 2 columns:
+            'Untracked' title (first line only),
+            filename
+
+        Example:
+            [
+              [ 'Untracked', 'file1' ],
+              [ ''         , 'file2' ],
+            ]
+    """
+    rawUntrackedLines = []
+
+    rawUntrackedList = fileStatuses[KEY_FILE_STATUSES_UNTRACKED]
+
+    for i, untrackedFile in enumerate(rawUntrackedList):
+        rawUntrackedLines.append(
+            [
+                'Untracked' if i == 0 else '',
+                untrackedFile,
+            ]
+        )
+
+    return rawUntrackedLines
+
+#-----------------------------------------------------------------------------
 def utilGetStagedFileAsTwoColumns(stagedFile):
     """
     Get the specified stagedFile formatted as two columns
@@ -1219,7 +1388,39 @@ def main():
         print('This folder is not tracked by git.')
         sys.exit(1)
 
-    cmdRepo()
+    # Determine what output the user wants
+    options = {
+        KEY_OPTIONS_SECTION_LIST: [
+            OPTIONS_SECTION_STASHES,
+            OPTIONS_SECTION_STAGED,
+            OPTIONS_SECTION_MODIFIED,
+            OPTIONS_SECTION_UNTRACKED,
+            OPTIONS_SECTION_BRANCHES,
+        ],
+    }
+
+    i = 1
+    while i < len(sys.argv):
+        if sys.argv[i] == '--custom':
+            customDone = False
+            options[KEY_OPTIONS_SECTION_LIST] = []
+            i += 1
+            while i < len(sys.argv) and not customDone:
+                arg = sys.argv[i]
+                if arg.startswith('--'):
+                    customDone = True
+                elif arg not in OPTIONS_SECTIONS:
+                    print('Unknown --custom option: ' + arg)
+                    sys.exit(1)
+                else:
+                    options[KEY_OPTIONS_SECTION_LIST].append(sys.argv[i])
+                    i += 1
+            break
+        else:
+            print('Unknown command line argument: ' + sys.argv[i])
+            sys.exit(1)
+
+    cmdRepo(options)
 
 #-----------------------------------------------------------------------------
 if __name__ == '__main__':
