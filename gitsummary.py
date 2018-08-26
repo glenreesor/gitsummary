@@ -198,7 +198,11 @@ def cmdRepo(options):
     # Get all of our lines (still in columns) with each column padded or
     # truncated as required
     #-------------------------------------------------------------------------
-    (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size();
+    try:
+        (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size();
+    except:
+        SCREEN_WIDTH = 80
+
     TRUNCATION_INDICATOR = '...'
 
     alignedStashLines = utilGetColumnAlignedLines(
