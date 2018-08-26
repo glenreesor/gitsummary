@@ -2,6 +2,6 @@ Manual testing that is not covered by testGitsummary.py
     - Current folder is not tracked by git
     - Repo command:
         - shows "Detached Head" when user is in detached head state
-        - all sections (stashes, staged, modified, untracked, branches)
-          are present
+        - all sections (stashes, staged, modified, untracked, branch, branch-current,
+          branch-all) are present
         - each section is colorized properly

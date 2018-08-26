@@ -42,14 +42,19 @@ KEY_STASH_DESCRIPTION = 'description'
 #-----------------------------------------------------------------------------
 # Other constants so we can catch typos by linting
 #-----------------------------------------------------------------------------
-OPTIONS_SECTION_BRANCHES = 'branches'
+
+# These are options that user specifies on command line (so don't change these
+# values)
+OPTIONS_SECTION_BRANCH_ALL = 'branch-all'
+OPTIONS_SECTION_BRANCH_CURRENT = 'branch-current'
 OPTIONS_SECTION_MODIFIED = 'modified'
 OPTIONS_SECTION_STAGED = 'staged'
 OPTIONS_SECTION_STASHES = 'stashes'
 OPTIONS_SECTION_UNTRACKED = 'untracked'
 
 OPTIONS_SECTIONS = [
-    OPTIONS_SECTION_BRANCHES,
+    OPTIONS_SECTION_BRANCH_ALL,
+    OPTIONS_SECTION_BRANCH_CURRENT,
     OPTIONS_SECTION_MODIFIED,
     OPTIONS_SECTION_STAGED,
     OPTIONS_SECTION_STASHES,
@@ -118,26 +123,39 @@ def cmdRepo(options):
             if OPTIONS_SECTION_STASHES in options[KEY_OPTIONS_SECTION_LIST]
             else []
         )
+
     rawStagedLines = (
         utilGetRawStagedLines(fileStatuses)
             if OPTIONS_SECTION_STAGED in options[KEY_OPTIONS_SECTION_LIST]
             else []
         )
+
     rawModifiedLines = (
         utilGetRawModifiedLines(fileStatuses)
             if OPTIONS_SECTION_MODIFIED in options[KEY_OPTIONS_SECTION_LIST]
             else []
         )
+
     rawUntrackedLines = (
         utilGetRawUntrackedLines(fileStatuses)
             if OPTIONS_SECTION_UNTRACKED in options[KEY_OPTIONS_SECTION_LIST]
             else []
         )
-    rawBranchLines = (
-        utilGetRawBranchesLines(currentBranch, localBranches)
-            if OPTIONS_SECTION_BRANCHES in options[KEY_OPTIONS_SECTION_LIST]
-            else []
+
+    if OPTIONS_SECTION_BRANCH_CURRENT in options[KEY_OPTIONS_SECTION_LIST]:
+        rawBranchLines = utilGetRawBranchesLines(
+            currentBranch,
+            localBranches,
+            [currentBranch]
         )
+    elif OPTIONS_SECTION_BRANCH_ALL in options[KEY_OPTIONS_SECTION_LIST]:
+        rawBranchLines = utilGetRawBranchesLines(
+            currentBranch,
+            localBranches,
+            localBranches
+        )
+    else:
+        rawBranchLines = []
 
     #-------------------------------------------------------------------------
     # For each section of output (stashes, staged, etc):
@@ -274,7 +292,7 @@ def cmdRepo(options):
     #-------------------------------------------------------------------------
     previousSectionHadOutput = False
     for section in options[KEY_OPTIONS_SECTION_LIST]:
-        if section == OPTIONS_SECTION_BRANCHES:
+        if section == OPTIONS_SECTION_BRANCH_ALL or section == OPTIONS_SECTION_BRANCH_CURRENT:
             sectionLines = styledBranchLines
         elif section == OPTIONS_SECTION_MODIFIED:
             sectionLines = styledModifiedLines
@@ -1055,15 +1073,16 @@ def utilGetModifiedFileAsTwoColumns(modifiedFile):
     ]
 
 #-----------------------------------------------------------------------------
-def utilGetRawBranchesLines(currentBranch, localBranches):
+def utilGetRawBranchesLines(currentBranch, localBranches, branchesToShow):
     """
-    Get the "raw" lines for all branches, including the headings line.
+    Get the "raw" lines for the specified branches, including the headings line.
 
     Args
-        String         currentBranch - The name of the current branch.
-                                       Used to determine which branch line should
-                                       have the '*' indicator
-        List of String localBranches - List of all local branches
+        String         currentBranch  - The name of the current branch.
+                                        Used to determine which branch line should
+                                        have the '*' indicator
+        List of String localBranches  - All local branches
+        List of String branchesToShow - Branches to include in output
 
     Return
         List of 'lines', where each line is itself a List of columns
@@ -1091,7 +1110,7 @@ def utilGetRawBranchesLines(currentBranch, localBranches):
     # Do master and dev first since they're the most important
     importantBranches = ['master', 'dev']
     for branch in importantBranches:
-        if branch in localBranches:
+        if branch in branchesToShow:
             rawBranchLines.append(
                 utilGetBranchAsFiveColumns(
                     currentBranch,
@@ -1101,7 +1120,7 @@ def utilGetRawBranchesLines(currentBranch, localBranches):
             )
 
     # Now all the other branches
-    for branch in localBranches:
+    for branch in branchesToShow:
         if branch not in importantBranches:
             rawBranchLines.append(
                 utilGetBranchAsFiveColumns(
@@ -1388,17 +1407,18 @@ def main():
         print('This folder is not tracked by git.')
         sys.exit(1)
 
-    # Determine what output the user wants
+    # Default sections, in order, if user doesn't specify any
     options = {
         KEY_OPTIONS_SECTION_LIST: [
             OPTIONS_SECTION_STASHES,
             OPTIONS_SECTION_STAGED,
             OPTIONS_SECTION_MODIFIED,
             OPTIONS_SECTION_UNTRACKED,
-            OPTIONS_SECTION_BRANCHES,
+            OPTIONS_SECTION_BRANCH_ALL,
         ],
     }
 
+    # Parse the command line options
     i = 1
     while i < len(sys.argv):
         if sys.argv[i] == '--custom':

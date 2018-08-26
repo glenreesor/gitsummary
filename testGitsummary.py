@@ -1347,7 +1347,9 @@ class Test_utilGetRawBranchesLines(unittest.TestCase):
         execute(['git', 'checkout', '-b', 'dev'])
 
         self.assertEqual(3,
-            len(gs.utilGetRawBranchesLines('dev', gs.gitGetLocalBranches()))
+            len(gs.utilGetRawBranchesLines(
+                'dev', gs.gitGetLocalBranches(), ['dev', 'master']
+            ))
         )
 
 class Test_utilGetRawModifiedLines(unittest.TestCase):
