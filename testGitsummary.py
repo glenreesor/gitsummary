@@ -282,26 +282,70 @@ class Test_gitGetCurrentBranch(unittest.TestCase):
     #-------------------------------------------------------------------------
     # Tests
     #-------------------------------------------------------------------------
+
+    #
+    # First the oddball cases where there are no refs
+    #
     def test_initialRepositoryState(self):
         EXPECTED_BRANCH = 'master'
         execute(['git', 'init'])
 
         self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
 
-    def test_initialRepositoryStateFromClonedRemote(self):
-        LOCAL = 'local'
-        createEmptyRemoteLocalPair('remote', LOCAL)
-        os.chdir(LOCAL)
-
-        self.assertEqual('master', gs.gitGetCurrentBranch())
-
     def test_initialRepositoryStateNotMaster(self):
         EXPECTED_BRANCH = 'dev'
+
         execute(['git', 'init'])
         execute(['git', 'checkout', '-b', EXPECTED_BRANCH])
 
         self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
 
+    def test_initialRepositoryStateFromClonedRemote(self):
+        EXPECTED_BRANCH = 'master'
+
+        LOCAL = 'local'
+        createEmptyRemoteLocalPair('remote', LOCAL)
+        os.chdir(LOCAL)
+
+        self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
+
+    #
+    # Tests involving detached head state
+    def test_oneBranchDetachedHeadState(self):
+        EXPECTED_BRANCH = ''
+
+        createNonEmptyGitRepository()
+        createAndCommitFile('newFile1')
+        previousCommitHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'master'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', previousCommitHash])
+
+        self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
+
+    def test_multipleBranchesDetachedHeadState(self):
+        EXPECTED_BRANCH = ''
+
+        createNonEmptyGitRepository()
+        createAndCommitFile('newFile1')
+        previousCommitHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'master'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', '-b', 'dev'])
+        execute(['git', 'checkout', previousCommitHash])
+
+        self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
+
+
+    #
+    # Now the "regular" cases where we can rely on refs existing
+    #
     def test_oneBranchExists(self):
         EXPECTED_BRANCH = 'master'
 
@@ -313,21 +357,6 @@ class Test_gitGetCurrentBranch(unittest.TestCase):
 
         createNonEmptyGitRepository()
         execute(['git', 'checkout', '-b', EXPECTED_BRANCH])
-
-        self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
-
-    def test_detachedHeadState(self):
-        EXPECTED_BRANCH = ''
-
-        createNonEmptyGitRepository()
-        createAndCommitFile('newFile1')
-        firstHash = subprocess.check_output(
-            ['git', 'rev-list', '--max-count=1', 'master'],
-            universal_newlines = True
-        ).splitlines()[0]
-
-        createAndCommitFile('newFile2')
-        execute(['git', 'checkout', firstHash])
 
         self.assertEqual(EXPECTED_BRANCH, gs.gitGetCurrentBranch())
 
@@ -800,19 +829,77 @@ class Test_gitGetLocalBranches(unittest.TestCase):
     #-------------------------------------------------------------------------
     # Tests
     #-------------------------------------------------------------------------
+
+    #
+    # First the oddball cases where there are no refs
+    #
     def test_initialRepositoryState(self):
         EXPECTED_BRANCHES = ['master']
 
         execute(['git', 'init'])
         self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
 
+    def test_initialRepositoryStateNotMaster(self):
+        EXPECTED_BRANCHES = ['dev']
+
+        execute(['git', 'init'])
+        execute(['git', 'checkout', '-b', 'dev'])
+
+        self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
+
+    def test_initialRepositoryStateFromClonedRemote(self):
+        EXPECTED_BRANCHES = ['master']
+
+        LOCAL = 'local'
+        createEmptyRemoteLocalPair('remote', LOCAL)
+        os.chdir(LOCAL)
+
+        self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
+
+    #
+    # Tests involving detached head state
+    #
+    def test_oneBranchDetachedHeadState(self):
+        EXPECTED_BRANCHES = ['master']
+
+        createNonEmptyGitRepository()
+        createAndCommitFile('newFile1')
+        previousCommitHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'master'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', previousCommitHash])
+
+        self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
+
+    def test_multipleBranchesDetachedHeadState(self):
+        EXPECTED_BRANCHES = ['dev', 'master']
+
+        createNonEmptyGitRepository()
+        createAndCommitFile('newFile1')
+        previousCommitHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'master'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', '-b', 'dev'])
+        execute(['git', 'checkout', previousCommitHash])
+
+        self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
+
+    #
+    # Now the "regular" cases where we can rely on refs existing
+    #
     def test_oneBranch(self):
         EXPECTED_BRANCHES = ['master']
 
         createNonEmptyGitRepository()
         self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
 
-    def test_moreThanOneBranch(self):
+    def test_multipleBranchesExist(self):
         NEW_BRANCH = 'dev'
         EXPECTED_BRANCHES = [NEW_BRANCH, 'master']
         EXPECTED_BRANCHES.sort()
@@ -831,7 +918,6 @@ class Test_gitGetLocalBranches(unittest.TestCase):
 
         self.assertEqual(EXPECTED_BRANCHES, gs.gitGetLocalBranches())
 
-
 #-----------------------------------------------------------------------------
 class Test_gitGetRemoteTrackingBranch(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
@@ -840,11 +926,22 @@ class Test_gitGetRemoteTrackingBranch(unittest.TestCase):
     #-------------------------------------------------------------------------
     # Tests
     #-------------------------------------------------------------------------
+
+    #
+    # First the oddball cases where there are no refs
+    #
     def test_initialRepositoryStateNoRemote(self):
         execute(['git', 'init'])
 
         self.assertEqual('', gs.gitGetRemoteTrackingBranch(''))
         self.assertEqual('', gs.gitGetRemoteTrackingBranch('master'))
+
+    def test_initialRepositoryStateNoRemoteNotMaster(self):
+        execute(['git', 'init'])
+        execute(['git', 'checkout', '-b', 'dev'])
+
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch(''))
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch('dev'))
 
     def test_initialRepositoryStateWithRemote(self):
         LOCAL = 'local'
@@ -854,6 +951,80 @@ class Test_gitGetRemoteTrackingBranch(unittest.TestCase):
         self.assertEqual(''             , gs.gitGetRemoteTrackingBranch(''))
         self.assertEqual('origin/master', gs.gitGetRemoteTrackingBranch('master'))
 
+    #
+    # Tests involving detached head state
+    #
+    def test_noRemoteRepositoryOneBranchDetachedHeadState(self):
+        createNonEmptyGitRepository()
+        createAndCommitFile('newFile1')
+        previousCommitHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'master'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', previousCommitHash])
+
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch(''))
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch('master'))
+
+    def test_noRemoteRepositoryMultipleBranchesDetachedHeadState(self):
+        createNonEmptyGitRepository()
+        createAndCommitFile('newFile1')
+        previousCommitHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'master'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', '-b', 'dev'])
+        execute(['git', 'checkout', previousCommitHash])
+
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch(''))
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch('master'))
+        self.assertEqual('', gs.gitGetRemoteTrackingBranch('dev'))
+
+    def test_withRemoteRepositoryOneBranchDetachedHeadState(self):
+        LOCAL = 'local'
+
+        createNonEmptyRemoteLocalPair('remote', LOCAL)
+        os.chdir(LOCAL)
+        createAndCommitFile('newFile1')
+
+        previousCommitHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'master'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', previousCommitHash])
+
+        self.assertEqual(''             , gs.gitGetRemoteTrackingBranch(''))
+        self.assertEqual('origin/master', gs.gitGetRemoteTrackingBranch('master'))
+
+    def test_withRemoteRepositoryMultipleBranchesDetachedHeadState(self):
+        LOCAL = 'local'
+
+        createNonEmptyRemoteLocalPair('remote', LOCAL)
+        os.chdir(LOCAL)
+        createAndCommitFile('newFile1')
+
+        previousCommitHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'master'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', '-b' 'dev'])
+        execute(['git', 'checkout', previousCommitHash])
+
+        self.assertEqual(''             , gs.gitGetRemoteTrackingBranch(''))
+        self.assertEqual(''             , gs.gitGetRemoteTrackingBranch('dev'))
+        self.assertEqual('origin/master', gs.gitGetRemoteTrackingBranch('master'))
+
+    #
+    # Now the "regular" cases where we can rely on refs existing
+    #
     def test_noRemoteRepository(self):
         createNonEmptyGitRepository()
         self.assertEqual('', gs.gitGetRemoteTrackingBranch(''))

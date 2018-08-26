@@ -655,39 +655,61 @@ def gitGetRemoteTrackingBranch(localBranch):
                - '' if localBranch is ''
                - '' if localBranch has no remote tracking branch
     """
+    remoteTrackingBranch = ''
+
     #-------------------------------------------------------------------------
-    localBranches = gitGetLocalBranches()
+    # If there are any refs:
+    #   - 'git for-each-ref' will tell us the remote branch
+    #   - So just scan that output for 'localBranch'
+    #
+    # If there are no refs:
+    #   - There's only one branch
+    #   - If 'localBranch' is not the current branch, the remote is '' by definition
+    #   - If 'localBranch' is the current branch, 'git status' will tell us
+    #     the remote
 
-    if localBranch not in localBranches:
-        remoteTrackingBranch = ''
-    elif len(localBranches) == 1:
-        # There's only one branch -- the current one. So use 'git status' to
-        # determine it's remote (if any).
-        #
-        # We use this approach since it also works when there are no refs
-        # (which is the case immediately after 'git init')
+    # Use a tab to separate fields (like git status) so branch names can have
+    # spaces
+    refsOutput = gitUtilGetOutput(
+        [
+            'git',
+            'for-each-ref',
+            '--format=%(refname:short)\t%(upstream:short)',
+        ]
+    )
+    # Expected output:
+    # [branchname] [fully qualified remote branch name]
+    # [Repeat for all local branches]
 
-        output = gitUtilGetOutput(['git', 'status', '--branch', '--porcelain=2'])
+    if len(refsOutput) > 0:
+        # There are refs, so find 'localBranch' in the output
+        for line in refsOutput:
+            split = line.split('\t')
+            if localBranch == split[0]:
+                remoteTrackingBranch = split[1]
+    else:
+        # No refs, so there's only one branch
+        statusOutput = gitUtilGetOutput(['git', 'status', '--branch', '--porcelain=2'])
         # Expected output: a bunch of lines starting with '#', where we only care
         # about:
+        #   # branch.head BRANCH
         #   # branch.upstream REMOTE/BRANCH
-        remoteTrackingBranch = ''
-        for line in output:
-            match = re.match('^# branch.upstream (.+)$', line)
-            if (match):
-                remoteTrackingBranch = match.group(1)
 
-    else:
-        remoteTrackingBranch = gitUtilGetOutput(
-            [
-                'git',
-                'for-each-ref',
-                '--format=%(upstream:short)',
-                'refs/heads/' + localBranch
-            ]
-        )[0]
-        # Expected output:
-        # [fully qualified branch name]
+        # First pull out the info we're interested in
+        branchValue = None
+        remoteValue = None
+
+        for line in statusOutput:
+            branchMatch = re.match('^# branch.head (.+)$', line)
+            if (branchMatch):
+                branchValue = branchMatch.group(1)
+            else:
+                remoteMatch = re.match('^# branch.upstream (.+)$', line)
+                if (remoteMatch):
+                    remoteValue = remoteMatch.group(1)
+
+        if localBranch == branchValue and remoteValue != None:
+            remoteTrackingBranch = remoteValue
 
     return remoteTrackingBranch
 
