@@ -1565,6 +1565,11 @@ class Test_utilGetTargetBranch(unittest.TestCase):
         self.assertEqual('master', gs.utilGetTargetBranch('dev', ['master', 'dev']))
         self.assertEqual(''      , gs.utilGetTargetBranch('dev', ['dev']))
 
+        self.assertEqual(''      , gs.utilGetTargetBranch('hf-my-hotfix', []))
+        self.assertEqual('master', gs.utilGetTargetBranch('hf-my-hotfix', ['master']))
+        self.assertEqual('master', gs.utilGetTargetBranch('hf-my-hotfix', ['master', 'dev']))
+        self.assertEqual(''      , gs.utilGetTargetBranch('hf-my-hotfix', ['dev']))
+
         self.assertEqual(''   , gs.utilGetTargetBranch('feature-branch', []))
         self.assertEqual(''   , gs.utilGetTargetBranch('feature-branch', ['master']))
         self.assertEqual('dev', gs.utilGetTargetBranch('feature-branch', ['master', 'dev']))

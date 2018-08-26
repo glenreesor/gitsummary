@@ -1385,6 +1385,12 @@ def utilGetTargetBranch(branch, localBranches):
     """
     Return the name of the target branch associated with 'branch'.
 
+    Branch name patterns and their associated target branch are:
+        master --> None
+        dev    --> master
+        hf*    --> master
+        *      --> dev
+
     Args
         String         branch        - The name of the branch we're interested in
         List of String localBranches - List of all local branches
@@ -1395,6 +1401,8 @@ def utilGetTargetBranch(branch, localBranches):
     if branch == 'master':
         targetBranch = ''
     elif branch == 'dev':
+        targetBranch = 'master' if 'master' in localBranches else ''
+    elif branch.startswith('hf'):
         targetBranch = 'master' if 'master' in localBranches else ''
     else:
         targetBranch = 'dev' if 'dev' in localBranches else ''
