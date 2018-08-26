@@ -18,6 +18,9 @@ import subprocess
 import sys
 
 #-----------------------------------------------------------------------------
+VERSION = '3.0.0'
+
+#-----------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
 #-----------------------------------------------------------------------------
 KEY_COMMIT_SHORT_HASH = 'shortHash'
@@ -1469,7 +1472,33 @@ def main():
                 else:
                     options[KEY_OPTIONS_SECTION_LIST].append(sys.argv[i])
                     i += 1
-            break
+        elif sys.argv[i] == '--help':
+            print('Usage:')
+            print('    ' + sys.argv[0] + ' [--custom [options]] | --help')
+            print('')
+            print('Print a summary of the current git repository\'s status:')
+            print('    - stashes, staged files, modified files, untracked files,')
+            print('    - list of local branches, including the following for each:')
+            print('          - number of commits ahead/behind its target branch')
+            print('          - number of commits ahead/behind its remote branch')
+            print('          - the name of its target branch')
+
+            print('Flags:')
+            print('    --custom [options]')
+            print('        - Show only the specified sections of output')
+            print('        - Valid section names are:')
+            print('          \'stashes\', \'staged\', \'modified\', \'untracked\', \'branch-all\',')
+            print('          \'branch-current\'')
+            print('')
+            print('    --help')
+            print('        - Show this output')
+            print('')
+            print('    --version')
+            print('        - Show current version')
+            sys.exit(0)
+        elif sys.argv[i] == '--version':
+            print(VERSION)
+            sys.exit(0)
         else:
             print('Unknown command line argument: ' + sys.argv[i])
             sys.exit(1)
