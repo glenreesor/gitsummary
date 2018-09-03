@@ -24,6 +24,7 @@ def main():
 
     os.chdir(destFolder)
     setupScenario('all-sections', createScenarioAllSections)
+    setupScenario('demo', createScenarioDemo)
     setupScenario('detached-head', createScenarioDetachedHead)
 
 def setupScenario(scenarioFolder, scenarioSetupFn):
@@ -44,10 +45,11 @@ def setupScenario(scenarioFolder, scenarioSetupFn):
         Function scenarioSetupFn - The function that will create the environment
     """
     print('Creating ' + scenarioFolder)
+    cwd = os.getcwd()
     os.mkdir(scenarioFolder)
     os.chdir(scenarioFolder)
     scenarioSetupFn()
-    os.chdir('..')
+    os.chdir(cwd)
 
 def createScenarioAllSections():
     """
@@ -65,15 +67,18 @@ def createScenarioAllSections():
 
     # Create the initial files, which will be used for the 'Modified' section
     utilExecute(['git', 'init'])
-    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2, FILE_FOR_STASH]:
-        utilCreateAndCommitFile(aFile)
+    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
+        utilModifyAndCommitFile(aFile)
 
     # Create the two stashes
+    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
+
     stashedFileHandle = open(FILE_FOR_STASH, 'w')
     stashedFileHandle.write('a')
     stashedFileHandle.close()
     utilExecute(['git', 'stash'])
 
+    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents2', 'Fix something')
     stashedFileHandle = open(FILE_FOR_STASH, 'w')
     stashedFileHandle.write('b')
     stashedFileHandle.close()
@@ -101,31 +106,146 @@ def createScenarioAllSections():
     # Make another branch
     utilExecute(['git', 'checkout', '-b', 'dev'])
 
+def createScenarioDemo():
+    """
+    In the current folder, create the environment for:
+        - Demo output showing gitsummary capabilities
+        - Branches
+            commit1   commit2   commit3   commit4   commit5    ... commitX
+            master
+                                          dev
+                      feature-make-awesome
+                                                               feature-make-faster
+                      hf-fix-bad-bug
+
+        - Staged files etc will be setup on feature-make-faster, hence "X"
+          in "commitX" above, and below in remotes
+
+        - Remotes:
+            master              : in sync
+            dev                 : in sync
+            feature-make-awesome: no remote
+            feature-make-faster : +X
+
+        - Two entries in each section of gitsummary output
+    """
+
+    #-------------------------------------------------------------------------
+    # Create branches
+    #-------------------------------------------------------------------------
+    REMOTE = 'remote'
+    LOCAL = 'local'
+    WORK_FILE = 'branch-work-setup'
+
+    utilExecute(['git', 'init', '--bare', REMOTE])
+    utilExecute(['git', 'clone', REMOTE, LOCAL])
+    os.chdir(LOCAL)
+
+    utilModifyAndCommitFile(WORK_FILE, 'contents1', 'commit1')
+    utilExecute(['git', 'push'])
+
+    utilExecute(['git', 'checkout', '-b', 'dev', 'master'])
+    utilExecute(['git', 'push', '--set-upstream', 'origin', 'dev'])
+
+    utilExecute(['git', 'checkout', '-b', 'hf-fix-bad-bug', 'master'])
+    utilModifyAndCommitFile(WORK_FILE, 'contents2', 'commit2')
+
+    utilExecute(['git', 'checkout', 'dev'])
+    utilModifyAndCommitFile(WORK_FILE, 'contents3', 'commit3')
+    utilExecute(['git', 'push'])
+
+    utilExecute(['git', 'checkout', '-b', 'feature-make-awesome', 'dev'])
+
+    utilExecute(['git', 'checkout', 'dev'])
+    utilModifyAndCommitFile(WORK_FILE, 'contents4', 'commit4')
+    utilModifyAndCommitFile(WORK_FILE, 'contents5', 'commit5')
+    utilExecute(['git', 'push'])
+
+    utilExecute(['git', 'checkout', '-b', 'feature-make-faster', 'dev'])
+    utilModifyAndCommitFile(WORK_FILE, 'contents6', 'commit6')
+    utilExecute(['git', 'push', '--set-upstream', 'origin', 'feature-make-faster'])
+    utilModifyAndCommitFile(WORK_FILE, 'contents6a', 'commit6a')
+    utilModifyAndCommitFile(WORK_FILE, 'contents6b', 'commit6b')
+
+    #-------------------------------------------------------------------------
+    # Setup files to get two entries in each section of gitsummary output
+    #-------------------------------------------------------------------------
+    STAGED_FILE_1 = 'app.js'
+    STAGED_FILE_2 = '.eslintrc'
+    MODIFIED_FILE_1 = 'index.html'
+    MODIFIED_FILE_2 = 'app.css'
+    FILE_FOR_STASH = 'file-for-stash'
+    UNTRACKED_FILE_1 = 'todo.txt'
+    UNTRACKED_FILE_2 = 'test.output'
+
+    # Create the initial files, which will be used for the 'Modified' section
+    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
+        utilModifyAndCommitFile(aFile)
+
+    # Create the two stashes
+    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
+
+    stashedFileHandle = open(FILE_FOR_STASH, 'w')
+    stashedFileHandle.write('a')
+    stashedFileHandle.close()
+    utilExecute(['git', 'stash'])
+
+    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents2', 'Fix something')
+    stashedFileHandle = open(FILE_FOR_STASH, 'w')
+    stashedFileHandle.write('b')
+    stashedFileHandle.close()
+    utilExecute(['git', 'stash'])
+
+    # Stage changes
+    for aFile in [STAGED_FILE_1, STAGED_FILE_2]:
+        stagedFileHandle = open(aFile, 'w')
+        stagedFileHandle.write('a')
+        stagedFileHandle.close()
+        utilExecute(['git', 'add', aFile])
+
+    # Modified files
+    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
+        modifiedFileHandle = open(aFile, 'w')
+        modifiedFileHandle.write('a')
+        modifiedFileHandle.close()
+
+    # Untracked files
+    for aFile in [UNTRACKED_FILE_1, UNTRACKED_FILE_2]:
+        untrackedFileHandle = open(aFile, 'w')
+        untrackedFileHandle.write('a')
+        untrackedFileHandle.close()
+
 def createScenarioDetachedHead():
     """
     In the current folder, create the environment for:
         - Detached head state
     """
     utilExecute(['git', 'init'])
-    utilCreateAndCommitFile('file1')
+    utilModifyAndCommitFile('file1')
     previousCommitHash = subprocess.check_output(
         ['git', 'rev-list', '--max-count=1', 'master'],
         universal_newlines = True
     ).splitlines()[0]
-    utilCreateAndCommitFile('file2')
+    utilModifyAndCommitFile('file2')
     utilExecute(['git', 'checkout', previousCommitHash])
 
-def utilCreateAndCommitFile(filename, commitMsg = 'Commit Message'):
+def utilModifyAndCommitFile(
+    filename,
+    contents = 'default contents',
+    commitMsg = 'Default commit message'
+):
     """
-    Create the specified file (empty) in the current working directory then
-    'git add' and 'git commit'.
+    Modify (or create if it doesn't exist) the specified file, with the specified
+    contents, in the current working directory then 'git add' and 'git commit'.
 
     Args
-        String filename  - The name of the file to create
+        String filename  - The name of the file
+        String contents  - The contents for the file
         String commitMsg - The commit message to use
     """
-    newFile = open(filename, 'w')
-    newFile.close()
+    modifiedFile = open(filename, 'w')
+    modifiedFile.write(contents)
+    modifiedFile.close()
     utilExecute(['git', 'add', filename])
     utilExecute(['git', 'commit', '-m', commitMsg])
 
