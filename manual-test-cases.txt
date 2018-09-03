@@ -1,8 +1,55 @@
-Manual testing that is not covered by testGitsummary.py
-    - Current folder is not tracked by git
-    - Repo command:
-        - shows "Detached Head" when user is in detached head state
-        - all sections (stashes, staged, modified, untracked, branch, branch-current,
-          branch-all) are present
-        - each section is colorized properly
-        - redirecting output to a file
+Manual testing that is not covered by testGitsummary.py:
+
+Use createScenarios.py to create folders that satisfy the test
+criteria listed below.
+
+Test    Scenario to Use     Description
+1       n/a                 - Current folder not tracked by git
+                            - Expected output:
+                                This folder is not tracked by git.
+
+2       detached-head       - gitsummary shows 'Detached Head' in the branch
+                              list if we're in detached head state
+                            - Expected output:
+                                - Current branch indicator beside "Detached Head"
+
+3       all-sections        - All sections are listed and colorized properly
+                            - Confirm each section is listed, has two entries,
+                              and colorized properly:
+                                Stashes
+                                Staged
+                                Modified
+                                Untracked
+                                All branches
+
+4       all-sections        - --custom is processed in proper order
+                            - How to test:
+                                path-to-gitsummary/gitsummary.py --custom branch-all untracked modified staged stashes
+
+                            - Confirm each section is listed in the following order:
+                                Branches (all)
+                                Untracked
+                                Modified
+                                Staged
+                                Stashes
+
+5       all-sections        - Same as test 4, but current branch rather than all
+                              branches
+                            - How to test:
+                                path-to-gitsummary/gitsummary.py --custom branch-current untracked modified staged stashes
+
+                            - Confirm each section is listed in the following order:
+                                Branch (current)
+                                Untracked
+                                Modified
+                                Staged
+                                Stashes
+
+6       all-sections        - Confirm that redirecting to a file doesn't fail
+                            - How to test:
+                                path-to-gitsummary/gitsummary.py > gitsummary.out
+                                cat gitsummary.out
+
+                            - Confirm:
+                                - gitsummary.py didn't fail
+                                - the output is not empty

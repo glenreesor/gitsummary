@@ -28,6 +28,10 @@ def createAndCommitFile(filename, commitMsg = 'Commit Message'):
     """
     Create the specified file (empty) in the current working directory then
     'git add' and 'git commit'.
+
+    Args
+        String filename  - The name of the file to create
+        String commitMsg - The commit message to use
     """
     newFile = open(filename, 'w')
     newFile.close()
