@@ -1124,30 +1124,9 @@ class Test_gitGetStashes(unittest.TestCase):
             self.assertTrue(isinstance(oneStash[gs.KEY_STASH_DESCRIPTION], str))
 
 #-----------------------------------------------------------------------------
-class Test_gitUtilFolderIsTracked(unittest.TestCase):
-    def setUp(self)   : commonTestSetUp(self)
-    def tearDown(self): commonTestTearDown(self)
-
-    #-------------------------------------------------------------------------
-    # Tests
-    #-------------------------------------------------------------------------
-    def test_notGitTracked(self):
-        self.assertFalse(gs.gitUtilFolderIsTracked())
-
-    def test_initialRepositoryState(self):
-        execute(['git', 'init'])
-        self.assertTrue(gs.gitUtilFolderIsTracked())
-
-    def test_isGitTracked(self):
-        createNonEmptyGitRepository()
-        self.assertTrue(gs.gitUtilFolderIsTracked())
-
-#-----------------------------------------------------------------------------
 # Placeholders for:
 #   gitUtilGetOutput()            - No tests since it's implicitly tested by
 #                                   everything else
-#   gitUtilOutputSaysNotTracked() - No tests since it's tested indirectly
-#                                   through gitUtilFolderIsTracked()
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------

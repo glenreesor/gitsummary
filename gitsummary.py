@@ -776,48 +776,11 @@ def gitGetStashes():
     return stashes
 
 #-----------------------------------------------------------------------------
-def gitUtilFolderIsTracked():
-    """
-    Return whether the current folder is tracked by git.
-
-    Return
-        Boolean - Is it tracked?
-    """
-    isGitTracked = True
-
-    # Something simple. We don't use gitUtilGetOutput() because it's called
-    # in contexts where we know (or think we know) a folder is git tracked,
-    # and will exit immediately if not.
-    try:
-        output = subprocess.check_output(
-            ['git', 'for-each-ref', '--count=1', '--format=42'],
-            stderr = subprocess.STDOUT,
-            universal_newlines = True
-        )
-
-        # We're expecting an exception to be raised due to a non-zero exit
-        # code. Check here as well, since it'll shut up the linter
-        if gitUtilOutputSaysNotTracked(output):
-            isGitTracked = False
-
-    except subprocess.CalledProcessError as e:
-        if gitUtilOutputSaysNotTracked(e.output):
-            isGitTracked = False
-        else:
-            raise
-
-    return isGitTracked
-
-#-----------------------------------------------------------------------------
 def gitUtilGetOutput(command):
     """
     Get the output from running the specified git command.
 
-    It is assumed the current folder is git tracked. As a precaution, this
-    function will call sys.exit() if it's not, indicating that this is a
-    programming error.
-
-    Non-zero exit codes will result in an error being thrown.
+    If there's an error, print the command and its output, then call sys.exit().
 
     Args
         List command - The git command to run, including the 'git' part
@@ -834,30 +797,13 @@ def gitUtilGetOutput(command):
         )
 
     except subprocess.CalledProcessError as e:
-        if gitUtilOutputSaysNotTracked(e.output):
-            msg = 'Current folder is not git tracked. '
-            msg += 'This is a programming error in gitsummary.'
-            print(msg)
-            sys.exit()
-        else:
-            raise
+        print('Failure: ' + str(e.cmd))
+        print(e.output)
+        sys.exit(1)
     else:
         returnVal = output.splitlines()
 
     return returnVal
-
-#-----------------------------------------------------------------------------
-def gitUtilOutputSaysNotTracked(gitOutput):
-    """
-    Return whether the specified string matches the git message when the current
-    folder (or any of it's parents) is not git tracked.
-
-    Return
-        Boolean - Whether it's git tracked or not
-    """
-    MAGIC_OUTPUT = 'Not a git repository'
-
-    return True if MAGIC_OUTPUT in gitOutput else False
 
 #-----------------------------------------------------------------------------
 def utilGetAheadBehindString(ahead, behind):
@@ -1440,10 +1386,6 @@ def utilGetTargetBranch(branch, localBranches):
 
 #-----------------------------------------------------------------------------
 def main():
-    if not gitUtilFolderIsTracked():
-        print('This folder is not tracked by git.')
-        sys.exit(1)
-
     # Default sections, in order, if user doesn't specify any
     options = {
         KEY_OPTIONS_SECTION_LIST: [
