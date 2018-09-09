@@ -1,92 +1,99 @@
 # gitsummary
 
-Summarize git repository and branch statuses
+A better `git status`
+- stashes
+- file statuses
+- branch list
+    - number of commits ahead/behind remote and merge target
 
-## Description
-Use `gitsummary` to see a summary of your git repository:
+All nicely formatted with color.
 
-* All stashes
-* All staged, modified, and untracked files
-* For each local branch:
-   * Number of commits that differ between local and remote
-   * Number of commits that differ between local and `dev`
-     (`dev` will be compared to `master`)
-
-Use `gitsummary branch` to see a summary of a particular branch:
-
-* All stashes (regardless of what commit they're associated with)
-* All staged, modified, and untracked files
-* One-line descriptions for all commits that differ between local and remote
-* Number of commits that differ between local and `dev`
-(`dev` will be compared to `master`)
-
-
-## Example - All Branches
+## Example
 ![](https://raw.githubusercontent.com/glenreesor/gitsummary/master/doc/output.default.png)
 
-`gitsummary` shows a snapshot of your git repository. This screenshot shows:
+In addition to the usual stashes and file statuses, this output is showing the
+following branch information:
 
-* There is one stash on commit `060c412`
-* A list of staged, modified, and untracked files
-* local `dev` has 2 commits that haven't been merged to local `master`
-* local `feature-Make-Awesome`:
-   * has 2 commits that haven't been pushed to its remote
-   * has 2 commits that haven't been merged to local `dev`
-   * is missing 1 commit from local `dev`
+- `master`
+    - In sync with its remote branch
+    - Has no merge target
+- `dev`
+    - In sync with its remote branch
+    - 3 commits ahead of its merge target (`master`)
+- `feature-make-awesome`
+    - Has no remote branch
+    - 2 commits behind its merge target (`dev`)
+- `feature-make-faster`
+    - 6 commits ahead of its remote
+    - 7 commits ahead of its merge target (`dev`)
+- `hf-fix-bad-bug`
+    - Has no remote branch
+    - 1 commit ahead of its merge target (`master`)
 
-* local `feature-Make-Cross-Platform` does not have a corresponding remote,
- and is up to date with local `dev`
+## What is a 'Merge Target'?
+A merge target is the branch that `gitsummary` is expecting a particular branch
+to be merged into.
 
-## Example - Current Branch
-![](https://raw.githubusercontent.com/glenreesor/gitsummary/master/doc/output.currentBranch.png)
+The algorithm for determining merge targets is currently hard coded, but will
+be configurable in a future version.
 
-`gitsummary branch` shows complete information about the current branch
+Branch Name Pattern | Merge Target | Comments
+------------------- | ------------ | --------
+master              |   [None]     |
+dev                 |   master     | No target if master does not exist
+hf*                 |   master     | No target if master does not exist. ('hf' is an abbreviation for 'hotfix')
+*                   |   dev        |
 
-This screenshot shows local `feature-Make-Awesome`:
-
-   * has two commits that haven't been pushed to origin
-   (`Finish doing something awesome` and `Do something awesome - Part 1`)
-   * has 2 commits that haven't been merged to local its 'target' branch
-   (`dev`)
-   * is missing 1 commit from its target branch (`dev`)
-
-The specific commits relative to its target can be shown using `--target`
+(See below if you want to change `gitsummary` for your own branch merge targets.)
 
 ## Usage
 ```
-Usage: gitsummary [repo | branch] [options]
-    repo   - Show a summary of the current git repository, including:
-                 - Stashes and staged/modified/untracked files
-                 - All local branches
-                 - For each branch, the number of commits differing from its
-                   remote and merge target
-                       - Commits Ahead: +n
-                       - Commits Behind: -n
-                       - No remote or merge target signified by blanks
-           - This is the default if neither 'repo' nor 'branch' is specified.
+Usage:
+    /gitsummary.py [--custom [options]] | --help
 
-             Options:
-                 --n - Format output for a screen width of n characters
+Print a summary of the current git repository's status:
+    - stashes, staged files, modified files, untracked files,
+    - list of local branches, including the following for each:
+          - number of commits ahead/behind its target branch
+          - number of commits ahead/behind its remote branch
+          - the name of its target branch
+Flags:
+    --custom [options]
+        - Show only the specified sections of output
+        - Valid section names are:
+          'stashes', 'staged', 'modified', 'untracked', 'branch-all',
+          'branch-current'
 
-    branch - Show a summary of the current branch, including remote name,
-             merge target name, commits differing from the remote, and
-             number of commits differing from merge target.
+    --help
+        - Show this output
 
-           - Commits listed under "Local Branch" exist in the local branch but
-             not the remote. Commits listed under "Remote" exist in the remote
-             but not the local branch.
-             Options:
-                 BRANCH   - Any argument that doesn't start with -- is treated
-                            as a branch to use for the comparison, instead of
-                            the current branch
-                 --hash   - Show commit hashes as well as descriptions
-                 --target - Show the commits differing from the merge target
-                            instead of just the number
-                 --n      - Format output for a screen width of n characters
+    --version
+        - Show current version
 ```
 
 ## Requirements
 python3
 
 ## Installation
-Easy! Just copy [gitsummary](https://raw.githubusercontent.com/glenreesor/gitsummary/master/gitsummary) to a folder in your path, and you're set!
+Easy! Just copy [gitsummary.py](https://raw.githubusercontent.com/glenreesor/gitsummary/master/gitsummary.py) to a folder in your path, and you're set!
+
+## Customizing Branch Merge Targets
+The logic for mapping branches to their merge targets is in
+`gitsummary.py/utilGetTargetBranch()`,
+and the corresponding tests are in `testGitsummary.py/Test_utilGetTargetBranch`.
+
+The code is straight forward. For example, if you use `develop` instead of `dev`
+and `hotfix` instead of `hf`, the body of `utilGetTargetBrahch()` would be:
+
+```
+    if branch == 'master':
+        targetBranch = ''
+    elif branch == 'develop':
+        targetBranch = 'master' if 'master' in localBranches else ''
+    elif branch.startswith('hotfix'):
+        targetBranch = 'master' if 'master' in localBranches else ''
+    else:
+        targetBranch = 'develop' if 'develop' in localBranches else ''
+
+    return targetBranch
+```
