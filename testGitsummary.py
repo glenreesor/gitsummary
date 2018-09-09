@@ -3,6 +3,8 @@ import gitsummary as gs
 
 import os
 import re
+import shutil
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -10,16 +12,27 @@ import unittest
 #-----------------------------------------------------------------------------
 # setUp() and tearDown() common to all tests
 #   - Create/delete a temporary folder where we can do git stuff
-#   - cd into it on creation
+#   - cd into it at test start
+#   - cd out and delete it at test exit
+#
+# We can't use tempfile.TemporaryDirectory() because its cleanup() method
+# will fail on Windows files with the readonly attribute set (which is the
+# case for files in .git/)
 #-----------------------------------------------------------------------------
 def commonTestSetUp(self):
     self.setupInitialDir = os.getcwd()
-    self.tempDir = tempfile.TemporaryDirectory()
-    os.chdir(self.tempDir.name)
+    self.tempDir = tempfile.mkdtemp(prefix='testGitsummary.')
+    os.chdir(self.tempDir)
 
 def commonTestTearDown(self):
     os.chdir(self.setupInitialDir)
-    self.tempDir.cleanup()
+    shutil.rmtree(self.tempDir, onerror=rmtreeErrorHandler)
+
+def rmtreeErrorHandler(func, path, exception):
+    # We're expecting this to be called due to a Windows readonly file, so
+    # remove that attribute and continue
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 #-----------------------------------------------------------------------------
 # Helpers
@@ -1731,14 +1744,15 @@ class Test_utilGetTargetBranch(unittest.TestCase):
 if __name__ == '__main__':
     # Since we have a pile of tests hitting the filesystem, change to a
     # temporary directory up front, just in case we forget to for an individual
-    # test (and end up botching stuff in our dev folder)
+    # test (and end up messing up stuff in our dev folder)
     initialDir = os.getcwd()
-    tempDir = tempfile.TemporaryDirectory()
-    os.chdir(tempDir.name)
+    tempDir = tempfile.mkdtemp(prefix='testGitsummary.')
+    os.chdir(tempDir)
 
     # Now it's safe to test!
-    unittest.main()
+    # We need 'exit=false' so our cleanup after unittest.main() will run.
+    unittest.main(exit=False)
 
     # Cleanup
     os.chdir(initialDir)
-    tempDir.cleanup()
+    shutil.rmtree(tempDir)

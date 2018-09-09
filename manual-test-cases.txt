@@ -6,7 +6,8 @@ criteria listed below.
 Test    Scenario to Use     Description
 1       n/a                 - Current folder not tracked by git
                             - Expected output:
-                                This folder is not tracked by git.
+                                Failure: ['git', 'status', '--porcelain=2']
+                                fatal: Not a git repository (or any of the parent directories): .git
 
 2       detached-head       - 'Detached Head'
                             - Expected output:
