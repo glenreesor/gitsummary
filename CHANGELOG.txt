@@ -1,2 +1,21 @@
+2018-09-09 - Version 3.0.0
+    - No 'repo' and 'branch' options
+    - Properly handle detached head state
+    - Full test suite
+    - Fully tested on Linux, MacOS, Windows
+
+2017-03-34 - Version 2.0.0
+    - Switch to using two main options:
+        - repo: Showing information about the entire repository, in particular,
+                all branches
+            - Options:
+                --branch, --compareto, --current, --long, --current options
+
+        - branch: Showing information about just the current branch
+            - Options:
+                --hash, --target options
+
+    - New '--n' option for output width
+
 2016-10-01 - Version 1.0
-   - Initial release
+    - Initial release
