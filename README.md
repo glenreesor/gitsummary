@@ -42,7 +42,7 @@ Branch Name Pattern | Merge Target | Comments
 master              |   [None]     |
 dev                 |   master     | No target if master does not exist
 hf*                 |   master     | No target if master does not exist. ('hf' is an abbreviation for 'hotfix')
-*                   |   dev        |
+[everything else]   |   dev        |
 
 (See below if you want to change `gitsummary` for your own branch merge targets.)
 
