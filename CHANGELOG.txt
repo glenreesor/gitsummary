@@ -1,8 +1,19 @@
 2018-09-09 - Version 3.0.0
     - No 'repo' and 'branch' options
-    - Properly handle detached head state
-    - Full test suite
-    - Fully tested on Linux, MacOS, Windows
+    - Only git plumbing commands are used
+
+    - New Features:
+        - Output width matches terminal width
+        - Output can be customized to include any combination, and in any order,
+          of stashes, staged, modified, untracked, and branch sections
+        - Branch output can be restricted to current branch only
+
+    - Bug Fixes:
+        - Handle detached head state properly
+        - Gracefully handle lack of master and/or dev branches
+
+    - Testing:
+        - Full test suite, which passes for Linux, MacOS, Windows
 
 2017-03-34 - Version 2.0.0
     - Switch to using two main options:
