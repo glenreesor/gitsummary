@@ -22,7 +22,7 @@ import subprocess
 import sys
 
 #-----------------------------------------------------------------------------
-VERSION = '3.0.0'
+VERSION = '3.0.1'
 
 #-----------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
