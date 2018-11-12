@@ -53,7 +53,7 @@ Test    Scenario to Use     Description
                                 - gitsummary.py didn't fail
                                 - the output is not empty
 
-7       all-sectionLines    - Dynamic width
+7       all-sections        - Lines dynamic width
                             - How to test:
                                 - Resize window and confirm output matches
                                   window width
