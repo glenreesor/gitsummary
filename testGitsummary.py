@@ -1523,16 +1523,68 @@ class Test_utilGetRawBranchesLines(unittest.TestCase):
     # Tests
     #   - utilGetRawBranchesLines() just calls other functions that are fully
     #     tested
-    #   - so just a minimal test that it works properly with >1 branches
+    #   - so just minimal tests of the showAllBranches argument
     #-------------------------------------------------------------------------
 
-    def test(self):
+    def testAllBranches(self):
         createNonEmptyGitRepository()
         execute(['git', 'checkout', '-b', 'dev'])
 
+        # Expected: header, master, dev
         self.assertEqual(3,
             len(gs.utilGetRawBranchesLines(
-                'dev', gs.gitGetLocalBranches(), ['dev', 'master']
+                gs.gitGetCurrentBranch(), gs.gitGetLocalBranches(), True
+            ))
+        )
+
+    def testAllBranchesDetachedHeadState(self):
+        createNonEmptyGitRepository()
+        execute(['git', 'checkout', '-b', 'dev'])
+
+        createAndCommitFile('newFile1')
+        previousCommitHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'dev'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', previousCommitHash])
+
+        # Expected: header, master, dev, Detached Head
+        self.assertEqual(4,
+            len(gs.utilGetRawBranchesLines(
+                gs.gitGetCurrentBranch(), gs.gitGetLocalBranches(), True
+            ))
+        )
+
+    def testCurrentBranchOnly(self):
+        createNonEmptyGitRepository()
+        execute(['git', 'checkout', '-b', 'dev'])
+
+        # Expected: header, dev
+        self.assertEqual(2,
+            len(gs.utilGetRawBranchesLines(
+                gs.gitGetCurrentBranch(), gs.gitGetLocalBranches(), False
+            ))
+        )
+
+    def testCurrentBranchOnlyDetachedHeadState(self):
+        createNonEmptyGitRepository()
+        execute(['git', 'checkout', '-b', 'dev'])
+
+        createAndCommitFile('newFile1')
+        previousCommitHash = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', 'dev'],
+            universal_newlines = True
+        ).splitlines()[0]
+
+        createAndCommitFile('newFile2')
+        execute(['git', 'checkout', previousCommitHash])
+
+        # Expected: header, Detached Head
+        self.assertEqual(2,
+            len(gs.utilGetRawBranchesLines(
+                gs.gitGetCurrentBranch(), gs.gitGetLocalBranches(), False
             ))
         )
 
