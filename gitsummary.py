@@ -153,13 +153,13 @@ def cmdRepo(options):
         rawBranchLines = utilGetRawBranchesLines(
             currentBranch,
             localBranches,
-            [currentBranch]
+            False,
         )
     elif OPTIONS_SECTION_BRANCH_ALL in options[KEY_OPTIONS_SECTION_LIST]:
         rawBranchLines = utilGetRawBranchesLines(
             currentBranch,
             localBranches,
-            localBranches
+            True
         )
     else:
         rawBranchLines = []
@@ -1052,16 +1052,17 @@ def utilGetModifiedFileAsTwoColumns(modifiedFile):
     ]
 
 #-----------------------------------------------------------------------------
-def utilGetRawBranchesLines(currentBranch, localBranches, branchesToShow):
+def utilGetRawBranchesLines(currentBranch, localBranches, showAllBranches):
     """
     Get the "raw" lines for the specified branches, including the headings line.
 
     Args
-        String         currentBranch  - The name of the current branch.
-                                        Used to determine which branch line should
-                                        have the '*' indicator
-        List of String localBranches  - All local branches
-        List of String branchesToShow - Branches to include in output
+        String         currentBranch   - The name of the current branch.
+                                         Used to determine which branch line should
+                                         have the '*' indicator
+        List of String localBranches   - All local branches
+        Boolean        showAllBranches - Whether to show all branches (True)
+                                         or just the current branch (False)
 
     Return
         List of 'lines', where each line is itself a List of columns
@@ -1086,26 +1087,38 @@ def utilGetRawBranchesLines(currentBranch, localBranches, branchesToShow):
         ['', '', '  Remote', '  Target', ''],
     ]
 
-    # Do master and dev first since they're the most important
-    importantBranches = ['master', 'dev']
-    for branch in importantBranches:
-        if branch in branchesToShow:
-            rawBranchLines.append(
-                utilGetBranchAsFiveColumns(
-                    currentBranch,
-                    branch,
-                    utilGetTargetBranch(branch, localBranches)
+    if showAllBranches:
+        # Do master and dev first since they're the most important
+        importantBranches = ['master', 'dev']
+        for branch in importantBranches:
+            if branch in localBranches:
+                rawBranchLines.append(
+                    utilGetBranchAsFiveColumns(
+                        currentBranch,
+                        branch,
+                        utilGetTargetBranch(branch, localBranches)
+                    )
                 )
-            )
 
-    # Now all the other branches
-    for branch in branchesToShow:
-        if branch not in importantBranches:
+        # Now all the other branches
+        for branch in localBranches:
+            if branch not in importantBranches:
+                rawBranchLines.append(
+                    utilGetBranchAsFiveColumns(
+                        currentBranch,
+                        branch,
+                        utilGetTargetBranch(branch, localBranches)
+                    )
+                )
+    else:
+        # Only output a line if we're not in detached head state since we've
+        # got that covered below
+        if currentBranch != '':
             rawBranchLines.append(
                 utilGetBranchAsFiveColumns(
                     currentBranch,
-                    branch,
-                    utilGetTargetBranch(branch, localBranches)
+                    currentBranch,
+                    utilGetTargetBranch(currentBranch, localBranches)
                 )
             )
 
