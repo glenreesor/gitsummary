@@ -77,13 +77,9 @@ TEXT_YELLOW = 'yellow'
 TEXT_RED = 'red'
 
 #-----------------------------------------------------------------------------
-# Command layer
-#
-# These functions orchestrate the output for top level gitsummary commands
-#-----------------------------------------------------------------------------
-def cmdRepo(options):
+def doit(options):
     """
-    Print the output corresponding to the 'repo' command.
+    Orchestrate all output
 
     Args
         Dictionary options - A dictionary with the following key:
@@ -336,7 +332,7 @@ def cmdRepo(options):
         print('\nPlease notify the gitsummary author.')
 
 #-----------------------------------------------------------------------------
-# git interface layer
+# Git Interface Layer
 #
 # These functions form the lower layer interface with git. They are the only
 # functions with knowledge of the format of git commands.
@@ -780,6 +776,14 @@ def gitGetStashes():
     return stashes
 
 #-----------------------------------------------------------------------------
+# Git Utility Layer
+#
+# Pretty boring layer -- just one function. Maybe there will be more in the
+# future.
+#
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
 def gitUtilGetOutput(command):
     """
     Get the output from running the specified git command.
@@ -808,6 +812,14 @@ def gitUtilGetOutput(command):
         returnVal = output.splitlines()
 
     return returnVal
+
+#-----------------------------------------------------------------------------
+# Utility Layer
+#
+# These are utility functions that build various objects required to create
+# appropriate output. They don't run git directly, but may use functions from
+# the git layer.
+#-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
 def utilGetAheadBehindString(ahead, behind):
@@ -1462,7 +1474,7 @@ def main():
             print('Unknown command line argument: ' + sys.argv[i])
             sys.exit(1)
 
-    cmdRepo(options)
+    doit(options)
 
 #-----------------------------------------------------------------------------
 if __name__ == '__main__':
