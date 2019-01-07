@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import json
 import os
 import re
 import subprocess
@@ -23,6 +24,21 @@ import sys
 
 #-----------------------------------------------------------------------------
 VERSION = '3.0.1'
+
+#-----------------------------------------------------------------------------
+# Constants that have user exposure (so don't change the values)
+#-----------------------------------------------------------------------------
+KEY_CONFIG_DEFAULT_TARGET = 'defaultTarget'
+KEY_CONFIG_BRANCHES = 'branches'
+KEY_CONFIG_BRANCH_NAME = 'name'
+KEY_CONFIG_BRANCH_TARGET = 'target'
+
+OPTIONS_SECTION_BRANCH_ALL = 'branch-all'
+OPTIONS_SECTION_BRANCH_CURRENT = 'branch-current'
+OPTIONS_SECTION_MODIFIED = 'modified'
+OPTIONS_SECTION_STAGED = 'staged'
+OPTIONS_SECTION_STASHES = 'stashes'
+OPTIONS_SECTION_UNTRACKED = 'untracked'
 
 #-----------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
@@ -42,6 +58,10 @@ KEY_FILE_STATUSES_HEURISTIC_SCORE = 'heuristicScore'
 
 KEY_OPTIONS_SECTION_LIST = 'optionsCustomList'
 
+KEY_RETURN_STATUS = 'returnStatus'
+KEY_RETURN_MESSAGES = 'returnMessages'
+KEY_RETURN_VALUE = 'returnValue'
+
 KEY_STASH_FULL_HASH = 'fullHash'
 KEY_STASH_NAME = 'name'
 KEY_STASH_DESCRIPTION = 'description'
@@ -49,16 +69,6 @@ KEY_STASH_DESCRIPTION = 'description'
 #-----------------------------------------------------------------------------
 # Other constants so we can catch typos by linting
 #-----------------------------------------------------------------------------
-
-# These are options that user specifies on command line (so don't change these
-# values)
-OPTIONS_SECTION_BRANCH_ALL = 'branch-all'
-OPTIONS_SECTION_BRANCH_CURRENT = 'branch-current'
-OPTIONS_SECTION_MODIFIED = 'modified'
-OPTIONS_SECTION_STAGED = 'staged'
-OPTIONS_SECTION_STASHES = 'stashes'
-OPTIONS_SECTION_UNTRACKED = 'untracked'
-
 OPTIONS_SECTIONS = [
     OPTIONS_SECTION_BRANCH_ALL,
     OPTIONS_SECTION_BRANCH_CURRENT,
@@ -77,13 +87,43 @@ TEXT_YELLOW = 'yellow'
 TEXT_RED = 'red'
 
 #-----------------------------------------------------------------------------
+# Constants exposed for testing purposes
+#-----------------------------------------------------------------------------
+
+# These defaults are based on
+# https://nvie.com/posts/a-successful-git-branching-model/
+CONFIG_DEFAULT = {
+    KEY_CONFIG_DEFAULT_TARGET: 'develop',
+    KEY_CONFIG_BRANCHES: [
+        {
+            KEY_CONFIG_BRANCH_NAME: '^master$',
+            KEY_CONFIG_BRANCH_TARGET: ''
+        },
+        {
+            KEY_CONFIG_BRANCH_NAME:'^develop$',
+            KEY_CONFIG_BRANCH_TARGET: 'master'
+        },
+        {
+            KEY_CONFIG_BRANCH_NAME:'^hotfix-.*',
+            KEY_CONFIG_BRANCH_TARGET: 'master'
+        },
+        {
+            KEY_CONFIG_BRANCH_NAME:'^release-.*',
+            KEY_CONFIG_BRANCH_TARGET: 'master'
+        },
+    ]
+}
+
+CONFIG_FILENAME = '.gitsummaryconfig'
+
+#-----------------------------------------------------------------------------
 def doit(options):
     """
     Orchestrate all output
 
     Args
         Dictionary options - A dictionary with the following key:
-                                KEY_OPTIONS_SECTION_LIST   : List of String
+                                KEY_OPTIONS_SECTION_LIST : List of String
 
     Example:
 
@@ -104,6 +144,18 @@ def doit(options):
      * dev                 .  .     .  .  master
        featureBranch       .  .     .  .  dev
     """
+
+    #-------------------------------------------------------------------------
+    # Set configuration options
+    #-------------------------------------------------------------------------
+    configToUse = fsGetConfigToUse()
+    if configToUse[KEY_RETURN_STATUS]:
+        gitsummaryConfig = configToUse[KEY_RETURN_VALUE]
+    else:
+        for line in configToUse[KEY_RETURN_MESSAGES]:
+            print(line)
+        sys.exit()
+
     #-------------------------------------------------------------------------
     # Assemble the raw output lines(no colors, padding, or truncation)
     #
@@ -147,12 +199,14 @@ def doit(options):
 
     if OPTIONS_SECTION_BRANCH_CURRENT in options[KEY_OPTIONS_SECTION_LIST]:
         rawBranchLines = utilGetRawBranchesLines(
+            gitsummaryConfig,
             currentBranch,
             localBranches,
             False,
         )
     elif OPTIONS_SECTION_BRANCH_ALL in options[KEY_OPTIONS_SECTION_LIST]:
         rawBranchLines = utilGetRawBranchesLines(
+            gitsummaryConfig,
             currentBranch,
             localBranches,
             True
@@ -330,6 +384,133 @@ def doit(options):
             print(unknownOutput)
 
         print('\nPlease notify the gitsummary author.')
+
+#-----------------------------------------------------------------------------
+# Filesystem Interface Layer
+#
+# These functions form the interface with the filesystem, for operations other
+# than running git.
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+def fsGetConfigFullyQualifiedFilename():
+    """
+    Return the fully qualified path to the closest CONFIG_FILENAME
+
+    Algorithm is to look in current directory, then parent, repeating until
+    the config file is found, stopping at filesystem root.
+
+    Return
+        String|None The fully qualified path to the config file, or None if it
+                    doesn't exist
+    """
+
+    returnVal = None
+    folderToExamine = os.getcwd()
+
+    while not returnVal and folderToExamine != '/':
+        pathToTest = os.path.join(folderToExamine, CONFIG_FILENAME)
+        if os.path.isfile(pathToTest):
+            returnVal = pathToTest
+        else:
+            folderToExamine = os.path.dirname(folderToExamine)
+
+    return returnVal
+
+#-----------------------------------------------------------------------------
+def fsGetConfigToUse():
+    """
+    Get the configuration object to use -- either user-specified or default
+
+    If a user configuration file is found, it is parsed and validated.
+    Validation errors are returned (see below).
+
+    CONFIG_DEFAULT is used if no user config file is found.
+
+    Return
+        Dictionary - A dictionary containing the following keys:
+            KEY_RETURN_STATUS   - Boolean     - Whether the configuration
+                                                returned is valid
+            KEY_RETURN_MESSAGES - List of str - Errors encountering when parsing
+                                                user config file
+            KEY_RETURN_VALUE    - Dictionary  - The configuration object,
+                                                possibly empty if there were
+                                                errors processing user's
+                                                configuration file
+    """
+    errors = []
+    configObjectToUse = {}
+
+    userConfigFile = fsGetConfigFullyQualifiedFilename()
+    if userConfigFile == None:
+        configObjectToUse = CONFIG_DEFAULT
+    else:
+        configParseResult = fsGetValidatedUserConfig(userConfigFile)
+        if configParseResult[KEY_RETURN_STATUS]:
+            configObjectToUse = configParseResult[KEY_RETURN_VALUE]
+        else:
+            errors.append('There were problems with your configuration file.')
+            errors.append('Configuration file: ' + userConfigFile)
+            for error in configParseResult[KEY_RETURN_MESSAGES]:
+                errors.append('    ' + error)
+
+    returnVal = {
+        KEY_RETURN_STATUS: len(errors) == 0,
+        KEY_RETURN_MESSAGES: errors,
+        KEY_RETURN_VALUE: configObjectToUse
+    }
+
+    return returnVal
+
+#-----------------------------------------------------------------------------
+def fsGetValidatedUserConfig(fullyQualifiedFilename):
+    """
+    Get the user specified gitsummary configuration
+
+    Validate the contents and return errors if appropriate.
+
+    Return
+        Dictionary - A dictionary containing the following keys:
+            KEY_RETURN_STATUS   - Boolean     - Whether the configuration
+                                                returned is valid
+            KEY_RETURN_MESSAGES - List of str - Errors encountering when parsing
+                                                user config file
+            KEY_RETURN_VALUE    - Dictionary  - The user-specified configuration
+    """
+    errors = []
+    configObject = {}
+
+    # Read the file, removing comments
+    try:
+        inputFile = open(fullyQualifiedFilename)
+        configFileContents = ''
+
+        for line in inputFile:
+            # Strip out lines that contain only a comment
+            if not re.match('^[ \t]*\/\/', line):
+                configFileContents += line
+        inputFile.close()
+
+    except Exception as e:
+        errors.append('Error reading ' + fullyQualifiedFilename + ': ' + str(e))
+
+    # Parse the file as a json object
+    if len(errors) == 0:
+        try:
+            configObject = json.loads(configFileContents)
+            errors += utilValidateGitsummaryConfig(
+                configObject
+            )[KEY_RETURN_MESSAGES]
+        except Exception as e:
+            errors.append('Error parsing ' + fullyQualifiedFilename + ': ' + str(e))
+
+    returnVal = {
+        KEY_RETURN_STATUS: len(errors) == 0,
+        KEY_RETURN_MESSAGES: errors,
+        KEY_RETURN_VALUE: configObject
+    }
+
+    return returnVal
 
 #-----------------------------------------------------------------------------
 # Git Interface Layer
@@ -1064,17 +1245,24 @@ def utilGetModifiedFileAsTwoColumns(modifiedFile):
     ]
 
 #-----------------------------------------------------------------------------
-def utilGetRawBranchesLines(currentBranch, localBranches, showAllBranches):
+def utilGetRawBranchesLines(
+    gitsummaryConfig,
+    currentBranch,
+    localBranches,
+    showAllBranches
+):
     """
     Get the "raw" lines for the specified branches, including the headings line.
 
     Args
-        String         currentBranch   - The name of the current branch.
-                                         Used to determine which branch line should
-                                         have the '*' indicator
-        List of String localBranches   - All local branches
-        Boolean        showAllBranches - Whether to show all branches (True)
-                                         or just the current branch (False)
+        Dictionary     gitsummaryConfig - Dictionary containing all the
+                                          gitsummary configuration
+        String         currentBranch    - The name of the current branch.
+                                          Used to determine which branch line
+                                          should have the '*' indicator
+        List of String localBranches    - All local branches
+        Boolean        showAllBranches  - Whether to show all branches (True)
+                                          or just the current branch (False)
 
     Return
         List of 'lines', where each line is itself a List of columns
@@ -1104,33 +1292,51 @@ def utilGetRawBranchesLines(currentBranch, localBranches, showAllBranches):
         importantBranches = ['master', 'dev']
         for branch in importantBranches:
             if branch in localBranches:
+                targetBranch = utilGetTargetBranch(
+                    gitsummaryConfig,
+                    branch,
+                    localBranches
+                )
+
                 rawBranchLines.append(
                     utilGetBranchAsFiveColumns(
                         currentBranch,
                         branch,
-                        utilGetTargetBranch(branch, localBranches)
+                        targetBranch
                     )
                 )
 
         # Now all the other branches
         for branch in localBranches:
             if branch not in importantBranches:
+                targetBranch = utilGetTargetBranch(
+                    gitsummaryConfig,
+                    branch,
+                    localBranches
+                )
+
                 rawBranchLines.append(
                     utilGetBranchAsFiveColumns(
                         currentBranch,
                         branch,
-                        utilGetTargetBranch(branch, localBranches)
+                        targetBranch
                     )
                 )
     else:
         # Only output a line if we're not in detached head state since we've
         # got that covered below
         if currentBranch != '':
+            targetBranch = utilGetTargetBranch(
+                gitsummaryConfig,
+                currentBranch,
+                localBranches
+            )
+
             rawBranchLines.append(
                 utilGetBranchAsFiveColumns(
                     currentBranch,
                     currentBranch,
-                    utilGetTargetBranch(currentBranch, localBranches)
+                    targetBranch,
                 )
             )
 
@@ -1385,33 +1591,156 @@ def utilGetStyledText(styles, text):
     return escapeStart + text + escapeEnd
 
 #-----------------------------------------------------------------------------
-def utilGetTargetBranch(branch, localBranches):
+def utilGetTargetBranch(gitsummaryConfig, branch, localBranches):
     """
-    Return the name of the target branch associated with 'branch'.
-
-    Branch name patterns and their associated target branch are:
-        master --> None
-        dev    --> master
-        hf*    --> master
-        *      --> dev
+    Return the name of the target branch associated with 'branch', as specified
+    in 'gitsummaryConfig' (if that target branch exists).
 
     Args
-        String         branch        - The name of the branch we're interested in
-        List of String localBranches - List of all local branches
+        Dictionary     gitsummaryConfig - Dictionary containing all the
+                                          gitsummary configuration
+        String         branch           - The name of the branch we're interested
+                                          in
+        List of String localBranches    - List of all local branches
 
     Return
-        String The target branch. '' if no target branch
+        String - The target branch. '' if no target branch
     """
-    if branch == 'master':
-        targetBranch = ''
-    elif branch == 'dev':
-        targetBranch = 'master' if 'master' in localBranches else ''
-    elif branch.startswith('hf'):
-        targetBranch = 'master' if 'master' in localBranches else ''
-    else:
-        targetBranch = 'dev' if 'dev' in localBranches else ''
+    defaultTarget = gitsummaryConfig[KEY_CONFIG_DEFAULT_TARGET]
+    targetBranch = None
+
+    # See if current branch matches one in the config file
+    for branchConfig in gitsummaryConfig[KEY_CONFIG_BRANCHES]:
+        if re.match(branchConfig[KEY_CONFIG_BRANCH_NAME], branch):
+           thisTarget = branchConfig[KEY_CONFIG_BRANCH_TARGET]
+           targetBranch = thisTarget if thisTarget in localBranches else ''
+           break
+
+    # If we didn't match a branch from the user config, then use the default
+    if targetBranch == None:
+        targetBranch = defaultTarget if defaultTarget in localBranches else ''
 
     return targetBranch
+
+#-----------------------------------------------------------------------------
+def utilValidateGitsummaryConfig(configObject):
+    """
+    Validate the specified configObject
+
+    Test that all required keys are present and the correct type, and there are
+    no unexpected keys.
+
+    Return
+        Dictionary - With the following keys:
+            KEY_RETURN_STATUS  : Boolean - Whether the configObject is valid
+            KEY_RETURN_MESSAGES: List    - List of messages appropriate for user
+    """
+    errors = []
+
+    # defaultTarget
+    errors += utilValidateKeyPresenceAndType(
+        configObject,
+        KEY_CONFIG_DEFAULT_TARGET,
+        '',
+        '',
+        'string'
+    )
+
+    # branches
+    branchesErrors = utilValidateKeyPresenceAndType(
+        configObject,
+        KEY_CONFIG_BRANCHES,
+        [],
+        '',
+        'array'
+    )
+    errors += branchesErrors
+
+    # Identify top level unexpected keys
+    for key in configObject:
+        if key not in [KEY_CONFIG_DEFAULT_TARGET, KEY_CONFIG_BRANCHES]:
+            errors.append('Unexpected config option: ' + key)
+
+    if len(errors) == 0:
+        # Validate each branch
+        for i, branch in enumerate(configObject[KEY_CONFIG_BRANCHES]):
+            # Branch Name
+            branchErrors = utilValidateKeyPresenceAndType(
+                branch,
+                KEY_CONFIG_BRANCH_NAME,
+                '',
+                'branch ' + str(i) + ': ',
+                'string'
+            )
+            errors += branchErrors
+
+            if len(errors) == 0:
+                # Make sure branch name is a valid regular expression
+                try:
+                    re.compile(branch[KEY_CONFIG_BRANCH_NAME])
+                except:
+                    errors.append(
+                        'branch ' + str(i) + ': ' + KEY_CONFIG_BRANCH_NAME +
+                        ' is not a valid regular expression'
+                     )
+
+            # Branch Target
+            errors += utilValidateKeyPresenceAndType(
+                branch,
+                KEY_CONFIG_BRANCH_TARGET,
+                '',
+                'branch ' + str(i) + ': ',
+                'string'
+            )
+
+            # Branch Unexpected Keys
+            for key in branch:
+                if key not in [KEY_CONFIG_BRANCH_NAME, KEY_CONFIG_BRANCH_TARGET]:
+                    errors.append(
+                        'Unexpected config option for branch ' + str(i) + ': ' + key
+                    )
+
+    returnVal = {
+        KEY_RETURN_STATUS: len(errors) == 0,
+        KEY_RETURN_MESSAGES: errors
+    }
+
+    return returnVal
+
+#-----------------------------------------------------------------------------
+def utilValidateKeyPresenceAndType(
+    testObject,
+    key,
+    sampleType,
+    msgPrefix,
+    userFriendlyType
+):
+    """
+    Validate the the specified key is in the testObject and the value is the
+    same type as sampleType
+
+    Args
+        Dictionary testObject       - The object we're testing
+        String     key              - The key to look for
+        Mixed      sampleType       - An object of the same type we want key's
+                                      value to be
+        String     msgPrefix        - The string to be used as a prefix for
+                                      errors
+        String     userFriendlyType - The name of the type to be shown in
+                                      error message
+
+    Return
+        List of String - The errors encountered. Empty if no errors.
+    """
+    errors = []
+
+    if key not in testObject:
+        errors.append(msgPrefix + 'Missing ' + key)
+    else:
+        if not isinstance(testObject[key], sampleType.__class__):
+            errors.append(msgPrefix + key + ' must be a ' + userFriendlyType)
+
+    return errors
 
 #-----------------------------------------------------------------------------
 def main():

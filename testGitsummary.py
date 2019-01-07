@@ -18,6 +18,7 @@
 
 import gitsummary as gs
 
+import json
 import os
 import re
 import shutil
@@ -124,6 +125,195 @@ def execute(command):
         stderr = subprocess.DEVNULL,
         check=True
     )
+
+#-----------------------------------------------------------------------------
+class Test_fsGetConfigFullyQualifiedFilename(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def testNoneFound(self):
+        self.assertEqual(None, gs.fsGetConfigFullyQualifiedFilename())
+
+    def testCurrentFolder(self):
+        EXPECTED_PATH = os.path.join(os.getcwd(), gs.CONFIG_FILENAME)
+
+        configFile = open(gs.CONFIG_FILENAME, 'w')
+        configFile.close()
+
+        self.assertEqual(
+            EXPECTED_PATH,
+            gs.fsGetConfigFullyQualifiedFilename()
+        )
+
+    def testParentFolder(self):
+        CHILD_FOLDER = 'childFolder'
+        EXPECTED_PATH = os.path.join(os.getcwd(), gs.CONFIG_FILENAME)
+
+        configFile = open(gs.CONFIG_FILENAME, 'w')
+        configFile.close()
+
+        os.mkdir(CHILD_FOLDER)
+        os.chdir(CHILD_FOLDER)
+
+        self.assertEqual(
+            EXPECTED_PATH,
+            gs.fsGetConfigFullyQualifiedFilename()
+        )
+
+#-----------------------------------------------------------------------------
+class Test_fsGetConfigToUse(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #   - Opening, parsing, and validating the user's configuration file are
+    #     performed (and thus tested) in other functions
+    #   - So here we're just testing the high level if/else structure
+    #-------------------------------------------------------------------------
+    def testValidUserConfig(self):
+        CONFIG = [
+            '{',
+            '    "' + gs.KEY_CONFIG_DEFAULT_TARGET + '": "dev",',
+            '    "' + gs.KEY_CONFIG_BRANCHES       + '": [',
+            '        {',
+            '            "' + gs.KEY_CONFIG_BRANCH_NAME   + '": "^feature$",',
+            '            "' + gs.KEY_CONFIG_BRANCH_TARGET + '": "dev"',
+            '        }',
+            '    ]',
+            '}'
+        ]
+
+        configFile = open(gs.CONFIG_FILENAME, 'w')
+        for line in CONFIG:
+            configFile.write(line)
+        configFile.close()
+
+        returnVal = gs.fsGetConfigToUse()
+
+        self.assertTrue(returnVal[gs.KEY_RETURN_STATUS])
+        self.assertEqual(0, len(returnVal[gs.KEY_RETURN_MESSAGES]))
+        self.assertEqual(
+            json.loads(''.join(CONFIG)),
+            returnVal[gs.KEY_RETURN_VALUE]
+        )
+
+    def testNoUserConfig(self):
+        returnVal = gs.fsGetConfigToUse()
+
+        self.assertTrue(returnVal[gs.KEY_RETURN_STATUS])
+        self.assertEqual(0, len(returnVal[gs.KEY_RETURN_MESSAGES]))
+        self.assertEqual(gs.CONFIG_DEFAULT, returnVal[gs.KEY_RETURN_VALUE])
+
+    def testInvalidUserConfig(self):
+        CONFIG = '{}'
+        configFile = open(gs.CONFIG_FILENAME, 'w')
+        configFile.write(CONFIG)
+        configFile.close()
+
+        returnVal = gs.fsGetConfigToUse()
+
+        self.assertFalse(returnVal[gs.KEY_RETURN_STATUS])
+        self.assertTrue(len(returnVal[gs.KEY_RETURN_MESSAGES]) > 0)
+        self.assertEqual(
+            json.loads(CONFIG),
+            returnVal[gs.KEY_RETURN_VALUE]
+        )
+
+#-----------------------------------------------------------------------------
+class Test_fsGetValidatedUserConfig(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #   - Validation of the user configuration is performed (and thus tested)
+    #     in other functions
+    #   - So here we're just testing:
+    #       - Reading the file, including removing comments
+    #       - Returning correct status after validation
+    #-------------------------------------------------------------------------
+    def testValidConfigNoComments(self):
+        CONFIG = [
+            '{',
+            '    "' + gs.KEY_CONFIG_DEFAULT_TARGET + '": "dev",',
+            '    "' + gs.KEY_CONFIG_BRANCHES       + '": [',
+            '        {',
+            '            "' + gs.KEY_CONFIG_BRANCH_NAME   + '": "^feature$",',
+            '            "' + gs.KEY_CONFIG_BRANCH_TARGET + '": "dev"',
+            '        }',
+            '    ]',
+            '}'
+        ]
+
+        configFile = open(gs.CONFIG_FILENAME, 'w')
+        for line in CONFIG:
+            configFile.write(line + '\n')
+        configFile.close()
+
+        returnVal = gs.fsGetValidatedUserConfig(gs.CONFIG_FILENAME)
+
+        self.assertTrue(returnVal[gs.KEY_RETURN_STATUS])
+        self.assertEqual(0, len(returnVal[gs.KEY_RETURN_MESSAGES]))
+        self.assertEqual(
+            json.loads(''.join(CONFIG)),
+            returnVal[gs.KEY_RETURN_VALUE]
+        )
+
+    def testValidConfigWithComments(self):
+        CONFIG = [
+            '{',
+            '    "' + gs.KEY_CONFIG_DEFAULT_TARGET + '": "dev",',
+            '    "' + gs.KEY_CONFIG_BRANCHES       + '": [',
+            '        {',
+            '            "' + gs.KEY_CONFIG_BRANCH_NAME   + '": "^feature$",',
+            '            "' + gs.KEY_CONFIG_BRANCH_TARGET + '": "dev"',
+            '        }',
+            '    ]',
+            '}'
+        ]
+
+        configFile = open(gs.CONFIG_FILENAME, 'w')
+        for i, line in enumerate(CONFIG):
+            if i == 1:
+                configFile.write('// Comment at beginning of line\n')
+                configFile.write('    // Indented comment\n')
+            configFile.write(line + '\n')
+        configFile.close()
+
+        returnVal = gs.fsGetValidatedUserConfig(gs.CONFIG_FILENAME)
+
+        self.assertTrue(returnVal[gs.KEY_RETURN_STATUS])
+        self.assertEqual(0, len(returnVal[gs.KEY_RETURN_MESSAGES]))
+        self.assertEqual(
+            json.loads(''.join(CONFIG)),
+            returnVal[gs.KEY_RETURN_VALUE]
+        )
+
+    def testInvalidConfig(self):
+        CONFIG = '{}'
+
+        configFile = open(gs.CONFIG_FILENAME, 'w')
+        configFile.write(CONFIG + '\n')
+        configFile.close()
+
+        returnVal = gs.fsGetValidatedUserConfig(gs.CONFIG_FILENAME)
+
+        self.assertFalse(returnVal[gs.KEY_RETURN_STATUS])
+        self.assertTrue(len(returnVal[gs.KEY_RETURN_MESSAGES]) >0)
+        self.assertEqual(
+            json.loads(CONFIG),
+            returnVal[gs.KEY_RETURN_VALUE]
+        )
+
+    def testErrorOpeningFile(self):
+        returnVal = gs.fsGetValidatedUserConfig('file that does not exist')
+
+        self.assertFalse(returnVal[gs.KEY_RETURN_STATUS])
+        self.assertTrue(len(returnVal[gs.KEY_RETURN_MESSAGES]) >0)
 
 #-----------------------------------------------------------------------------
 class Test_gitGetCommitDetails(unittest.TestCase):
@@ -345,6 +535,7 @@ class Test_gitGetCurrentBranch(unittest.TestCase):
 
     #
     # Tests involving detached head state
+    #
     def test_oneBranchDetachedHeadState(self):
         EXPECTED_BRANCH = ''
 
@@ -1188,6 +1379,7 @@ class Test_utilGetAheadBehindString(unittest.TestCase):
                 gs.utilGetAheadBehindString(case[AHEAD], case[BEHIND])
             )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetBranchAsFiveColumns(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1308,6 +1500,7 @@ class Test_utilGetBranchAsFiveColumns(unittest.TestCase):
         self.assertEqual(gs.utilGetAheadBehindString(1, 2), result[3])
         self.assertEqual(TARGET, result[4])
 
+#-----------------------------------------------------------------------------
 class Test_utilGetColumnAlignedLines(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1465,6 +1658,7 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
             )
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetMaxColumnWidths(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1490,6 +1684,7 @@ class Test_utilGetMaxColumnWidths(unittest.TestCase):
             )
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetModifiedFileAsTwoColumns(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1515,6 +1710,7 @@ class Test_utilGetModifiedFileAsTwoColumns(unittest.TestCase):
             gs.utilGetModifiedFileAsTwoColumns(modifiedFileStatus)
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetRawBranchesLines(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1533,7 +1729,10 @@ class Test_utilGetRawBranchesLines(unittest.TestCase):
         # Expected: header, master, dev
         self.assertEqual(3,
             len(gs.utilGetRawBranchesLines(
-                gs.gitGetCurrentBranch(), gs.gitGetLocalBranches(), True
+                gs.CONFIG_DEFAULT,
+                gs.gitGetCurrentBranch(),
+                gs.gitGetLocalBranches(),
+                True
             ))
         )
 
@@ -1553,7 +1752,10 @@ class Test_utilGetRawBranchesLines(unittest.TestCase):
         # Expected: header, master, dev, Detached Head
         self.assertEqual(4,
             len(gs.utilGetRawBranchesLines(
-                gs.gitGetCurrentBranch(), gs.gitGetLocalBranches(), True
+                gs.CONFIG_DEFAULT,
+                gs.gitGetCurrentBranch(),
+                gs.gitGetLocalBranches(),
+                True
             ))
         )
 
@@ -1564,7 +1766,10 @@ class Test_utilGetRawBranchesLines(unittest.TestCase):
         # Expected: header, dev
         self.assertEqual(2,
             len(gs.utilGetRawBranchesLines(
-                gs.gitGetCurrentBranch(), gs.gitGetLocalBranches(), False
+                gs.CONFIG_DEFAULT,
+                gs.gitGetCurrentBranch(),
+                gs.gitGetLocalBranches(),
+                False
             ))
         )
 
@@ -1584,10 +1789,14 @@ class Test_utilGetRawBranchesLines(unittest.TestCase):
         # Expected: header, Detached Head
         self.assertEqual(2,
             len(gs.utilGetRawBranchesLines(
-                gs.gitGetCurrentBranch(), gs.gitGetLocalBranches(), False
+                gs.CONFIG_DEFAULT,
+                gs.gitGetCurrentBranch(),
+                gs.gitGetLocalBranches(),
+                False
             ))
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetRawModifiedLines(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1614,6 +1823,7 @@ class Test_utilGetRawModifiedLines(unittest.TestCase):
             len(gs.utilGetRawModifiedLines(gs.gitGetFileStatuses()))
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetRawStagedLines(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1640,6 +1850,7 @@ class Test_utilGetRawStagedLines(unittest.TestCase):
             len(gs.utilGetRawStagedLines(gs.gitGetFileStatuses()))
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetRawStashLines(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1669,6 +1880,7 @@ class Test_utilGetRawStashLines(unittest.TestCase):
             len(gs.utilGetRawStashLines())
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetRawUntrackedLines(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1694,6 +1906,7 @@ class Test_utilGetRawUntrackedLines(unittest.TestCase):
             len(gs.utilGetRawUntrackedLines(gs.gitGetFileStatuses()))
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetStagedFileAsTwoColumns(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1737,6 +1950,7 @@ class Test_utilGetStagedFileAsTwoColumns(unittest.TestCase):
             gs.utilGetStagedFileAsTwoColumns(stagedFileStatus)
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetStashAsTwoColumns(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1762,6 +1976,7 @@ class Test_utilGetStashAsTwoColumns(unittest.TestCase):
             gs.utilGetStashAsTwoColumns(stashStatus)
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetStyledText(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -1784,31 +1999,416 @@ class Test_utilGetStyledText(unittest.TestCase):
             gs.utilGetStyledText([gs.TEXT_BOLD, gs.TEXT_FLASHING], 'test')
         )
 
+#-----------------------------------------------------------------------------
 class Test_utilGetTargetBranch(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests - Matching Different Targets without regular expressions
+    #-------------------------------------------------------------------------
+    FIRST_BRANCH = 'firstBranch'
+    FIRST_TARGET = 'firstTarget'
+
+    SECOND_BRANCH = 'secondBranch'
+    SECOND_TARGET = 'secondTarget'
+
+    DEFAULT_TARGET = 'defaultTarget'
+
+    CONFIG = {
+        gs.KEY_CONFIG_DEFAULT_TARGET: DEFAULT_TARGET,
+        gs.KEY_CONFIG_BRANCHES: [
+            {
+                gs.KEY_CONFIG_BRANCH_NAME: FIRST_BRANCH,
+                gs.KEY_CONFIG_BRANCH_TARGET: FIRST_TARGET,
+            },
+            {
+                gs.KEY_CONFIG_BRANCH_NAME: SECOND_BRANCH,
+                gs.KEY_CONFIG_BRANCH_TARGET: SECOND_TARGET,
+            },
+        ]
+    }
+
+    def testFirstBranchMatchesAndTargetExists(self):
+        BRANCH = self.FIRST_BRANCH
+        EXPECTED_TARGET = self.FIRST_TARGET
+        BRANCH_LIST = [
+            self.FIRST_BRANCH,
+            self.FIRST_TARGET,
+            self.SECOND_BRANCH,
+            self.SECOND_TARGET,
+        ]
+
+        self.assertEqual(
+            EXPECTED_TARGET,
+            gs.utilGetTargetBranch(
+                self.CONFIG,
+                BRANCH,
+                BRANCH_LIST,
+            )
+        )
+
+    def testFirstBranchMatchesAndTargetDoesNotExit(self):
+        BRANCH = self.FIRST_BRANCH
+        EXPECTED_TARGET = ''
+        BRANCH_LIST = [
+            self.FIRST_BRANCH,
+            self.SECOND_BRANCH,
+            self.SECOND_TARGET,
+        ]
+
+        self.assertEqual(
+            EXPECTED_TARGET,
+            gs.utilGetTargetBranch(
+                self.CONFIG,
+                BRANCH,
+                BRANCH_LIST,
+            )
+        )
+
+    def testNotFirstBranchMatchesAndTargetExists(self):
+        BRANCH = self.SECOND_BRANCH
+        EXPECTED_TARGET = self.SECOND_TARGET
+        BRANCH_LIST = [
+            self.FIRST_BRANCH,
+            self.FIRST_TARGET,
+            self.SECOND_BRANCH,
+            self.SECOND_TARGET,
+        ]
+
+        self.assertEqual(
+            EXPECTED_TARGET,
+            gs.utilGetTargetBranch(
+                self.CONFIG,
+                BRANCH,
+                BRANCH_LIST,
+            )
+        )
+
+    def testNotFirstBranchMatchesAndTargetDoesNotExist(self):
+        BRANCH = self.SECOND_BRANCH
+        EXPECTED_TARGET = ''
+        BRANCH_LIST = [
+            self.FIRST_BRANCH,
+            self.FIRST_TARGET,
+            self.SECOND_BRANCH,
+        ]
+
+        self.assertEqual(
+            EXPECTED_TARGET,
+            gs.utilGetTargetBranch(
+                self.CONFIG,
+                BRANCH,
+                BRANCH_LIST,
+            )
+        )
+
+    def testDefaultTargetAndTargetExists(self):
+        BRANCH = 'something-else'
+        EXPECTED_TARGET = self.DEFAULT_TARGET
+        BRANCH_LIST = [
+            'something-else',
+            self.FIRST_BRANCH,
+            self.FIRST_TARGET,
+            self.SECOND_BRANCH,
+            self.SECOND_TARGET,
+            self.DEFAULT_TARGET,
+        ]
+
+        self.assertEqual(
+            EXPECTED_TARGET,
+            gs.utilGetTargetBranch(
+                self.CONFIG,
+                BRANCH,
+                BRANCH_LIST,
+            )
+        )
+
+    def testDefaultTargetAndTargetDoesNotExist(self):
+        BRANCH = 'something-else'
+        EXPECTED_TARGET = ''
+        BRANCH_LIST = [
+            'something-else',
+            self.FIRST_BRANCH,
+            self.FIRST_TARGET,
+            self.SECOND_BRANCH,
+            self.SECOND_TARGET,
+        ]
+
+        self.assertEqual(
+            EXPECTED_TARGET,
+            gs.utilGetTargetBranch(
+                self.CONFIG,
+                BRANCH,
+                BRANCH_LIST,
+            )
+        )
+
+    #-------------------------------------------------------------------------
+    # Tests - Matching Different Targets without regular expressions
+    #-------------------------------------------------------------------------
+    def testMatchUsingRegularExpression(self):
+        CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'develop',
+            gs.KEY_CONFIG_BRANCHES: [
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME:'^hotfix-.+',
+                    gs.KEY_CONFIG_BRANCH_TARGET: 'master',
+                },
+            ],
+        }
+
+        self.assertEqual(
+            'master',
+            gs.utilGetTargetBranch(
+                CONFIG,
+                'hotfix-123',
+                ['master', 'develop', 'hotfix-123'],
+            )
+        )
+
+#-----------------------------------------------------------------------------
+class Test_utilValidateGitsummaryConfig(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
     #-------------------------------------------------------------------------
-    def test(self):
-        self.assertEqual('', gs.utilGetTargetBranch('master', []))
-        self.assertEqual('', gs.utilGetTargetBranch('master', ['master']))
-        self.assertEqual('', gs.utilGetTargetBranch('master', ['master', 'dev']))
+    def testOkOneBranch(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME: '^develop$',
+                    gs.KEY_CONFIG_BRANCH_TARGET: 'master',
+                },
+            ],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
 
-        self.assertEqual(''      , gs.utilGetTargetBranch('dev', []))
-        self.assertEqual('master', gs.utilGetTargetBranch('dev', ['master']))
-        self.assertEqual('master', gs.utilGetTargetBranch('dev', ['master', 'dev']))
-        self.assertEqual(''      , gs.utilGetTargetBranch('dev', ['dev']))
+        self.assertTrue(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(0, len(testResult[gs.KEY_RETURN_MESSAGES]))
 
-        self.assertEqual(''      , gs.utilGetTargetBranch('hf-my-hotfix', []))
-        self.assertEqual('master', gs.utilGetTargetBranch('hf-my-hotfix', ['master']))
-        self.assertEqual('master', gs.utilGetTargetBranch('hf-my-hotfix', ['master', 'dev']))
-        self.assertEqual(''      , gs.utilGetTargetBranch('hf-my-hotfix', ['dev']))
+    def testOkMultipleBranches(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME: '^master$',
+                    gs.KEY_CONFIG_BRANCH_TARGET: '',
+                },
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME: '^develop$',
+                    gs.KEY_CONFIG_BRANCH_TARGET: 'master',
+                },
+            ],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
 
-        self.assertEqual(''   , gs.utilGetTargetBranch('feature-branch', []))
-        self.assertEqual(''   , gs.utilGetTargetBranch('feature-branch', ['master']))
-        self.assertEqual('dev', gs.utilGetTargetBranch('feature-branch', ['master', 'dev']))
+        self.assertTrue(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(0, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testEmpty(self):
+        TEST_CONFIG = {}
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(2, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testUnknownKey(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [],
+            'unknown': 'bobs yer uncle',
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testDefaultTargetNotString(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: [],
+            gs.KEY_CONFIG_BRANCHES: [],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchesMissing(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchesNotArray(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: 'bobs yer uncle',
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchNameMissing(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [
+                {
+                    gs.KEY_CONFIG_BRANCH_TARGET: 'bobs yer uncle',
+                },
+            ],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchNameNotString(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME: [],
+                    gs.KEY_CONFIG_BRANCH_TARGET: 'bobs yer uncle',
+                },
+            ],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchNameNotValidRegexp(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME: '$[',
+                    gs.KEY_CONFIG_BRANCH_TARGET: 'bobs yer uncle',
+                },
+            ],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchTargetMissing(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME: 'bobs yer uncle',
+                },
+            ],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchTargetNotString(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME: 'bobs yer uncle',
+                    gs.KEY_CONFIG_BRANCH_TARGET: [],
+                },
+            ],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchUnknownKey(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME: 'a-name',
+                    gs.KEY_CONFIG_BRANCH_TARGET: 'a-target',
+                    'unknown': 'something',
+                },
+            ],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+#-----------------------------------------------------------------------------
+class Test_utilValidateKeyPresenceAndType(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def testOk(self):
+        TEST_KEY = 'testKey'
+        TEST_VALUE = '123'
+
+        TEST_OBJECT = {
+            TEST_KEY: TEST_VALUE,
+        }
+
+        self.assertEqual(
+            0,
+            len(gs.utilValidateKeyPresenceAndType(
+                TEST_OBJECT,
+                TEST_KEY,
+                TEST_VALUE,
+                'msg',
+                'string'
+            ))
+        )
+
+    def testMissingKey(self):
+        TEST_KEY = 'testKey'
+        TEST_VALUE = '123'
+
+        TEST_OBJECT = {
+            TEST_KEY: TEST_VALUE,
+        }
+
+        self.assertEqual(
+            1,
+            len(gs.utilValidateKeyPresenceAndType(
+                TEST_OBJECT,
+                'key-not-in-object',
+                TEST_VALUE,
+                'msg',
+                'string'
+            ))
+        )
+
+    def testKeyIncorrectType(self):
+        TEST_KEY = 'testKey'
+        TEST_VALUE = '123'
+
+        TEST_OBJECT = {
+            TEST_KEY: TEST_VALUE,
+        }
+
+        self.assertEqual(
+            1,
+            len(gs.utilValidateKeyPresenceAndType(
+                TEST_OBJECT,
+                TEST_KEY,
+                [],
+                'msg',
+                'array'
+            ))
+        )
 
 if __name__ == '__main__':
     # Since we have a pile of tests hitting the filesystem, change to a
