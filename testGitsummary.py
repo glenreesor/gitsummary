@@ -2145,25 +2145,61 @@ class Test_utilGetTargetBranch(unittest.TestCase):
         )
 
     #-------------------------------------------------------------------------
-    # Tests - Matching Different Targets without regular expressions
+    # Tests - Matching Different Targets with regular expressions
     #-------------------------------------------------------------------------
     def testMatchUsingRegularExpression(self):
         CONFIG = {
             gs.KEY_CONFIG_DEFAULT_TARGET: 'develop',
             gs.KEY_CONFIG_BRANCHES: [
                 {
-                    gs.KEY_CONFIG_BRANCH_NAME:'^hotfix-.+',
-                    gs.KEY_CONFIG_BRANCH_TARGET: 'master',
+                    gs.KEY_CONFIG_BRANCH_NAME:'^xx-start',
+                    gs.KEY_CONFIG_BRANCH_TARGET: 'first',
+                },
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME:'end-xx$',
+                    gs.KEY_CONFIG_BRANCH_TARGET: 'second',
+                },
+                {
+                    gs.KEY_CONFIG_BRANCH_NAME:'middle-xx-more',
+                    gs.KEY_CONFIG_BRANCH_TARGET: 'third',
                 },
             ],
         }
 
+        BRANCH_LIST = [
+            'develop',
+            'first',
+            'second',
+            'third',
+            'xx-start-bla',
+            'bla-end-xx',
+            'bla-middle-xx-more-bla',
+        ]
+
         self.assertEqual(
-            'master',
+            'first',
             gs.utilGetTargetBranch(
                 CONFIG,
-                'hotfix-123',
-                ['master', 'develop', 'hotfix-123'],
+                'xx-start-bla',
+                BRANCH_LIST,
+            )
+        )
+
+        self.assertEqual(
+            'second',
+            gs.utilGetTargetBranch(
+                CONFIG,
+                'bla-end-xx',
+                BRANCH_LIST,
+            )
+        )
+
+        self.assertEqual(
+            'third',
+            gs.utilGetTargetBranch(
+                CONFIG,
+                'bla-middle-xx-more-bla',
+                BRANCH_LIST,
             )
         )
 

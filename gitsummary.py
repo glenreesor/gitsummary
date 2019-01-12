@@ -487,7 +487,7 @@ def fsGetValidatedUserConfig(fullyQualifiedFilename):
 
         for line in inputFile:
             # Strip out lines that contain only a comment
-            if not re.match('^[ \t]*\/\/', line):
+            if not re.search('^[ \t]*\/\/', line):
                 configFileContents += line
         inputFile.close()
 
@@ -644,7 +644,7 @@ def gitGetCurrentBranch():
     # BRANCH will be '(detached)' if detached head state
     parsedBranch = ''
     for line in output:
-        match = re.match('^# branch.head (.+)$', line)
+        match = re.search('^# branch.head (.+)$', line)
         if (match):
             parsedBranch = match.group(1)
 
@@ -732,19 +732,19 @@ def gitGetFileStatuses():
 
         if outputLine[0] == '1':
             # 1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
-            match = re.match('([^ ]+ ){8}(.+)$', outputLine)
+            match = re.search('^([^ ]+ ){8}(.+)$', outputLine)
             filename = match.group(2)
 
         elif outputLine[0] == '2':
             # 2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>[tab]<origPath>
-            match = re.match('^([^ ]+ ){8}[A-Z]([^ ]+) (.+)\t(.+)$', outputLine)
+            match = re.search('^([^ ]+ ){8}[A-Z]([^ ]+) (.+)\t(.+)$', outputLine)
             heuristicScore = match.group(2)
             newFilename = match.group(3)
             filename = match.group(4)
 
         elif outputLine[0] == 'u':
             # u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
-            match = re.match('^([^ ]+ ){10}(.+)$', outputLine)
+            match = re.search('^([^ ]+ ){10}(.+)$', outputLine)
             filename = match.group(2)
 
         elif outputLine[0] == '?':
@@ -888,11 +888,11 @@ def gitGetRemoteTrackingBranch(localBranch):
         remoteValue = None
 
         for line in statusOutput:
-            branchMatch = re.match('^# branch.head (.+)$', line)
+            branchMatch = re.search('^# branch.head (.+)$', line)
             if (branchMatch):
                 branchValue = branchMatch.group(1)
             else:
-                remoteMatch = re.match('^# branch.upstream (.+)$', line)
+                remoteMatch = re.search('^# branch.upstream (.+)$', line)
                 if (remoteMatch):
                     remoteValue = remoteMatch.group(1)
 
@@ -944,7 +944,7 @@ def gitGetStashes():
 
     for oneStash in output:
         split = oneStash.split(' ', 2)
-        nameMatch = re.match('^refs/([^:]+})', split[1])
+        nameMatch = re.search('^refs/([^:]+})', split[1])
         name = nameMatch.group(1)
         stashes.append(
             {
@@ -1611,7 +1611,7 @@ def utilGetTargetBranch(gitsummaryConfig, branch, localBranches):
 
     # See if current branch matches one in the config file
     for branchConfig in gitsummaryConfig[KEY_CONFIG_BRANCHES]:
-        if re.match(branchConfig[KEY_CONFIG_BRANCH_NAME], branch):
+        if re.search(branchConfig[KEY_CONFIG_BRANCH_NAME], branch):
            thisTarget = branchConfig[KEY_CONFIG_BRANCH_TARGET]
            targetBranch = thisTarget if thisTarget in localBranches else ''
            break
