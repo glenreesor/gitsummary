@@ -31,6 +31,7 @@ VERSION = '3.0.1'
 KEY_CONFIG_DEFAULT_TARGET = 'defaultTarget'
 KEY_CONFIG_BRANCHES = 'branches'
 KEY_CONFIG_BRANCH_NAME = 'name'
+KEY_CONFIG_BRANCH_ORDER = 'branchOrder'
 KEY_CONFIG_BRANCH_TARGET = 'target'
 
 OPTIONS_SECTION_BRANCH_ALL = 'branch-all'
@@ -90,9 +91,15 @@ TEXT_RED = 'red'
 # Constants exposed for testing purposes
 #-----------------------------------------------------------------------------
 
-# These defaults are based on
-# https://nvie.com/posts/a-successful-git-branching-model/
+# Branch names are based on:
+#   https://nvie.com/posts/a-successful-git-branching-model/
 CONFIG_DEFAULT = {
+    KEY_CONFIG_BRANCH_ORDER: [
+        '^master$',
+        '^hotfix-.*',
+        '^release-.',
+        '^develop$',
+    ],
     KEY_CONFIG_DEFAULT_TARGET: 'develop',
     KEY_CONFIG_BRANCHES: [
         {
@@ -173,6 +180,11 @@ def doit(options):
     currentBranch = gitGetCurrentBranch()
     localBranches = gitGetLocalBranches()
 
+    localBranchesInDisplayOrder = utilGetBranchOrder(
+        gitsummaryConfig,
+        localBranches
+    )
+
     rawStashLines = (
         utilGetRawStashLines()
             if OPTIONS_SECTION_STASHES in options[KEY_OPTIONS_SECTION_LIST]
@@ -201,14 +213,14 @@ def doit(options):
         rawBranchLines = utilGetRawBranchesLines(
             gitsummaryConfig,
             currentBranch,
-            localBranches,
+            localBranchesInDisplayOrder,
             False,
         )
     elif OPTIONS_SECTION_BRANCH_ALL in options[KEY_OPTIONS_SECTION_LIST]:
         rawBranchLines = utilGetRawBranchesLines(
             gitsummaryConfig,
             currentBranch,
-            localBranches,
+            localBranchesInDisplayOrder,
             True
         )
     else:
@@ -1095,6 +1107,43 @@ def utilGetBranchAsFiveColumns(currentBranch, branch, targetBranch):
     ]
 
 #-----------------------------------------------------------------------------
+def utilGetBranchOrder(gitsummaryConfig, branchList):
+    """
+    Return the branches in branchList in the order specified by the
+    gitsummaryConfig.
+
+    - The order of patterns in gitsummaryConfig is the order that matching
+      branches will be returned
+    - For branches that match one particular pattern in gitsummaryConfig, they
+      will be returned in alphabetical order.
+    - Branches that don't match any patterns in gitsummaryConfig will be listed
+      last (in alphabetical order as well).
+
+    Args
+        Dictionary     gitsummaryConfig - Dictionary containing all the
+                                          gitsummary configuration
+        List of String branchList       - The list of branches to be put in
+                                          order
+
+    Return
+        List of String - The branches in order as per gitsummaryConfig
+
+    """
+    originalBranchList = sorted(branchList)
+    returnVal = []
+
+    # First the branches that match gitsummaryConfig patterns
+    for branchPattern in gitsummaryConfig[KEY_CONFIG_BRANCH_ORDER]:
+        for branch in [x for x in originalBranchList if x not in returnVal]:
+            if re.search(branchPattern, branch):
+                returnVal.append(branch)
+
+    # Then the branches that don't match any config patterns
+    returnVal += [x for x in originalBranchList if x not in returnVal]
+
+    return returnVal
+
+#-----------------------------------------------------------------------------
 def utilGetColumnAlignedLines(
     requiredWidth,
     truncIndicator,
@@ -1260,7 +1309,8 @@ def utilGetRawBranchesLines(
         String         currentBranch    - The name of the current branch.
                                           Used to determine which branch line
                                           should have the '*' indicator
-        List of String localBranches    - All local branches
+        List of String localBranches    - All local branches, in the order they
+                                          should appear in the returned list
         Boolean        showAllBranches  - Whether to show all branches (True)
                                           or just the current branch (False)
 
@@ -1288,57 +1338,29 @@ def utilGetRawBranchesLines(
     ]
 
     if showAllBranches:
-        # Do master and dev first since they're the most important
-        importantBranches = ['master', 'dev']
-        for branch in importantBranches:
-            if branch in localBranches:
-                targetBranch = utilGetTargetBranch(
-                    gitsummaryConfig,
-                    branch,
-                    localBranches
-                )
-
-                rawBranchLines.append(
-                    utilGetBranchAsFiveColumns(
-                        currentBranch,
-                        branch,
-                        targetBranch
-                    )
-                )
-
-        # Now all the other branches
-        for branch in localBranches:
-            if branch not in importantBranches:
-                targetBranch = utilGetTargetBranch(
-                    gitsummaryConfig,
-                    branch,
-                    localBranches
-                )
-
-                rawBranchLines.append(
-                    utilGetBranchAsFiveColumns(
-                        currentBranch,
-                        branch,
-                        targetBranch
-                    )
-                )
+        branchesToList = localBranches
     else:
-        # Only output a line if we're not in detached head state since we've
-        # got that covered below
+        # Make sure we're not showing a branch line for detached head state,
+        # since we've got logic for that below
         if currentBranch != '':
-            targetBranch = utilGetTargetBranch(
-                gitsummaryConfig,
-                currentBranch,
-                localBranches
-            )
+            branchesToList = [currentBranch]
+        else:
+            branchesToList = []
 
-            rawBranchLines.append(
-                utilGetBranchAsFiveColumns(
-                    currentBranch,
-                    currentBranch,
-                    targetBranch,
-                )
+    for branch in branchesToList:
+        targetBranch = utilGetTargetBranch(
+            gitsummaryConfig,
+            branch,
+            localBranches
+        )
+
+        rawBranchLines.append(
+            utilGetBranchAsFiveColumns(
+                currentBranch,
+                branch,
+                targetBranch
             )
+        )
 
     # If we're in detached head state, add a branch line that indicates we're
     # in detached head state
@@ -1637,7 +1659,52 @@ def utilValidateGitsummaryConfig(configObject):
     """
     errors = []
 
+    #---------------------------------------------------------------------------
+    # Identify top level unexpected keys
+    #---------------------------------------------------------------------------
+    for key in configObject:
+        if key not in [
+            KEY_CONFIG_BRANCH_ORDER,
+            KEY_CONFIG_DEFAULT_TARGET,
+            KEY_CONFIG_BRANCHES
+        ]:
+            errors.append('Unexpected configuration option: ' + key)
+
+    #---------------------------------------------------------------------------
+    # branchOrder
+    #---------------------------------------------------------------------------
+    branchOrderErrors = utilValidateKeyPresenceAndType(
+        configObject,
+        KEY_CONFIG_BRANCH_ORDER,
+        [],
+        '',
+        'array'
+    )
+    errors += branchOrderErrors
+
+    if len(branchOrderErrors) == 0:
+
+        # Make sure all branch names are valid regular expressions
+        for i, branch in enumerate(configObject[KEY_CONFIG_BRANCH_ORDER]):
+            # Make sure it's a string
+            if not isinstance(branch, ''.__class__):
+                errors.append(
+                    KEY_CONFIG_BRANCH_ORDER + ': Element ' + str(i) +
+                    ' must be a string'
+                )
+            else:
+                # Make sure it's a valid regular expression
+                try:
+                    re.compile(branch)
+                except:
+                    errors.append(
+                        KEY_CONFIG_BRANCH_ORDER + ': Element ' + str(i) +
+                        ' is not a valid regular expression'
+                    )
+
+    #---------------------------------------------------------------------------
     # defaultTarget
+    #---------------------------------------------------------------------------
     errors += utilValidateKeyPresenceAndType(
         configObject,
         KEY_CONFIG_DEFAULT_TARGET,
@@ -1646,7 +1713,9 @@ def utilValidateGitsummaryConfig(configObject):
         'string'
     )
 
+    #---------------------------------------------------------------------------
     # branches
+    #---------------------------------------------------------------------------
     branchesErrors = utilValidateKeyPresenceAndType(
         configObject,
         KEY_CONFIG_BRANCHES,
@@ -1655,11 +1724,6 @@ def utilValidateGitsummaryConfig(configObject):
         'array'
     )
     errors += branchesErrors
-
-    # Identify top level unexpected keys
-    for key in configObject:
-        if key not in [KEY_CONFIG_DEFAULT_TARGET, KEY_CONFIG_BRANCHES]:
-            errors.append('Unexpected config option: ' + key)
 
     if len(errors) == 0:
         # Validate each branch
@@ -1697,7 +1761,8 @@ def utilValidateGitsummaryConfig(configObject):
             for key in branch:
                 if key not in [KEY_CONFIG_BRANCH_NAME, KEY_CONFIG_BRANCH_TARGET]:
                     errors.append(
-                        'Unexpected config option for branch ' + str(i) + ': ' + key
+                        'Unexpected configuration option for branch ' + str(i) +
+                        ': ' + key
                     )
 
     returnVal = {
@@ -1782,7 +1847,7 @@ def main():
             print('          - number of commits ahead/behind its target branch')
             print('          - number of commits ahead/behind its remote branch')
             print('          - the name of its target branch')
-
+            print()
             print('Flags:')
             print('    --custom [options]')
             print('        - Show only the specified sections of output')

@@ -177,6 +177,7 @@ class Test_fsGetConfigToUse(unittest.TestCase):
     def testValidUserConfig(self):
         CONFIG = [
             '{',
+            '    "' + gs.KEY_CONFIG_BRANCH_ORDER   + '": ["^master$"],',
             '    "' + gs.KEY_CONFIG_DEFAULT_TARGET + '": "dev",',
             '    "' + gs.KEY_CONFIG_BRANCHES       + '": [',
             '        {',
@@ -239,6 +240,7 @@ class Test_fsGetValidatedUserConfig(unittest.TestCase):
     def testValidConfigNoComments(self):
         CONFIG = [
             '{',
+            '    "' + gs.KEY_CONFIG_BRANCH_ORDER   + '": ["^master$"],',
             '    "' + gs.KEY_CONFIG_DEFAULT_TARGET + '": "dev",',
             '    "' + gs.KEY_CONFIG_BRANCHES       + '": [',
             '        {',
@@ -266,6 +268,7 @@ class Test_fsGetValidatedUserConfig(unittest.TestCase):
     def testValidConfigWithComments(self):
         CONFIG = [
             '{',
+            '    "' + gs.KEY_CONFIG_BRANCH_ORDER   + '": ["^master$"],',
             '    "' + gs.KEY_CONFIG_DEFAULT_TARGET + '": "dev",',
             '    "' + gs.KEY_CONFIG_BRANCHES       + '": [',
             '        {',
@@ -1501,6 +1504,81 @@ class Test_utilGetBranchAsFiveColumns(unittest.TestCase):
         self.assertEqual(TARGET, result[4])
 
 #-----------------------------------------------------------------------------
+class Test_utilGetBranchOrder(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #-------------------------------------------------------------------------
+    # Tests
+    #-------------------------------------------------------------------------
+    def testEmptyBranchPatterns(self):
+        BRANCH_LIST = ['d', 'c', 'b', 'a']
+        config = gs.CONFIG_DEFAULT
+        config[gs.KEY_CONFIG_BRANCH_ORDER] = []
+
+        self.assertEqual(
+            sorted(BRANCH_LIST),
+            gs.utilGetBranchOrder(config, BRANCH_LIST)
+        )
+
+    def testBranchPatternsZeroMatches(self):
+        BRANCH_LIST = ['d', 'c', 'b', 'a']
+        config = gs.CONFIG_DEFAULT
+        config[gs.KEY_CONFIG_BRANCH_ORDER] = ['e', 'f']
+
+        self.assertEqual(
+            sorted(BRANCH_LIST),
+            gs.utilGetBranchOrder(config, BRANCH_LIST)
+        )
+
+    def testBranchPatternsOneMatches(self):
+        BRANCH_LIST = ['d', 'c', 'b', 'a']
+        config = gs.CONFIG_DEFAULT
+        config[gs.KEY_CONFIG_BRANCH_ORDER] = ['c', 'e']
+
+        self.assertEqual(
+            ['c', 'a', 'b', 'd'],
+            gs.utilGetBranchOrder(config, BRANCH_LIST)
+        )
+
+    def testBranchPatternsMultipleMatches(self):
+        BRANCH_LIST = ['d', 'c', 'b', 'a']
+        config = gs.CONFIG_DEFAULT
+        config[gs.KEY_CONFIG_BRANCH_ORDER] = ['c', 'b']
+
+        self.assertEqual(
+            ['c', 'b', 'a', 'd'],
+            gs.utilGetBranchOrder(config, BRANCH_LIST)
+        )
+
+    def testOneBranchMatchesMultiplePatterns(self):
+        BRANCH_LIST = ['e', 'd', 'c', 'b', 'a']
+        config = gs.CONFIG_DEFAULT
+        config[gs.KEY_CONFIG_BRANCH_ORDER] = ['e', 'e', 'c', 'b']
+
+        self.assertEqual(
+            ['e', 'c', 'b', 'a', 'd'],
+            gs.utilGetBranchOrder(config, BRANCH_LIST)
+        )
+
+    def testPatternsTreatedAsRegularExpressions(self):
+        BRANCH_LIST = [
+            'elephant',
+            'eagle',
+            'deer',
+            'cougar',
+            'beagle',
+            'alligator'
+        ]
+        config = gs.CONFIG_DEFAULT
+        config[gs.KEY_CONFIG_BRANCH_ORDER] = ['^ea', 'ant$', 'oug']
+
+        self.assertEqual(
+            ['eagle', 'elephant', 'cougar', 'alligator', 'beagle', 'deer'],
+            gs.utilGetBranchOrder(config, BRANCH_LIST)
+        )
+
+#-----------------------------------------------------------------------------
 class Test_utilGetColumnAlignedLines(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -2213,6 +2291,7 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
     #-------------------------------------------------------------------------
     def testOkOneBranch(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
             gs.KEY_CONFIG_BRANCHES: [
                 {
@@ -2228,6 +2307,7 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
 
     def testOkMultipleBranches(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
             gs.KEY_CONFIG_BRANCHES: [
                 {
@@ -2250,10 +2330,11 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
         testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
 
         self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
-        self.assertEqual(2, len(testResult[gs.KEY_RETURN_MESSAGES]))
+        self.assertEqual(3, len(testResult[gs.KEY_RETURN_MESSAGES]))
 
     def testUnknownKey(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
             gs.KEY_CONFIG_BRANCHES: [],
             'unknown': 'bobs yer uncle',
@@ -2263,8 +2344,62 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
         self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
         self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
 
+    def testBranchOrderMissing(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchOrderNotArray(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: 'bobs yer uncle',
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchOrderNotArrayOfStrings(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: [ [] ],
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testBranchOrderNotArrayOfValidRegularExpressions(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['$['],
+            gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
+            gs.KEY_CONFIG_BRANCHES: [],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
+    def testDefaultTargetMissing(self):
+        TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
+            gs.KEY_CONFIG_BRANCHES: [],
+        }
+        testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
+
+        self.assertFalse(testResult[gs.KEY_RETURN_STATUS])
+        self.assertEqual(1, len(testResult[gs.KEY_RETURN_MESSAGES]))
+
     def testDefaultTargetNotString(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: [],
             gs.KEY_CONFIG_BRANCHES: [],
         }
@@ -2275,6 +2410,7 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
 
     def testBranchesMissing(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
         }
         testResult = gs.utilValidateGitsummaryConfig(TEST_CONFIG)
@@ -2284,6 +2420,7 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
 
     def testBranchesNotArray(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
             gs.KEY_CONFIG_BRANCHES: 'bobs yer uncle',
         }
@@ -2294,6 +2431,7 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
 
     def testBranchNameMissing(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
             gs.KEY_CONFIG_BRANCHES: [
                 {
@@ -2308,6 +2446,7 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
 
     def testBranchNameNotString(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
             gs.KEY_CONFIG_BRANCHES: [
                 {
@@ -2323,6 +2462,7 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
 
     def testBranchNameNotValidRegexp(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
             gs.KEY_CONFIG_BRANCHES: [
                 {
@@ -2338,6 +2478,7 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
 
     def testBranchTargetMissing(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
             gs.KEY_CONFIG_BRANCHES: [
                 {
@@ -2352,6 +2493,7 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
 
     def testBranchTargetNotString(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
             gs.KEY_CONFIG_BRANCHES: [
                 {
@@ -2367,6 +2509,7 @@ class Test_utilValidateGitsummaryConfig(unittest.TestCase):
 
     def testBranchUnknownKey(self):
         TEST_CONFIG = {
+            gs.KEY_CONFIG_BRANCH_ORDER: ['^master$'],
             gs.KEY_CONFIG_DEFAULT_TARGET: 'master',
             gs.KEY_CONFIG_BRANCHES: [
                 {
