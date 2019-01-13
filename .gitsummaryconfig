@@ -1,9 +1,11 @@
 {
     "branchOrder": [
         "^master$",
-        "^hf-.+",
-        "^release-.+",
-        "^dev$"
+        "^dev$",
+        "^b\/",
+        "^f\/",
+        "^hf\/",
+        "^release-"
     ],
     "defaultTarget": "",
     "branches": [
