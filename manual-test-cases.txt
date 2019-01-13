@@ -71,5 +71,5 @@ Test    Description                     Scenario        Commandline and Expected
                                                             gitsummarytesting
 
                                                         Expected Result:
-                                                            - Matches width of current window
+                                                            - Matches width of current window (except in gitbash terminal)
 
