@@ -111,11 +111,11 @@ CONFIG_DEFAULT = {
             KEY_CONFIG_BRANCH_TARGET: 'master'
         },
         {
-            KEY_CONFIG_BRANCH_NAME:'^hotfix-.*',
+            KEY_CONFIG_BRANCH_NAME:'^hotfix-',
             KEY_CONFIG_BRANCH_TARGET: 'master'
         },
         {
-            KEY_CONFIG_BRANCH_NAME:'^release-.*',
+            KEY_CONFIG_BRANCH_NAME:'^release-',
             KEY_CONFIG_BRANCH_TARGET: 'master'
         },
     ]
@@ -1653,7 +1653,7 @@ def utilPrintHelp(commandName):
         String commandName - The name this script was invoked with
     """
     print('Usage:')
-    print('    ' + commandName + ' [--custom [options]] | --help')
+    print('    ' + commandName + ' [--custom [options]] | --help | --helpconfig | --version')
     print('')
     print('Print a summary of the current git repository\'s status:')
     print('    - stashes, staged files, modified files, untracked files,')
@@ -1672,8 +1672,79 @@ def utilPrintHelp(commandName):
     print('    --help')
     print('        - Show this output')
     print('')
+    print('    --helpconfig')
+    print('        - Show information for the gitsummary configuration file')
+    print('')
     print('    --version')
     print('        - Show current version')
+
+#-----------------------------------------------------------------------------
+def utilPrintHelpConfig():
+    """
+    Print help output describing the configuration file
+    """
+
+    print("""The gitsummary configuration file ("{configFilename}") is a json-formatted
+file used to specify:
+    - the order in which branches are printed
+    - branch names and their corresponding targets
+
+Any line beginning with "//" (with optional preceding whitespace) is treated as
+as a comment and thus ignored.
+
+The following is a sample configuration file that matches the built-in defaults:
+
+   {{
+       // Specify the order in which to display branches
+       //     - Branches that match the first regular expression are displayed
+       //       first (in alphabetical order), followed by branches matching
+       //       the second regular expression, and so on
+       //     - Branches not matching any of the regular expressions are
+       //       listed last (also in alphabetical order)
+       "branchOrder": [
+           "^master$",
+           "^develop$",
+           "^hotfix-",
+           "^release-"
+       ],
+
+       // Specify the default target branch if none of the regular expressions
+       // in "branches" (see below) match. "" is a valid value.
+       "defaultTarget": "develop",
+
+       // Specify branches and their corresponding target branches
+       //     - When displaying branch information, the branch name is
+       //       matched against the "name" regular expressions below, in
+       //       successive order, until a match is made
+       //     - The "target" of the first match will be shown as the branch's
+       //       target branch
+       "branches": [
+           {{
+               "name"  : "^master$",
+               "target": ""
+           }},
+           {{
+               "name"  :"^develop$",
+               "target": "master"
+           }},
+           {{
+               "name"  :"^hotfix-.*",
+               "target": "master"
+           }},
+           {{
+               "name"  :"^release-.*",
+               "target": "master"
+           }}
+       ]
+    }}
+
+Gitsummary will look for {configFilename} in the current directory. If
+not found, it will look in successive parent folders all the way up to the root
+of the filesystem.
+
+    """.format(
+        configFilename = CONFIG_FILENAME,
+    ))
 
 #-----------------------------------------------------------------------------
 def utilValidateGitsummaryConfig(configObject):
@@ -1871,11 +1942,15 @@ def main():
         elif sys.argv[i] == '--help':
             utilPrintHelp(sys.argv[0])
             sys.exit(0)
+        elif sys.argv[i] == '--helpconfig':
+            utilPrintHelpConfig()
+            sys.exit(0)
         elif sys.argv[i] == '--version':
             print(VERSION)
             sys.exit(0)
         else:
             print('Unknown command line argument: ' + sys.argv[i])
+            print('See "' + sys.argv[0] + ' --help"')
             sys.exit(1)
 
     doit(options)
