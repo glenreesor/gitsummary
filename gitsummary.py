@@ -420,7 +420,14 @@ def fsGetConfigFullyQualifiedFilename():
     returnVal = None
     folderToExamine = os.getcwd()
 
-    while not returnVal and folderToExamine != '/':
+    # splitdrive()[1] gives the current path
+    #   - Unix filesystems   : current path, as expected
+    #   - Windows filesystems: current path, excluding drive letters and UNC
+    #     paths
+    while (
+        not returnVal and
+        os.path.splitdrive(folderToExamine)[1] not in ['/', '\\']
+    ):
         pathToTest = os.path.join(folderToExamine, CONFIG_FILENAME)
         if os.path.isfile(pathToTest):
             returnVal = pathToTest
