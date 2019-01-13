@@ -2109,6 +2109,43 @@ class Test_utilGetTargetBranch(unittest.TestCase):
     def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
+    # Test - Defaults
+    #-------------------------------------------------------------------------
+    def testDefaultTargets(self):
+        BRANCH_LIST = [
+            'master',
+            'develop',
+            'hotfix-broken',
+            'release-1.0.0',
+            'make-awesome',
+        ]
+
+        self.assertEqual(
+            '',
+            gs.utilGetTargetBranch(gs.CONFIG_DEFAULT, 'master', BRANCH_LIST)
+        )
+
+        self.assertEqual(
+            'master',
+            gs.utilGetTargetBranch(gs.CONFIG_DEFAULT, 'develop', BRANCH_LIST)
+        )
+
+        self.assertEqual(
+            'master',
+            gs.utilGetTargetBranch(gs.CONFIG_DEFAULT, 'hotfix-broken', BRANCH_LIST)
+        )
+
+        self.assertEqual(
+            'master',
+            gs.utilGetTargetBranch(gs.CONFIG_DEFAULT, 'release-1.0.0', BRANCH_LIST)
+        )
+
+        self.assertEqual(
+            'develop',
+            gs.utilGetTargetBranch(gs.CONFIG_DEFAULT, 'make-awesome', BRANCH_LIST)
+        )
+
+    #-------------------------------------------------------------------------
     # Tests - Matching Different Targets without regular expressions
     #-------------------------------------------------------------------------
     FIRST_BRANCH = 'firstBranch'
