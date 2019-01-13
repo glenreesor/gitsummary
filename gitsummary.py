@@ -96,9 +96,9 @@ TEXT_RED = 'red'
 CONFIG_DEFAULT = {
     KEY_CONFIG_BRANCH_ORDER: [
         '^master$',
-        '^hotfix-.*',
-        '^release-.',
         '^develop$',
+        '^hotfix-',
+        '^release-',
     ],
     KEY_CONFIG_DEFAULT_TARGET: 'develop',
     KEY_CONFIG_BRANCHES: [

@@ -18,6 +18,7 @@
 
 import gitsummary as gs
 
+import copy
 import json
 import os
 import re
@@ -1511,9 +1512,34 @@ class Test_utilGetBranchOrder(unittest.TestCase):
     #-------------------------------------------------------------------------
     # Tests
     #-------------------------------------------------------------------------
+    def testDefaultBranchOrder(self):
+        BRANCHES = [
+            'hotfix-oops2',
+            'hotfix-oops',
+            'make-something2',
+            'make-something',
+            'release-1.0.0',
+            'develop',
+            'master',
+        ]
+
+        ORDERED_BRANCHES = [
+            'master',
+            'develop',
+            'hotfix-oops',
+            'hotfix-oops2',
+            'release-1.0.0',
+            'make-something',
+            'make-something2',
+        ]
+        self.assertEqual(
+            ORDERED_BRANCHES,
+            gs.utilGetBranchOrder(gs.CONFIG_DEFAULT, BRANCHES)
+        )
+
     def testEmptyBranchPatterns(self):
         BRANCH_LIST = ['d', 'c', 'b', 'a']
-        config = gs.CONFIG_DEFAULT
+        config = copy.deepcopy(gs.CONFIG_DEFAULT)
         config[gs.KEY_CONFIG_BRANCH_ORDER] = []
 
         self.assertEqual(
@@ -1523,7 +1549,7 @@ class Test_utilGetBranchOrder(unittest.TestCase):
 
     def testBranchPatternsZeroMatches(self):
         BRANCH_LIST = ['d', 'c', 'b', 'a']
-        config = gs.CONFIG_DEFAULT
+        config = copy.deepcopy(gs.CONFIG_DEFAULT)
         config[gs.KEY_CONFIG_BRANCH_ORDER] = ['e', 'f']
 
         self.assertEqual(
@@ -1533,7 +1559,7 @@ class Test_utilGetBranchOrder(unittest.TestCase):
 
     def testBranchPatternsOneMatches(self):
         BRANCH_LIST = ['d', 'c', 'b', 'a']
-        config = gs.CONFIG_DEFAULT
+        config = copy.deepcopy(gs.CONFIG_DEFAULT)
         config[gs.KEY_CONFIG_BRANCH_ORDER] = ['c', 'e']
 
         self.assertEqual(
@@ -1543,7 +1569,7 @@ class Test_utilGetBranchOrder(unittest.TestCase):
 
     def testBranchPatternsMultipleMatches(self):
         BRANCH_LIST = ['d', 'c', 'b', 'a']
-        config = gs.CONFIG_DEFAULT
+        config = copy.deepcopy(gs.CONFIG_DEFAULT)
         config[gs.KEY_CONFIG_BRANCH_ORDER] = ['c', 'b']
 
         self.assertEqual(
@@ -1553,7 +1579,7 @@ class Test_utilGetBranchOrder(unittest.TestCase):
 
     def testOneBranchMatchesMultiplePatterns(self):
         BRANCH_LIST = ['e', 'd', 'c', 'b', 'a']
-        config = gs.CONFIG_DEFAULT
+        config = copy.deepcopy(gs.CONFIG_DEFAULT)
         config[gs.KEY_CONFIG_BRANCH_ORDER] = ['e', 'e', 'c', 'b']
 
         self.assertEqual(
@@ -1570,7 +1596,7 @@ class Test_utilGetBranchOrder(unittest.TestCase):
             'beagle',
             'alligator'
         ]
-        config = gs.CONFIG_DEFAULT
+        config = copy.deepcopy(gs.CONFIG_DEFAULT)
         config[gs.KEY_CONFIG_BRANCH_ORDER] = ['^ea', 'ant$', 'oug']
 
         self.assertEqual(
