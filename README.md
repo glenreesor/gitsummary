@@ -143,7 +143,6 @@ The following is a sample configuration file that matches the built-in defaults:
 Gitsummary will look for `.gitsummaryconfig` in the current directory. If
 not found, it will look in successive parent folders all the way up to the root
 of the filesystem.
-```
 
 [defaultOutput]: https://raw.githubusercontent.com/glenreesor/gitsummary/master/doc/output.default.png
 
