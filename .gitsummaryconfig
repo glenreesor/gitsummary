@@ -1,0 +1,37 @@
+{
+    "branchOrder": [
+        "^master$",
+        "^dev$",
+        "^b\/",
+        "^f\/",
+        "^hf\/",
+        "^release-"
+    ],
+    "defaultTarget": "",
+    "branches": [
+        {
+            "name": "^master$",
+            "target": ""
+        },
+        {
+            "name": "^dev$",
+            "target": "master"
+        },
+        {
+            "name": "^f\/.+",
+            "target": "dev"
+        },
+        {
+            "name": "^b\/.+",
+            "target": "dev"
+        },
+        {
+            "name": "^hf\/.+",
+            "target": "master"
+        },
+        {
+            "name": "^release-.+",
+            "target": "master"
+        }
+    ]
+}

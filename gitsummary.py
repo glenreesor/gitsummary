@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import json
 import os
 import re
 import subprocess
@@ -23,6 +24,22 @@ import sys
 
 #-----------------------------------------------------------------------------
 VERSION = '3.0.1'
+
+#-----------------------------------------------------------------------------
+# Constants that have user exposure (so don't change the values)
+#-----------------------------------------------------------------------------
+KEY_CONFIG_DEFAULT_TARGET = 'defaultTarget'
+KEY_CONFIG_BRANCHES = 'branches'
+KEY_CONFIG_BRANCH_NAME = 'name'
+KEY_CONFIG_BRANCH_ORDER = 'branchOrder'
+KEY_CONFIG_BRANCH_TARGET = 'target'
+
+OPTIONS_SECTION_BRANCH_ALL = 'branch-all'
+OPTIONS_SECTION_BRANCH_CURRENT = 'branch-current'
+OPTIONS_SECTION_MODIFIED = 'modified'
+OPTIONS_SECTION_STAGED = 'staged'
+OPTIONS_SECTION_STASHES = 'stashes'
+OPTIONS_SECTION_UNTRACKED = 'untracked'
 
 #-----------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
@@ -42,6 +59,10 @@ KEY_FILE_STATUSES_HEURISTIC_SCORE = 'heuristicScore'
 
 KEY_OPTIONS_SECTION_LIST = 'optionsCustomList'
 
+KEY_RETURN_STATUS = 'returnStatus'
+KEY_RETURN_MESSAGES = 'returnMessages'
+KEY_RETURN_VALUE = 'returnValue'
+
 KEY_STASH_FULL_HASH = 'fullHash'
 KEY_STASH_NAME = 'name'
 KEY_STASH_DESCRIPTION = 'description'
@@ -49,16 +70,6 @@ KEY_STASH_DESCRIPTION = 'description'
 #-----------------------------------------------------------------------------
 # Other constants so we can catch typos by linting
 #-----------------------------------------------------------------------------
-
-# These are options that user specifies on command line (so don't change these
-# values)
-OPTIONS_SECTION_BRANCH_ALL = 'branch-all'
-OPTIONS_SECTION_BRANCH_CURRENT = 'branch-current'
-OPTIONS_SECTION_MODIFIED = 'modified'
-OPTIONS_SECTION_STAGED = 'staged'
-OPTIONS_SECTION_STASHES = 'stashes'
-OPTIONS_SECTION_UNTRACKED = 'untracked'
-
 OPTIONS_SECTIONS = [
     OPTIONS_SECTION_BRANCH_ALL,
     OPTIONS_SECTION_BRANCH_CURRENT,
@@ -77,17 +88,49 @@ TEXT_YELLOW = 'yellow'
 TEXT_RED = 'red'
 
 #-----------------------------------------------------------------------------
-# Command layer
-#
-# These functions orchestrate the output for top level gitsummary commands
+# Constants exposed for testing purposes
 #-----------------------------------------------------------------------------
-def cmdRepo(options):
+
+# Branch names are based on:
+#   https://nvie.com/posts/a-successful-git-branching-model/
+CONFIG_DEFAULT = {
+    KEY_CONFIG_BRANCH_ORDER: [
+        '^master$',
+        '^develop$',
+        '^hotfix-',
+        '^release-',
+    ],
+    KEY_CONFIG_DEFAULT_TARGET: 'develop',
+    KEY_CONFIG_BRANCHES: [
+        {
+            KEY_CONFIG_BRANCH_NAME: '^master$',
+            KEY_CONFIG_BRANCH_TARGET: ''
+        },
+        {
+            KEY_CONFIG_BRANCH_NAME:'^develop$',
+            KEY_CONFIG_BRANCH_TARGET: 'master'
+        },
+        {
+            KEY_CONFIG_BRANCH_NAME:'^hotfix-',
+            KEY_CONFIG_BRANCH_TARGET: 'master'
+        },
+        {
+            KEY_CONFIG_BRANCH_NAME:'^release-',
+            KEY_CONFIG_BRANCH_TARGET: 'master'
+        },
+    ]
+}
+
+CONFIG_FILENAME = '.gitsummaryconfig'
+
+#-----------------------------------------------------------------------------
+def doit(options):
     """
-    Print the output corresponding to the 'repo' command.
+    Orchestrate all output
 
     Args
         Dictionary options - A dictionary with the following key:
-                                KEY_OPTIONS_SECTION_LIST   : List of String
+                                KEY_OPTIONS_SECTION_LIST : List of String
 
     Example:
 
@@ -108,6 +151,18 @@ def cmdRepo(options):
      * dev                 .  .     .  .  master
        featureBranch       .  .     .  .  dev
     """
+
+    #-------------------------------------------------------------------------
+    # Set configuration options
+    #-------------------------------------------------------------------------
+    configToUse = fsGetConfigToUse()
+    if configToUse[KEY_RETURN_STATUS]:
+        gitsummaryConfig = configToUse[KEY_RETURN_VALUE]
+    else:
+        for line in configToUse[KEY_RETURN_MESSAGES]:
+            print(line)
+        sys.exit()
+
     #-------------------------------------------------------------------------
     # Assemble the raw output lines(no colors, padding, or truncation)
     #
@@ -124,6 +179,11 @@ def cmdRepo(options):
     fileStatuses = gitGetFileStatuses()
     currentBranch = gitGetCurrentBranch()
     localBranches = gitGetLocalBranches()
+
+    localBranchesInDisplayOrder = utilGetBranchOrder(
+        gitsummaryConfig,
+        localBranches
+    )
 
     rawStashLines = (
         utilGetRawStashLines()
@@ -151,14 +211,16 @@ def cmdRepo(options):
 
     if OPTIONS_SECTION_BRANCH_CURRENT in options[KEY_OPTIONS_SECTION_LIST]:
         rawBranchLines = utilGetRawBranchesLines(
+            gitsummaryConfig,
             currentBranch,
-            localBranches,
+            localBranchesInDisplayOrder,
             False,
         )
     elif OPTIONS_SECTION_BRANCH_ALL in options[KEY_OPTIONS_SECTION_LIST]:
         rawBranchLines = utilGetRawBranchesLines(
+            gitsummaryConfig,
             currentBranch,
-            localBranches,
+            localBranchesInDisplayOrder,
             True
         )
     else:
@@ -336,7 +398,141 @@ def cmdRepo(options):
         print('\nPlease notify the gitsummary author.')
 
 #-----------------------------------------------------------------------------
-# git interface layer
+# Filesystem Interface Layer
+#
+# These functions form the interface with the filesystem, for operations other
+# than running git.
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+def fsGetConfigFullyQualifiedFilename():
+    """
+    Return the fully qualified path to the closest CONFIG_FILENAME
+
+    Algorithm is to look in current directory, then parent, repeating until
+    the config file is found, stopping at filesystem root.
+
+    Return
+        String|None The fully qualified path to the config file, or None if it
+                    doesn't exist
+    """
+
+    returnVal = None
+    folderToExamine = os.getcwd()
+
+    # splitdrive()[1] gives the current path
+    #   - Unix filesystems   : current path, as expected
+    #   - Windows filesystems: current path, excluding drive letters and UNC
+    #     paths
+    while (
+        not returnVal and
+        os.path.splitdrive(folderToExamine)[1] not in ['/', '\\']
+    ):
+        pathToTest = os.path.join(folderToExamine, CONFIG_FILENAME)
+        if os.path.isfile(pathToTest):
+            returnVal = pathToTest
+        else:
+            folderToExamine = os.path.dirname(folderToExamine)
+
+    return returnVal
+
+#-----------------------------------------------------------------------------
+def fsGetConfigToUse():
+    """
+    Get the configuration object to use -- either user-specified or default
+
+    If a user configuration file is found, it is parsed and validated.
+    Validation errors are returned (see below).
+
+    CONFIG_DEFAULT is used if no user config file is found.
+
+    Return
+        Dictionary - A dictionary containing the following keys:
+            KEY_RETURN_STATUS   - Boolean     - Whether the configuration
+                                                returned is valid
+            KEY_RETURN_MESSAGES - List of str - Errors encountering when parsing
+                                                user config file
+            KEY_RETURN_VALUE    - Dictionary  - The configuration object,
+                                                possibly empty if there were
+                                                errors processing user's
+                                                configuration file
+    """
+    errors = []
+    configObjectToUse = {}
+
+    userConfigFile = fsGetConfigFullyQualifiedFilename()
+    if userConfigFile == None:
+        configObjectToUse = CONFIG_DEFAULT
+    else:
+        configParseResult = fsGetValidatedUserConfig(userConfigFile)
+        if configParseResult[KEY_RETURN_STATUS]:
+            configObjectToUse = configParseResult[KEY_RETURN_VALUE]
+        else:
+            errors.append('There were problems with your configuration file.')
+            errors.append('Configuration file: ' + userConfigFile)
+            for error in configParseResult[KEY_RETURN_MESSAGES]:
+                errors.append('    ' + error)
+
+    returnVal = {
+        KEY_RETURN_STATUS: len(errors) == 0,
+        KEY_RETURN_MESSAGES: errors,
+        KEY_RETURN_VALUE: configObjectToUse
+    }
+
+    return returnVal
+
+#-----------------------------------------------------------------------------
+def fsGetValidatedUserConfig(fullyQualifiedFilename):
+    """
+    Get the user specified gitsummary configuration
+
+    Validate the contents and return errors if appropriate.
+
+    Return
+        Dictionary - A dictionary containing the following keys:
+            KEY_RETURN_STATUS   - Boolean     - Whether the configuration
+                                                returned is valid
+            KEY_RETURN_MESSAGES - List of str - Errors encountering when parsing
+                                                user config file
+            KEY_RETURN_VALUE    - Dictionary  - The user-specified configuration
+    """
+    errors = []
+    configObject = {}
+
+    # Read the file, removing comments
+    try:
+        inputFile = open(fullyQualifiedFilename)
+        configFileContents = ''
+
+        for line in inputFile:
+            # Strip out lines that contain only a comment
+            if not re.search('^[ \t]*\/\/', line):
+                configFileContents += line
+        inputFile.close()
+
+    except Exception as e:
+        errors.append('Error reading ' + fullyQualifiedFilename + ': ' + str(e))
+
+    # Parse the file as a json object
+    if len(errors) == 0:
+        try:
+            configObject = json.loads(configFileContents)
+            errors += utilValidateGitsummaryConfig(
+                configObject
+            )[KEY_RETURN_MESSAGES]
+        except Exception as e:
+            errors.append('Error parsing ' + fullyQualifiedFilename + ': ' + str(e))
+
+    returnVal = {
+        KEY_RETURN_STATUS: len(errors) == 0,
+        KEY_RETURN_MESSAGES: errors,
+        KEY_RETURN_VALUE: configObject
+    }
+
+    return returnVal
+
+#-----------------------------------------------------------------------------
+# Git Interface Layer
 #
 # These functions form the lower layer interface with git. They are the only
 # functions with knowledge of the format of git commands.
@@ -467,7 +663,7 @@ def gitGetCurrentBranch():
     # BRANCH will be '(detached)' if detached head state
     parsedBranch = ''
     for line in output:
-        match = re.match('^# branch.head (.+)$', line)
+        match = re.search('^# branch.head (.+)$', line)
         if (match):
             parsedBranch = match.group(1)
 
@@ -555,19 +751,19 @@ def gitGetFileStatuses():
 
         if outputLine[0] == '1':
             # 1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
-            match = re.match('([^ ]+ ){8}(.+)$', outputLine)
+            match = re.search('^([^ ]+ ){8}(.+)$', outputLine)
             filename = match.group(2)
 
         elif outputLine[0] == '2':
             # 2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>[tab]<origPath>
-            match = re.match('^([^ ]+ ){8}[A-Z]([^ ]+) (.+)\t(.+)$', outputLine)
+            match = re.search('^([^ ]+ ){8}[A-Z]([^ ]+) (.+)\t(.+)$', outputLine)
             heuristicScore = match.group(2)
             newFilename = match.group(3)
             filename = match.group(4)
 
         elif outputLine[0] == 'u':
             # u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
-            match = re.match('^([^ ]+ ){10}(.+)$', outputLine)
+            match = re.search('^([^ ]+ ){10}(.+)$', outputLine)
             filename = match.group(2)
 
         elif outputLine[0] == '?':
@@ -711,11 +907,11 @@ def gitGetRemoteTrackingBranch(localBranch):
         remoteValue = None
 
         for line in statusOutput:
-            branchMatch = re.match('^# branch.head (.+)$', line)
+            branchMatch = re.search('^# branch.head (.+)$', line)
             if (branchMatch):
                 branchValue = branchMatch.group(1)
             else:
-                remoteMatch = re.match('^# branch.upstream (.+)$', line)
+                remoteMatch = re.search('^# branch.upstream (.+)$', line)
                 if (remoteMatch):
                     remoteValue = remoteMatch.group(1)
 
@@ -767,7 +963,7 @@ def gitGetStashes():
 
     for oneStash in output:
         split = oneStash.split(' ', 2)
-        nameMatch = re.match('^refs/([^:]+})', split[1])
+        nameMatch = re.search('^refs/([^:]+})', split[1])
         name = nameMatch.group(1)
         stashes.append(
             {
@@ -778,6 +974,14 @@ def gitGetStashes():
         )
 
     return stashes
+
+#-----------------------------------------------------------------------------
+# Git Utility Layer
+#
+# Pretty boring layer -- just one function. Maybe there will be more in the
+# future.
+#
+#-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
 def gitUtilGetOutput(command):
@@ -808,6 +1012,14 @@ def gitUtilGetOutput(command):
         returnVal = output.splitlines()
 
     return returnVal
+
+#-----------------------------------------------------------------------------
+# Utility Layer
+#
+# These are utility functions that build various objects required to create
+# appropriate output. They don't run git directly, but may use functions from
+# the git layer.
+#-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
 def utilGetAheadBehindString(ahead, behind):
@@ -900,6 +1112,43 @@ def utilGetBranchAsFiveColumns(currentBranch, branch, targetBranch):
         utilGetAheadBehindString(aheadOfTarget, behindTarget),
         targetBranch,
     ]
+
+#-----------------------------------------------------------------------------
+def utilGetBranchOrder(gitsummaryConfig, branchList):
+    """
+    Return the branches in branchList in the order specified by the
+    gitsummaryConfig.
+
+    - The order of patterns in gitsummaryConfig is the order that matching
+      branches will be returned
+    - For branches that match one particular pattern in gitsummaryConfig, they
+      will be returned in alphabetical order.
+    - Branches that don't match any patterns in gitsummaryConfig will be listed
+      last (in alphabetical order as well).
+
+    Args
+        Dictionary     gitsummaryConfig - Dictionary containing all the
+                                          gitsummary configuration
+        List of String branchList       - The list of branches to be put in
+                                          order
+
+    Return
+        List of String - The branches in order as per gitsummaryConfig
+
+    """
+    originalBranchList = sorted(branchList)
+    returnVal = []
+
+    # First the branches that match gitsummaryConfig patterns
+    for branchPattern in gitsummaryConfig[KEY_CONFIG_BRANCH_ORDER]:
+        for branch in [x for x in originalBranchList if x not in returnVal]:
+            if re.search(branchPattern, branch):
+                returnVal.append(branch)
+
+    # Then the branches that don't match any config patterns
+    returnVal += [x for x in originalBranchList if x not in returnVal]
+
+    return returnVal
 
 #-----------------------------------------------------------------------------
 def utilGetColumnAlignedLines(
@@ -1052,17 +1301,25 @@ def utilGetModifiedFileAsTwoColumns(modifiedFile):
     ]
 
 #-----------------------------------------------------------------------------
-def utilGetRawBranchesLines(currentBranch, localBranches, showAllBranches):
+def utilGetRawBranchesLines(
+    gitsummaryConfig,
+    currentBranch,
+    localBranches,
+    showAllBranches
+):
     """
     Get the "raw" lines for the specified branches, including the headings line.
 
     Args
-        String         currentBranch   - The name of the current branch.
-                                         Used to determine which branch line should
-                                         have the '*' indicator
-        List of String localBranches   - All local branches
-        Boolean        showAllBranches - Whether to show all branches (True)
-                                         or just the current branch (False)
+        Dictionary     gitsummaryConfig - Dictionary containing all the
+                                          gitsummary configuration
+        String         currentBranch    - The name of the current branch.
+                                          Used to determine which branch line
+                                          should have the '*' indicator
+        List of String localBranches    - All local branches, in the order they
+                                          should appear in the returned list
+        Boolean        showAllBranches  - Whether to show all branches (True)
+                                          or just the current branch (False)
 
     Return
         List of 'lines', where each line is itself a List of columns
@@ -1088,39 +1345,29 @@ def utilGetRawBranchesLines(currentBranch, localBranches, showAllBranches):
     ]
 
     if showAllBranches:
-        # Do master and dev first since they're the most important
-        importantBranches = ['master', 'dev']
-        for branch in importantBranches:
-            if branch in localBranches:
-                rawBranchLines.append(
-                    utilGetBranchAsFiveColumns(
-                        currentBranch,
-                        branch,
-                        utilGetTargetBranch(branch, localBranches)
-                    )
-                )
-
-        # Now all the other branches
-        for branch in localBranches:
-            if branch not in importantBranches:
-                rawBranchLines.append(
-                    utilGetBranchAsFiveColumns(
-                        currentBranch,
-                        branch,
-                        utilGetTargetBranch(branch, localBranches)
-                    )
-                )
+        branchesToList = localBranches
     else:
-        # Only output a line if we're not in detached head state since we've
-        # got that covered below
+        # Make sure we're not showing a branch line for detached head state,
+        # since we've got logic for that below
         if currentBranch != '':
-            rawBranchLines.append(
-                utilGetBranchAsFiveColumns(
-                    currentBranch,
-                    currentBranch,
-                    utilGetTargetBranch(currentBranch, localBranches)
-                )
+            branchesToList = [currentBranch]
+        else:
+            branchesToList = []
+
+    for branch in branchesToList:
+        targetBranch = utilGetTargetBranch(
+            gitsummaryConfig,
+            branch,
+            localBranches
+        )
+
+        rawBranchLines.append(
+            utilGetBranchAsFiveColumns(
+                currentBranch,
+                branch,
+                targetBranch
             )
+        )
 
     # If we're in detached head state, add a branch line that indicates we're
     # in detached head state
@@ -1373,33 +1620,301 @@ def utilGetStyledText(styles, text):
     return escapeStart + text + escapeEnd
 
 #-----------------------------------------------------------------------------
-def utilGetTargetBranch(branch, localBranches):
+def utilGetTargetBranch(gitsummaryConfig, branch, localBranches):
     """
-    Return the name of the target branch associated with 'branch'.
-
-    Branch name patterns and their associated target branch are:
-        master --> None
-        dev    --> master
-        hf*    --> master
-        *      --> dev
+    Return the name of the target branch associated with 'branch', as specified
+    in 'gitsummaryConfig' (if that target branch exists).
 
     Args
-        String         branch        - The name of the branch we're interested in
-        List of String localBranches - List of all local branches
+        Dictionary     gitsummaryConfig - Dictionary containing all the
+                                          gitsummary configuration
+        String         branch           - The name of the branch we're interested
+                                          in
+        List of String localBranches    - List of all local branches
 
     Return
-        String The target branch. '' if no target branch
+        String - The target branch. '' if no target branch
     """
-    if branch == 'master':
-        targetBranch = ''
-    elif branch == 'dev':
-        targetBranch = 'master' if 'master' in localBranches else ''
-    elif branch.startswith('hf'):
-        targetBranch = 'master' if 'master' in localBranches else ''
-    else:
-        targetBranch = 'dev' if 'dev' in localBranches else ''
+    defaultTarget = gitsummaryConfig[KEY_CONFIG_DEFAULT_TARGET]
+    targetBranch = None
+
+    # See if current branch matches one in the config file
+    for branchConfig in gitsummaryConfig[KEY_CONFIG_BRANCHES]:
+        if re.search(branchConfig[KEY_CONFIG_BRANCH_NAME], branch):
+           thisTarget = branchConfig[KEY_CONFIG_BRANCH_TARGET]
+           targetBranch = thisTarget if thisTarget in localBranches else ''
+           break
+
+    # If we didn't match a branch from the user config, then use the default
+    if targetBranch == None:
+        targetBranch = defaultTarget if defaultTarget in localBranches else ''
 
     return targetBranch
+
+#-----------------------------------------------------------------------------
+def utilPrintHelp(commandName):
+    """
+    Print the output corresponding to '--help'.
+
+    Args
+        String commandName - The name this script was invoked with
+    """
+    print('Usage:')
+    print('    ' + commandName + ' [--custom [options]] | --help | --helpconfig | --version')
+    print('')
+    print('Print a summary of the current git repository\'s status:')
+    print('    - stashes, staged files, modified files, untracked files,')
+    print('    - list of local branches, including the following for each:')
+    print('          - number of commits ahead/behind its target branch')
+    print('          - number of commits ahead/behind its remote branch')
+    print('          - the name of its target branch')
+    print()
+    print('Flags:')
+    print('    --custom [options]')
+    print('        - Show only the specified sections of output')
+    print('        - Valid section names are:')
+    print('          \'stashes\', \'staged\', \'modified\', \'untracked\', \'branch-all\',')
+    print('          \'branch-current\'')
+    print('')
+    print('    --help')
+    print('        - Show this output')
+    print('')
+    print('    --helpconfig')
+    print('        - Show information for the gitsummary configuration file')
+    print('')
+    print('    --version')
+    print('        - Show current version')
+
+#-----------------------------------------------------------------------------
+def utilPrintHelpConfig():
+    """
+    Print help output describing the configuration file
+    """
+
+    print("""The gitsummary configuration file ("{configFilename}") is a json-formatted
+file used to specify:
+    - the order in which branches are printed
+    - branch names and their corresponding targets
+
+Any line beginning with "//" (with optional preceding whitespace) is treated as
+a comment and thus ignored.
+
+The following is a sample configuration file that matches the built-in defaults:
+
+   {{
+       // Specify the order in which to display branches
+       //     - Branches that match the first regular expression are displayed
+       //       first (in alphabetical order), followed by branches matching
+       //       the second regular expression, and so on
+       //     - Branches not matching any of the regular expressions are
+       //       listed last (also in alphabetical order)
+       "branchOrder": [
+           "^master$",
+           "^develop$",
+           "^hotfix-",
+           "^release-"
+       ],
+
+       // Specify the default target branch if none of the regular expressions
+       // in "branches" (see below) match. "" is a valid value.
+       "defaultTarget": "develop",
+
+       // Specify branches and their corresponding target branches
+       //     - When displaying branch information, the branch name is
+       //       matched against the "name" regular expressions below, in
+       //       successive order, until a match is made
+       //     - The "target" of the first match will be shown as the branch's
+       //       target branch
+       "branches": [
+           {{
+               "name"  : "^master$",
+               "target": ""
+           }},
+           {{
+               "name"  :"^develop$",
+               "target": "master"
+           }},
+           {{
+               "name"  :"^hotfix-.*",
+               "target": "master"
+           }},
+           {{
+               "name"  :"^release-.*",
+               "target": "master"
+           }}
+       ]
+    }}
+
+Gitsummary will look for {configFilename} in the current directory. If
+not found, it will look in successive parent folders all the way up to the root
+of the filesystem.
+
+    """.format(
+        configFilename = CONFIG_FILENAME,
+    ))
+
+#-----------------------------------------------------------------------------
+def utilValidateGitsummaryConfig(configObject):
+    """
+    Validate the specified configObject
+
+    Test that all required keys are present and the correct type, and there are
+    no unexpected keys.
+
+    Return
+        Dictionary - With the following keys:
+            KEY_RETURN_STATUS  : Boolean - Whether the configObject is valid
+            KEY_RETURN_MESSAGES: List    - List of messages appropriate for user
+    """
+    errors = []
+
+    #---------------------------------------------------------------------------
+    # Identify top level unexpected keys
+    #---------------------------------------------------------------------------
+    for key in configObject:
+        if key not in [
+            KEY_CONFIG_BRANCH_ORDER,
+            KEY_CONFIG_DEFAULT_TARGET,
+            KEY_CONFIG_BRANCHES
+        ]:
+            errors.append('Unexpected configuration option: ' + key)
+
+    #---------------------------------------------------------------------------
+    # branchOrder
+    #---------------------------------------------------------------------------
+    branchOrderErrors = utilValidateKeyPresenceAndType(
+        configObject,
+        KEY_CONFIG_BRANCH_ORDER,
+        [],
+        '',
+        'array'
+    )
+    errors += branchOrderErrors
+
+    if len(branchOrderErrors) == 0:
+
+        # Make sure all branch names are valid regular expressions
+        for i, branch in enumerate(configObject[KEY_CONFIG_BRANCH_ORDER]):
+            # Make sure it's a string
+            if not isinstance(branch, ''.__class__):
+                errors.append(
+                    KEY_CONFIG_BRANCH_ORDER + ': Element ' + str(i) +
+                    ' must be a string'
+                )
+            else:
+                # Make sure it's a valid regular expression
+                try:
+                    re.compile(branch)
+                except:
+                    errors.append(
+                        KEY_CONFIG_BRANCH_ORDER + ': Element ' + str(i) +
+                        ' is not a valid regular expression'
+                    )
+
+    #---------------------------------------------------------------------------
+    # defaultTarget
+    #---------------------------------------------------------------------------
+    errors += utilValidateKeyPresenceAndType(
+        configObject,
+        KEY_CONFIG_DEFAULT_TARGET,
+        '',
+        '',
+        'string'
+    )
+
+    #---------------------------------------------------------------------------
+    # branches
+    #---------------------------------------------------------------------------
+    branchesErrors = utilValidateKeyPresenceAndType(
+        configObject,
+        KEY_CONFIG_BRANCHES,
+        [],
+        '',
+        'array'
+    )
+    errors += branchesErrors
+
+    if len(errors) == 0:
+        # Validate each branch
+        for i, branch in enumerate(configObject[KEY_CONFIG_BRANCHES]):
+            # Branch Name
+            branchErrors = utilValidateKeyPresenceAndType(
+                branch,
+                KEY_CONFIG_BRANCH_NAME,
+                '',
+                'branch ' + str(i) + ': ',
+                'string'
+            )
+            errors += branchErrors
+
+            if len(errors) == 0:
+                # Make sure branch name is a valid regular expression
+                try:
+                    re.compile(branch[KEY_CONFIG_BRANCH_NAME])
+                except:
+                    errors.append(
+                        'branch ' + str(i) + ': ' + KEY_CONFIG_BRANCH_NAME +
+                        ' is not a valid regular expression'
+                     )
+
+            # Branch Target
+            errors += utilValidateKeyPresenceAndType(
+                branch,
+                KEY_CONFIG_BRANCH_TARGET,
+                '',
+                'branch ' + str(i) + ': ',
+                'string'
+            )
+
+            # Branch Unexpected Keys
+            for key in branch:
+                if key not in [KEY_CONFIG_BRANCH_NAME, KEY_CONFIG_BRANCH_TARGET]:
+                    errors.append(
+                        'Unexpected configuration option for branch ' + str(i) +
+                        ': ' + key
+                    )
+
+    returnVal = {
+        KEY_RETURN_STATUS: len(errors) == 0,
+        KEY_RETURN_MESSAGES: errors
+    }
+
+    return returnVal
+
+#-----------------------------------------------------------------------------
+def utilValidateKeyPresenceAndType(
+    testObject,
+    key,
+    sampleType,
+    msgPrefix,
+    userFriendlyType
+):
+    """
+    Validate the the specified key is in the testObject and the value is the
+    same type as sampleType
+
+    Args
+        Dictionary testObject       - The object we're testing
+        String     key              - The key to look for
+        Mixed      sampleType       - An object of the same type we want key's
+                                      value to be
+        String     msgPrefix        - The string to be used as a prefix for
+                                      errors
+        String     userFriendlyType - The name of the type to be shown in
+                                      error message
+
+    Return
+        List of String - The errors encountered. Empty if no errors.
+    """
+    errors = []
+
+    if key not in testObject:
+        errors.append(msgPrefix + 'Missing ' + key)
+    else:
+        if not isinstance(testObject[key], sampleType.__class__):
+            errors.append(msgPrefix + key + ' must be a ' + userFriendlyType)
+
+    return errors
 
 #-----------------------------------------------------------------------------
 def main():
@@ -1432,37 +1947,20 @@ def main():
                     options[KEY_OPTIONS_SECTION_LIST].append(sys.argv[i])
                     i += 1
         elif sys.argv[i] == '--help':
-            print('Usage:')
-            print('    ' + sys.argv[0] + ' [--custom [options]] | --help')
-            print('')
-            print('Print a summary of the current git repository\'s status:')
-            print('    - stashes, staged files, modified files, untracked files,')
-            print('    - list of local branches, including the following for each:')
-            print('          - number of commits ahead/behind its target branch')
-            print('          - number of commits ahead/behind its remote branch')
-            print('          - the name of its target branch')
-
-            print('Flags:')
-            print('    --custom [options]')
-            print('        - Show only the specified sections of output')
-            print('        - Valid section names are:')
-            print('          \'stashes\', \'staged\', \'modified\', \'untracked\', \'branch-all\',')
-            print('          \'branch-current\'')
-            print('')
-            print('    --help')
-            print('        - Show this output')
-            print('')
-            print('    --version')
-            print('        - Show current version')
+            utilPrintHelp(sys.argv[0])
+            sys.exit(0)
+        elif sys.argv[i] == '--helpconfig':
+            utilPrintHelpConfig()
             sys.exit(0)
         elif sys.argv[i] == '--version':
             print(VERSION)
             sys.exit(0)
         else:
             print('Unknown command line argument: ' + sys.argv[i])
+            print('See "' + sys.argv[0] + ' --help"')
             sys.exit(1)
 
-    cmdRepo(options)
+    doit(options)
 
 #-----------------------------------------------------------------------------
 if __name__ == '__main__':

@@ -16,6 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import gitsummary  # So we have access to the default .gitsummaryconfig
+import json
 import os
 import subprocess
 
@@ -129,19 +131,19 @@ def createScenarioDemo():
         - Branches
             commit1   commit2   commit3   commit4   commit5    ... commitX
             master
-                                          dev
-                      feature-make-awesome
-                                                               feature-make-faster
-                      hf-fix-bad-bug
+                                          develop
+                      make-awesome-new-thing
+                                                               make-faster
+                      hotfix-fix-something-bad
 
-        - Staged files etc will be setup on feature-make-faster, hence "X"
+        - Staged files etc will be setup on make-faster, hence "X"
           in "commitX" above, and below in remotes
 
         - Remotes:
-            master              : in sync
-            dev                 : in sync
-            feature-make-awesome: no remote
-            feature-make-faster : +X
+            master                 : in sync
+            develop                : in sync
+            make-awesome-new-thing : no remote
+            make-faster            : +X
 
         - Two entries in each section of gitsummary output
     """
@@ -160,28 +162,39 @@ def createScenarioDemo():
     utilModifyAndCommitFile(WORK_FILE, 'contents1', 'commit1')
     utilExecute(['git', 'push'])
 
-    utilExecute(['git', 'checkout', '-b', 'dev', 'master'])
-    utilExecute(['git', 'push', '--set-upstream', 'origin', 'dev'])
+    utilExecute(['git', 'checkout', '-b', 'develop', 'master'])
+    utilExecute(['git', 'push', '--set-upstream', 'origin', 'develop'])
 
-    utilExecute(['git', 'checkout', '-b', 'hf-fix-bad-bug', 'master'])
+    utilExecute(['git', 'checkout', '-b', 'hotfix-fix-something-bad', 'master'])
     utilModifyAndCommitFile(WORK_FILE, 'contents2', 'commit2')
 
-    utilExecute(['git', 'checkout', 'dev'])
+    utilExecute(['git', 'checkout', 'develop'])
     utilModifyAndCommitFile(WORK_FILE, 'contents3', 'commit3')
     utilExecute(['git', 'push'])
 
-    utilExecute(['git', 'checkout', '-b', 'feature-make-awesome', 'dev'])
+    utilExecute(['git', 'checkout', '-b', 'make-awesome-new-thing', 'develop'])
 
-    utilExecute(['git', 'checkout', 'dev'])
+    utilExecute(['git', 'checkout', 'develop'])
     utilModifyAndCommitFile(WORK_FILE, 'contents4', 'commit4')
     utilModifyAndCommitFile(WORK_FILE, 'contents5', 'commit5')
     utilExecute(['git', 'push'])
 
-    utilExecute(['git', 'checkout', '-b', 'feature-make-faster', 'dev'])
+    utilExecute(['git', 'checkout', '-b', 'make-faster', 'develop'])
     utilModifyAndCommitFile(WORK_FILE, 'contents6', 'commit6')
-    utilExecute(['git', 'push', '--set-upstream', 'origin', 'feature-make-faster'])
+    utilExecute(['git', 'push', '--set-upstream', 'origin', 'make-faster'])
     utilModifyAndCommitFile(WORK_FILE, 'contents6a', 'commit6a')
     utilModifyAndCommitFile(WORK_FILE, 'contents6b', 'commit6b')
+
+    #-------------------------------------------------------------------------
+    # Create .gitsummaryconfig with gitsummary defaults.
+    # Do it here so we don't commit the "added" files below.
+    #-------------------------------------------------------------------------
+    gitsummaryConfigFile = open(gitsummary.CONFIG_FILENAME, 'w')
+    json.dump(gitsummary.CONFIG_DEFAULT, gitsummaryConfigFile)
+    gitsummaryConfigFile.close()
+
+    utilExecute(['git', 'add', gitsummary.CONFIG_FILENAME])
+    utilExecute(['git', 'commit', '-m', 'Add .gitsummaryconfig'])
 
     #-------------------------------------------------------------------------
     # Setup files to get two entries in each section of gitsummary output

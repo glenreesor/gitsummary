@@ -9,7 +9,7 @@ A better `git status`
 All nicely formatted with color.
 
 ## Example
-![](https://raw.githubusercontent.com/glenreesor/gitsummary/master/doc/output.default.png)
+![][defaultOutput]
 
 In addition to the usual stashes and file statuses, this output is showing the
 following branch information:
@@ -17,16 +17,16 @@ following branch information:
 - `master`
     - In sync with its remote branch
     - Has no merge target
-- `dev`
+- `develop`
     - In sync with its remote branch
     - 3 commits ahead of its merge target (`master`)
-- `feature-make-awesome`
+- `make-awesome-new-thing`
     - Has no remote branch
-    - 2 commits behind its merge target (`dev`)
-- `feature-make-faster`
-    - 6 commits ahead of its remote
-    - 7 commits ahead of its merge target (`dev`)
-- `hf-fix-bad-bug`
+    - 2 commits behind its merge target (`develop`)
+- `make-faster`
+    - 7 commits ahead of its remote
+    - 8 commits ahead of its merge target (`develop`)
+- `hotfix-fix-something-bad`
     - Has no remote branch
     - 1 commit ahead of its merge target (`master`)
 
@@ -34,22 +34,24 @@ following branch information:
 A merge target is the branch that `gitsummary` is expecting a particular branch
 to be merged into.
 
-The algorithm for determining merge targets is currently hard coded, but will
-be configurable in a future version.
+For any given branch, the merge target is determined by the first regular
+expression that matches that branch:
 
-Branch Name Pattern | Merge Target | Comments
-------------------- | ------------ | --------
-master              |   [None]     |
-dev                 |   master     | No target if master does not exist
-hf*                 |   master     | No target if master does not exist. ('hf' is an abbreviation for 'hotfix')
-[everything else]   |   dev        |
+Regular Expression  | Merge Target
+------------------- | ------------
+^master$            |   [None]
+^develop$           |   master
+^hotfix-            |   master
+^release-           |   master
+[everything else]   |   develop
 
-(See below if you want to change `gitsummary` for your own branch merge targets.)
+You can specify your own merge targets in a `.gitsummaryconfig` file
+(see below).
 
 ## Usage
 ```
 Usage:
-    /gitsummary.py [--custom [options]] | --help
+    gitsummary.py [--custom [options]] | --help | --helpconfig | --version
 
 Print a summary of the current git repository's status:
     - stashes, staged files, modified files, untracked files,
@@ -57,6 +59,7 @@ Print a summary of the current git repository's status:
           - number of commits ahead/behind its target branch
           - number of commits ahead/behind its remote branch
           - the name of its target branch
+
 Flags:
     --custom [options]
         - Show only the specified sections of output
@@ -67,6 +70,9 @@ Flags:
     --help
         - Show this output
 
+    --helpconfig
+        - Show information for the gitsummary configuration file
+
     --version
         - Show current version
 ```
@@ -75,25 +81,70 @@ Flags:
 python3
 
 ## Installation
-Easy! Just copy [gitsummary.py](https://raw.githubusercontent.com/glenreesor/gitsummary/master/gitsummary.py) to a folder in your path, and you're set!
+Easy! Just copy [gitsummary.py][gitsummaryScript]
+to a folder in your path, and you're set!
 
-## Customizing Branch Merge Targets
-The logic for mapping branches to their merge targets is in
-`gitsummary.py/utilGetTargetBranch()`,
-and the corresponding tests are in `testGitsummary.py/Test_utilGetTargetBranch`.
+## Configuration File
+The gitsummary configuration file (`.gitsummaryconfig`) is a json-formatted
+file used to specify:
 
-The code is straight forward. For example, if you use `develop` instead of `dev`
-and `hotfix` instead of `hf`, the body of `utilGetTargetBrahch()` would be:
+- the order in which branches are printed
+- branch names and their corresponding targets
 
+Any line beginning with "//" (with optional preceding whitespace) is treated as
+a comment and thus ignored.
+
+The following is a sample configuration file that matches the built-in defaults:
 ```
-    if branch == 'master':
-        targetBranch = ''
-    elif branch == 'develop':
-        targetBranch = 'master' if 'master' in localBranches else ''
-    elif branch.startswith('hotfix'):
-        targetBranch = 'master' if 'master' in localBranches else ''
-    else:
-        targetBranch = 'develop' if 'develop' in localBranches else ''
+{
+    // Specify the order in which to display branches
+    //     - Branches that match the first regular expression are displayed
+    //       first (in alphabetical order), followed by branches matching
+    //       the second regular expression, and so on
+    //     - Branches not matching any of the regular expressions are
+    //       listed last (also in alphabetical order)
+    "branchOrder": [
+        "^master$",
+        "^develop$",
+        "^hotfix-",
+        "^release-"
+    ],
 
-    return targetBranch
+    // Specify the default target branch if none of the regular expressions
+    // in "branches" (see below) match. "" is a valid value.
+    "defaultTarget": "develop",
+
+    // Specify branches and their corresponding target branches
+    //     - When displaying branch information, the branch name is
+    //       matched against the "name" regular expressions below, in
+    //       successive order, until a match is made
+    //     - The "target" of the first match will be shown as the branch's
+    //       target branch
+    "branches": [
+        {
+            "name"  : "^master$",
+            "target": ""
+        },
+        {
+            "name"  :"^develop$",
+            "target": "master"
+        },
+        {
+            "name"  :"^hotfix-.*",
+            "target": "master"
+        },
+        {
+            "name"  :"^release-.*",
+            "target": "master"
+        }
+    ]
+}
 ```
+Gitsummary will look for `.gitsummaryconfig` in the current directory. If
+not found, it will look in successive parent folders all the way up to the root
+of the filesystem.
+```
+
+[defaultOutput]: https://raw.githubusercontent.com/glenreesor/gitsummary/master/doc/output.default.png
+
+[gitsummaryScript]: https://raw.githubusercontent.com/glenreesor/gitsummary/master/gitsummary.py
