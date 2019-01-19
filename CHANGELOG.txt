@@ -1,3 +1,7 @@
+2019-01-18 - Version 3.1.0
+    - Add support for configurable branch targets and branch order via new
+      .gitsummaryconfig file
+
 2018-11-12 - Version 3.0.1
     - Fix edge case for '--custom branch-current' when in detached head state
 
