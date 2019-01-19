@@ -91,7 +91,7 @@ file used to specify:
 - the order in which branches are printed
 - branch names and their corresponding targets
 
-Any line beginning with "//" (with optional preceding whitespace) is treated as
+Any line beginning with `//` (with optional preceding whitespace) is treated as
 a comment and thus ignored.
 
 The following is a sample configuration file that matches the built-in defaults:
