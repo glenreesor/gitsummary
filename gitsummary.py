@@ -1789,7 +1789,7 @@ def utilPrintHelp(commandName):
     print('    ' + commandName + ' [--custom [sections]] | --help | --helpconfig | --version')
     print('')
     print('Print a summary of the current git repository\'s status:')
-    print('    - stashes, stage changes, working directory changes, unmerged changed,')
+    print('    - stashes, stage changes, working directory changes, unmerged changes,')
     print('      untracked files,')
     print('    - list of local branches, including the following for each:')
     print('          - number of commits ahead/behind its target branch')
