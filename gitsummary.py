@@ -22,12 +22,12 @@ import re
 import subprocess
 import sys
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 VERSION = '3.1.0'
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Constants that have user exposure (so don't change the values)
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 KEY_CONFIG_DEFAULT_TARGET = 'defaultTarget'
 KEY_CONFIG_BRANCHES = 'branches'
 KEY_CONFIG_BRANCH_NAME = 'name'
@@ -41,9 +41,9 @@ OPTIONS_SECTION_STAGED = 'staged'
 OPTIONS_SECTION_STASHES = 'stashes'
 OPTIONS_SECTION_UNTRACKED = 'untracked'
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 KEY_COMMIT_SHORT_HASH = 'shortHash'
 KEY_COMMIT_DESCRIPTION = 'description'
 
@@ -67,9 +67,9 @@ KEY_STASH_FULL_HASH = 'fullHash'
 KEY_STASH_NAME = 'name'
 KEY_STASH_DESCRIPTION = 'description'
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Other constants so we can catch typos by linting
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 OPTIONS_SECTIONS = [
     OPTIONS_SECTION_BRANCH_ALL,
     OPTIONS_SECTION_BRANCH_CURRENT,
@@ -87,9 +87,9 @@ TEXT_NORMAL = 'normal'
 TEXT_YELLOW = 'yellow'
 TEXT_RED = 'red'
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Constants exposed for testing purposes
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
 # Branch names are based on:
 #   https://nvie.com/posts/a-successful-git-branching-model/
@@ -123,7 +123,7 @@ CONFIG_DEFAULT = {
 
 CONFIG_FILENAME = '.gitsummaryconfig'
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def doit(options):
     """
     Orchestrate all output
@@ -152,9 +152,9 @@ def doit(options):
        featureBranch       .  .     .  .  dev
     """
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Set configuration options
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     configToUse = fsGetConfigToUse()
     if configToUse[KEY_RETURN_STATUS]:
         gitsummaryConfig = configToUse[KEY_RETURN_VALUE]
@@ -163,7 +163,7 @@ def doit(options):
             print(line)
         sys.exit()
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Assemble the raw output lines(no colors, padding, or truncation)
     #
     # Each element in raw*Lines below:
@@ -174,7 +174,7 @@ def doit(options):
     # Later steps will:
     #   - pad/truncate columns to ensure proper line length
     #   - add colors
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
 
     fileStatuses = gitGetFileStatuses()
     currentBranch = gitGetCurrentBranch()
@@ -226,24 +226,24 @@ def doit(options):
     else:
         rawBranchLines = []
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # For each section of output (stashes, staged, etc):
     #   - Determine maximum widths for each column of each line, so we can
     #     align columns within each section
     #
     # Each xyzMaxColumnWidths will be a List of numbers, where each number
     # is the maximum width of the corresponding column.
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     stashesMaxColumnWidths = utilGetMaxColumnWidths(rawStashLines)
     stagedMaxColumnWidths = utilGetMaxColumnWidths(rawStagedLines)
     modifiedMaxColumnWidths = utilGetMaxColumnWidths(rawModifiedLines)
     untrackedMaxColumnWidths = utilGetMaxColumnWidths(rawUntrackedLines)
     branchesMaxColumnWidths = utilGetMaxColumnWidths(rawBranchLines)
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Ensure that title column for each of stashes, staged, modified, and
     # untracked is the same width so they line up
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     maxTitleWidths = max(
         stashesMaxColumnWidths[0] if len(stashesMaxColumnWidths) > 0 else 0,
         stagedMaxColumnWidths[0] if len(stagedMaxColumnWidths) > 0 else 0,
@@ -263,10 +263,10 @@ def doit(options):
     if len(untrackedMaxColumnWidths) > 0:
         untrackedMaxColumnWidths[0] = maxTitleWidths
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Get all of our lines (still in columns) with each column padded or
     # truncated as required
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     try:
         (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size();
     except:
@@ -314,9 +314,9 @@ def doit(options):
         rawBranchLines,
     )
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Final step: Create a single string for each line, with required colors
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     styledStashLines = []
     for line in alignedStashLines:
         styledStashLines.append(
@@ -360,9 +360,9 @@ def doit(options):
             line[4]
         )
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Print all our beautifully formatted output
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     previousSectionHadOutput = False
     for section in options[KEY_OPTIONS_SECTION_LIST]:
         if section == OPTIONS_SECTION_BRANCH_ALL or section == OPTIONS_SECTION_BRANCH_CURRENT:
@@ -385,9 +385,9 @@ def doit(options):
             print(line)
         previousSectionHadOutput = True if len(sectionLines) > 0 else False
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Notify user if git returned something we didn't know how to handle
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     rawUnknownFileList = fileStatuses[KEY_FILE_STATUSES_UNKNOWN]
     if len(rawUnknownFileList) > 0:
         print('git returned some unexpected output:')
@@ -397,14 +397,14 @@ def doit(options):
 
         print('\nPlease notify the gitsummary author.')
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Filesystem Interface Layer
 #
 # These functions form the interface with the filesystem, for operations other
 # than running git.
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def fsGetConfigFullyQualifiedFilename():
     """
     Return the fully qualified path to the closest CONFIG_FILENAME
@@ -436,7 +436,7 @@ def fsGetConfigFullyQualifiedFilename():
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def fsGetConfigToUse():
     """
     Get the configuration object to use -- either user-specified or default
@@ -481,7 +481,7 @@ def fsGetConfigToUse():
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def fsGetValidatedUserConfig(fullyQualifiedFilename):
     """
     Get the user specified gitsummary configuration
@@ -531,7 +531,7 @@ def fsGetValidatedUserConfig(fullyQualifiedFilename):
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Git Interface Layer
 #
 # These functions form the lower layer interface with git. They are the only
@@ -546,9 +546,9 @@ def fsGetValidatedUserConfig(fullyQualifiedFilename):
 #   - They assume there is at least one commit, thus will produce unexpected
 #     results or throw exceptions if run immediately after 'git init'.
 #     It's too much of a pain to deal with this edge case.
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetCommitDetails(fullHash):
     """
     Get the details of the commit corresponding to the specified fullHash.
@@ -579,7 +579,7 @@ def gitGetCommitDetails(fullHash):
 
     return description
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
     """
     Get a list of commits that exist in branch1 but not branch2.
@@ -646,7 +646,7 @@ def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
 
     return commitList
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetCurrentBranch():
     """
     Get the name of the current branch.
@@ -671,7 +671,7 @@ def gitGetCurrentBranch():
 
     return currentBranch
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetFileStatuses():
     """
     Get statuses for all files that have been modified or are not tracked
@@ -708,7 +708,7 @@ def gitGetFileStatuses():
 
     output = gitUtilGetOutput(['git', 'status', '--porcelain=2'])
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Each line of output describes one file.
     # That description specifies how the committed file differs from:
     #   - that file in the index (stage)
@@ -727,7 +727,7 @@ def gitGetFileStatuses():
     #   - an untracked file
     #
     # See the manpage for 'git status --porcelain=2' for full details
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
 
     fileStatuses = {
         KEY_FILE_STATUSES_STAGED: [],
@@ -737,13 +737,13 @@ def gitGetFileStatuses():
     }
 
     for outputLine in output:
-        #---------------------------------------------------------------------
+        #-----------------------------------------------------------------------
         # Different types of changes have different output formats. Get the
         # data that we'll assemble later.
         #   - filename       (all types)
         #   - newFilename    (only renames or copies)
         #   - heuristicScore (only renames or copies)
-        #---------------------------------------------------------------------
+        #-----------------------------------------------------------------------
         parseCode = TRACKED
 
         # Note that we can't just split on spaces, since our filename may have
@@ -774,11 +774,11 @@ def gitGetFileStatuses():
         else:
             parseCode = UNKNOWN_FORMAT
 
-        #---------------------------------------------------------------------
+        #-----------------------------------------------------------------------
         # Build the dictionaries that will be returned for each of staged,
         # modified, untracked, and unknown files. The latter being an unknown
         # format (shouldn't happen).
-        #---------------------------------------------------------------------
+        #-----------------------------------------------------------------------
         if parseCode == UNKNOWN_FORMAT:
             fileStatuses[KEY_FILE_STATUSES_UNKNOWN].append(outputLine)
         elif parseCode == UNTRACKED:
@@ -818,7 +818,7 @@ def gitGetFileStatuses():
 
     return fileStatuses
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetLocalBranches():
     """
     Get a list of local branch names.
@@ -846,7 +846,7 @@ def gitGetLocalBranches():
 
     return localBranches
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetRemoteTrackingBranch(localBranch):
     """
     Get the fully qualified name of the specified branch's remote tracking
@@ -864,7 +864,7 @@ def gitGetRemoteTrackingBranch(localBranch):
     """
     remoteTrackingBranch = ''
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # If there are any refs:
     #   - 'git for-each-ref' will tell us the remote branch
     #   - So just scan that output for 'localBranch'
@@ -920,7 +920,7 @@ def gitGetRemoteTrackingBranch(localBranch):
 
     return remoteTrackingBranch
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetStashes():
     """
     Get the list of stashes in the current repository.
@@ -975,15 +975,15 @@ def gitGetStashes():
 
     return stashes
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Git Utility Layer
 #
 # Pretty boring layer -- just one function. Maybe there will be more in the
 # future.
 #
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitUtilGetOutput(command):
     """
     Get the output from running the specified git command.
@@ -1013,15 +1013,15 @@ def gitUtilGetOutput(command):
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Utility Layer
 #
 # These are utility functions that build various objects required to create
 # appropriate output. They don't run git directly, but may use functions from
 # the git layer.
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetAheadBehindString(ahead, behind):
     """
     Get a string of the form '+ahead -behind' that is used to indicate number
@@ -1062,7 +1062,7 @@ def utilGetAheadBehindString(ahead, behind):
 
     return formattedString
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetBranchAsFiveColumns(currentBranch, branch, targetBranch):
     """
     Get the specified branch formatted as five columns
@@ -1113,7 +1113,7 @@ def utilGetBranchAsFiveColumns(currentBranch, branch, targetBranch):
         targetBranch,
     ]
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetBranchOrder(gitsummaryConfig, branchList):
     """
     Return the branches in branchList in the order specified by the
@@ -1150,7 +1150,7 @@ def utilGetBranchOrder(gitsummaryConfig, branchList):
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetColumnAlignedLines(
     requiredWidth,
     truncIndicator,
@@ -1245,7 +1245,7 @@ def utilGetColumnAlignedLines(
 
     return alignedLines
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetMaxColumnWidths(lines):
     """
     Get the maximum width of each line of the specified lines.
@@ -1281,7 +1281,7 @@ def utilGetMaxColumnWidths(lines):
 
     return maxColumnWidths
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetModifiedFileAsTwoColumns(modifiedFile):
     """
     Get the specified modifiedFile formatted as two columns
@@ -1300,7 +1300,7 @@ def utilGetModifiedFileAsTwoColumns(modifiedFile):
         modifiedFile[KEY_FILE_STATUSES_FILENAME],
     ]
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetRawBranchesLines(
     gitsummaryConfig,
     currentBranch,
@@ -1382,7 +1382,7 @@ def utilGetRawBranchesLines(
 
     return rawBranchLines
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetRawModifiedLines(fileStatuses):
     """
     Get the "raw" lines for all modified files.
@@ -1421,7 +1421,7 @@ def utilGetRawModifiedLines(fileStatuses):
 
     return rawModifiedLines
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetRawStagedLines(fileStatuses):
     """
     Get the "raw" lines for all staged files.
@@ -1460,7 +1460,7 @@ def utilGetRawStagedLines(fileStatuses):
 
     return rawStagedLines
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetRawStashLines():
     """
     Get the "raw" lines for all stashes.
@@ -1491,7 +1491,7 @@ def utilGetRawStashLines():
 
     return rawStashLines
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetRawUntrackedLines(fileStatuses):
     """
     Get the "raw" lines for all untracked files.
@@ -1530,7 +1530,7 @@ def utilGetRawUntrackedLines(fileStatuses):
 
     return rawUntrackedLines
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetStagedFileAsTwoColumns(stagedFile):
     """
     Get the specified stagedFile formatted as two columns
@@ -1564,7 +1564,7 @@ def utilGetStagedFileAsTwoColumns(stagedFile):
         fileDetails,
     ]
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetStashAsTwoColumns(stash):
     """
     Get the specified stash formatted as two columns
@@ -1581,7 +1581,7 @@ def utilGetStashAsTwoColumns(stash):
         stash[KEY_STASH_DESCRIPTION],
     ]
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetStyledText(styles, text):
     """
     Return the specified text in the specified style. As a convenience, 'text'
@@ -1619,7 +1619,7 @@ def utilGetStyledText(styles, text):
 
     return escapeStart + text + escapeEnd
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetTargetBranch(gitsummaryConfig, branch, localBranches):
     """
     Return the name of the target branch associated with 'branch', as specified
@@ -1651,7 +1651,7 @@ def utilGetTargetBranch(gitsummaryConfig, branch, localBranches):
 
     return targetBranch
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilPrintHelp(commandName):
     """
     Print the output corresponding to '--help'.
@@ -1685,7 +1685,7 @@ def utilPrintHelp(commandName):
     print('    --version')
     print('        - Show current version')
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilPrintHelpConfig():
     """
     Print help output describing the configuration file
@@ -1753,7 +1753,7 @@ of the filesystem.
         configFilename = CONFIG_FILENAME,
     ))
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilValidateGitsummaryConfig(configObject):
     """
     Validate the specified configObject
@@ -1881,7 +1881,7 @@ def utilValidateGitsummaryConfig(configObject):
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilValidateKeyPresenceAndType(
     testObject,
     key,
@@ -1916,7 +1916,7 @@ def utilValidateKeyPresenceAndType(
 
     return errors
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def main():
     # Default sections, in order, if user doesn't specify any
     options = {
@@ -1962,6 +1962,6 @@ def main():
 
     doit(options)
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 if __name__ == '__main__':
     main()
