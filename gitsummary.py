@@ -1391,13 +1391,13 @@ def utilGetRawWorkDirLines(fileStatuses):
     Get the "raw" lines for all workdir files.
 
     Args
-        Dictionary with the following contents:
-            KEY_FILE_STATUSES_STAGE:     []   - differences between the stage and
-                                                HEAD
-            KEY_FILE_STATUSES_WORK_DIR:  []   - differences between the working
-                                                directory and the stage
-            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
-            KEY_FILE_STATUSES_UNKNOWN:   []   - unknown git output
+        Dictionary with the following key (among others)
+            KEY_FILE_STATUSES_WORK_DIR: List of Dictionaries as returned by
+                                        gitGetFileStatuses()
+
+        Note: We pass the full fileStatuses object rather than just the List we
+              need since that would required testing doit(), which is only
+              testable manually.
 
     Return
         List of 'lines', where each line is itself a List of columns
@@ -1432,13 +1432,13 @@ def utilGetRawStageLines(fileStatuses):
     Get the "raw" lines for all staged files.
 
     Args
-        Dictionary with the following contents:
-            KEY_FILE_STATUSES_STAGE:     []   - differences between the stage and
-                                                HEAD
-            KEY_FILE_STATUSES_WORK_DIR:  []   - differences between the working
-                                                directory and the stage
-            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
-            KEY_FILE_STATUSES_UNKNOWN:   []   - unknown git output
+        Dictionary with the following key (among others):
+            KEY_FILE_STATUSES_STAGE: List of Dictionaries as returned by
+                                     gitGetFileStatuses()
+
+        Note: We pass the full fileStatuses object rather than just the List we
+              need since that would required testing doit(), which is only
+              testable manually.
 
     Return
         List of 'lines', where each line is itself a List of columns
@@ -1504,13 +1504,13 @@ def utilGetRawUntrackedLines(fileStatuses):
     Get the "raw" lines for all untracked files.
 
     Args
-        Dictionary with the following contents:
-            KEY_FILE_STATUSES_STAGE:     []   - differences between the stage and
-                                                HEAD
-            KEY_FILE_STATUSES_WORK_DIR:  []   - differences between the working
-                                                directory and the stage
-            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
-            KEY_FILE_STATUSES_UNKNOWN:   []   - unknown git output
+        Dictionary with the following key (among others):
+            KEY_FILE_STATUSES_UNTRACKED: List of Dictionaries as returned by
+                                         gitGetFileStatuses()
+
+        Note: We pass the full fileStatuses object rather than just the List we
+              need since that would required testing doit(), which is only
+              testable manually.
 
     Return
         List of 'lines', where each line is itself a List of columns
