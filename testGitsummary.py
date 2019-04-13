@@ -605,7 +605,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: testFile
                 },
             ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_WORK_DIR: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -626,7 +626,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
                 },
             ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_WORK_DIR: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -645,7 +645,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
                 },
             ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_WORK_DIR: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -670,7 +670,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_HEURISTIC_SCORE: '100',
                 },
             ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_WORK_DIR: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -684,7 +684,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     def util_testWorkDirDeletedFile(self, testFile):
         EXPECTED_RESULT = {
             gs.KEY_FILE_STATUSES_STAGE: [],
-            gs.KEY_FILE_STATUSES_MODIFIED: [
+            gs.KEY_FILE_STATUSES_WORK_DIR: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'D',
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
@@ -703,7 +703,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     def util_testWorkDirModifiedFile(self, testFile):
         EXPECTED_RESULT = {
             gs.KEY_FILE_STATUSES_STAGE: [],
-            gs.KEY_FILE_STATUSES_MODIFIED: [
+            gs.KEY_FILE_STATUSES_WORK_DIR: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'M',
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
@@ -732,7 +732,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
                 },
             ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [
+            gs.KEY_FILE_STATUSES_WORK_DIR: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'U',
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
@@ -796,7 +796,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     def util_testUntrackedFile(self, testFile):
         EXPECTED_RESULT = {
             gs.KEY_FILE_STATUSES_STAGE: [],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_WORK_DIR: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [testFile],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -820,7 +820,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
         statuses = gs.gitGetFileStatuses()
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_STAGE])
-        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_MODIFIED])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_WORK_DIR])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNTRACKED])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNKNOWN])
 
@@ -833,7 +833,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
                 },
             ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_WORK_DIR: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -851,7 +851,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         TEST_FILE = 'testfile'
         EXPECTED_RESULT = {
             gs.KEY_FILE_STATUSES_STAGE: [],
-            gs.KEY_FILE_STATUSES_MODIFIED: [],
+            gs.KEY_FILE_STATUSES_WORK_DIR: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [TEST_FILE],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -868,7 +868,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         createNonEmptyGitRepository()
         statuses = gs.gitGetFileStatuses()
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_STAGE])
-        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_MODIFIED])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_WORK_DIR])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNTRACKED])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNKNOWN])
 
@@ -937,7 +937,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
                 },
             ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [
+            gs.KEY_FILE_STATUSES_WORK_DIR: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'M',
                     gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
@@ -996,7 +996,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE2,
                 },
             ],
-            gs.KEY_FILE_STATUSES_MODIFIED: [
+            gs.KEY_FILE_STATUSES_WORK_DIR: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'M',
                     gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE3,
@@ -1789,7 +1789,7 @@ class Test_utilGetMaxColumnWidths(unittest.TestCase):
         )
 
 #-----------------------------------------------------------------------------
-class Test_utilGetModifiedFileAsTwoColumns(unittest.TestCase):
+class Test_utilGetWorkDirFileAsTwoColumns(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
 
@@ -1805,13 +1805,13 @@ class Test_utilGetModifiedFileAsTwoColumns(unittest.TestCase):
         modifiedFile.close()
 
         fileStatuses = gs.gitGetFileStatuses()
-        modifiedFileStatus = fileStatuses[gs.KEY_FILE_STATUSES_MODIFIED][0]
+        modifiedFileStatus = fileStatuses[gs.KEY_FILE_STATUSES_WORK_DIR][0]
         self.assertEqual(
             [
                 modifiedFileStatus[gs.KEY_FILE_STATUSES_TYPE],
                 modifiedFileStatus[gs.KEY_FILE_STATUSES_FILENAME],
             ],
-            gs.utilGetModifiedFileAsTwoColumns(modifiedFileStatus)
+            gs.utilGetWorkDirFileAsTwoColumns(modifiedFileStatus)
         )
 
 #-----------------------------------------------------------------------------
@@ -1901,13 +1901,13 @@ class Test_utilGetRawBranchesLines(unittest.TestCase):
         )
 
 #-----------------------------------------------------------------------------
-class Test_utilGetRawModifiedLines(unittest.TestCase):
+class Test_utilGetRawWorkDirLines(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
-    #   - utilGetRawModifiedLines() just calls other functions that are fully
+    #   - utilGetRawWorkDirLines() just calls other functions that are fully
     #     tested
     #   - so just a minimal test that it works properly with >1 modified files
     #-------------------------------------------------------------------------
@@ -1924,7 +1924,7 @@ class Test_utilGetRawModifiedLines(unittest.TestCase):
             modifiedFile.close()
 
         self.assertEqual(2,
-            len(gs.utilGetRawModifiedLines(gs.gitGetFileStatuses()))
+            len(gs.utilGetRawWorkDirLines(gs.gitGetFileStatuses()))
         )
 
 #-----------------------------------------------------------------------------
