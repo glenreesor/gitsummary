@@ -599,7 +599,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     #-------------------------------------------------------------------------
     def util_testStageAddedFile(self, testFile):
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
+            gs.KEY_FILE_STATUSES_STAGE: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'A',
                     gs.KEY_FILE_STATUSES_FILENAME: testFile
@@ -620,7 +620,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
     def util_testStageDeletedFile(self, testFile):
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
+            gs.KEY_FILE_STATUSES_STAGE: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'D',
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
@@ -639,7 +639,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
     def util_testStageModifiedFile(self, testFile):
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
+            gs.KEY_FILE_STATUSES_STAGE: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'M',
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
@@ -662,7 +662,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     def util_testStageRenamedFile(self, testFile):
         TEST_FILE_RENAMED = testFile + 'renamed'
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
+            gs.KEY_FILE_STATUSES_STAGE: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'R',
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
@@ -683,7 +683,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
     def util_testWorkDirDeletedFile(self, testFile):
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [],
+            gs.KEY_FILE_STATUSES_STAGE: [],
             gs.KEY_FILE_STATUSES_MODIFIED: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'D',
@@ -702,7 +702,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
     def util_testWorkDirModifiedFile(self, testFile):
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [],
+            gs.KEY_FILE_STATUSES_STAGE: [],
             gs.KEY_FILE_STATUSES_MODIFIED: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'M',
@@ -726,7 +726,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         # Unmerged files are created by merge conflicts, and git always
         # says both the stage and workdir are unmerged
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
+            gs.KEY_FILE_STATUSES_STAGE: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'U',
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
@@ -795,7 +795,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
     def util_testUntrackedFile(self, testFile):
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [],
+            gs.KEY_FILE_STATUSES_STAGE: [],
             gs.KEY_FILE_STATUSES_MODIFIED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [testFile],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
@@ -819,7 +819,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         execute(['git', 'init'])
 
         statuses = gs.gitGetFileStatuses()
-        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_STAGED])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_STAGE])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_MODIFIED])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNTRACKED])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNKNOWN])
@@ -827,7 +827,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     def test_initialRepositoryStateStageAddedFile(self):
         TEST_FILE = 'testfile'
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
+            gs.KEY_FILE_STATUSES_STAGE: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'A',
                     gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
@@ -850,7 +850,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     def test_initialRepositoryStateUntrackedFile(self):
         TEST_FILE = 'testfile'
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [],
+            gs.KEY_FILE_STATUSES_STAGE: [],
             gs.KEY_FILE_STATUSES_MODIFIED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [TEST_FILE],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
@@ -867,7 +867,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     def test_nothingToReport(self):
         createNonEmptyGitRepository()
         statuses = gs.gitGetFileStatuses()
-        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_STAGED])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_STAGE])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_MODIFIED])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNTRACKED])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNKNOWN])
@@ -931,7 +931,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
         TEST_FILE = 'testfile'
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
+            gs.KEY_FILE_STATUSES_STAGE: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'M',
                     gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
@@ -984,7 +984,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         TEST_FILE5 = 'testfile5'
         TEST_FILE6 = 'testfile6'
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGED: [
+            gs.KEY_FILE_STATUSES_STAGE: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'R',
                     gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE1,
@@ -1928,13 +1928,13 @@ class Test_utilGetRawModifiedLines(unittest.TestCase):
         )
 
 #-----------------------------------------------------------------------------
-class Test_utilGetRawStagedLines(unittest.TestCase):
+class Test_utilGetRawStageLines(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
-    #   - utilGetRawStagedLines() just calls other functions that are fully
+    #   - utilGetRawStageLines() just calls other functions that are fully
     #     tested
     #   - so just a minimal test that it works properly with >1 staged files
     #-------------------------------------------------------------------------
@@ -1951,7 +1951,7 @@ class Test_utilGetRawStagedLines(unittest.TestCase):
             execute(['git', 'add', testFile])
 
         self.assertEqual(2,
-            len(gs.utilGetRawStagedLines(gs.gitGetFileStatuses()))
+            len(gs.utilGetRawStageLines(gs.gitGetFileStatuses()))
         )
 
 #-----------------------------------------------------------------------------
@@ -2027,7 +2027,7 @@ class Test_utilGetStagedFileAsTwoColumns(unittest.TestCase):
         execute(['git', 'add', TEST_FILE])
 
         fileStatuses = gs.gitGetFileStatuses()
-        stagedFileStatus = fileStatuses[gs.KEY_FILE_STATUSES_STAGED][0]
+        stagedFileStatus = fileStatuses[gs.KEY_FILE_STATUSES_STAGE][0]
         self.assertEqual(
             [
                 stagedFileStatus[gs.KEY_FILE_STATUSES_TYPE],
@@ -2045,7 +2045,7 @@ class Test_utilGetStagedFileAsTwoColumns(unittest.TestCase):
         execute(['git', 'mv', TEST_FILE, NEW_FILE])
 
         fileStatuses = gs.gitGetFileStatuses()
-        stagedFileStatus = fileStatuses[gs.KEY_FILE_STATUSES_STAGED][0]
+        stagedFileStatus = fileStatuses[gs.KEY_FILE_STATUSES_STAGE][0]
         self.assertEqual(
             [
                 stagedFileStatus[gs.KEY_FILE_STATUSES_TYPE] + '(100)',
