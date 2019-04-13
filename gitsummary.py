@@ -1285,25 +1285,6 @@ def utilGetMaxColumnWidths(lines):
     return maxColumnWidths
 
 #-------------------------------------------------------------------------------
-def utilGetWorkDirFileAsTwoColumns(workDirFile):
-    """
-    Get the specified workDirFile formatted as two columns
-
-    Args
-        Dictionary workDirFile  - One workDirFile as returned by
-                                  gitGetFileStatuses
-
-    Return
-        List of String - First element:  Change type
-                                         Examples: 'D', 'M'
-                       - Second element: Filename
-    """
-    return [
-        workDirFile[KEY_FILE_STATUSES_TYPE],
-        workDirFile[KEY_FILE_STATUSES_FILENAME],
-    ]
-
-#-------------------------------------------------------------------------------
 def utilGetRawBranchesLines(
     gitsummaryConfig,
     currentBranch,
@@ -1384,47 +1365,6 @@ def utilGetRawBranchesLines(
         )
 
     return rawBranchLines
-
-#-------------------------------------------------------------------------------
-def utilGetRawWorkDirLines(fileStatuses):
-    """
-    Get the "raw" lines for all workdir files.
-
-    Args
-        Dictionary with the following key (among others)
-            KEY_FILE_STATUSES_WORK_DIR: List of Dictionaries as returned by
-                                        gitGetFileStatuses()
-
-        Note: We pass the full fileStatuses object rather than just the List we
-              need since that would required testing doit(), which is only
-              testable manually.
-
-    Return
-        List of 'lines', where each line is itself a List of columns
-
-        Each line has 3 columns:
-            'Work Dir' title (first line only),
-            changeType,
-            filename
-
-        Example:
-            [
-              [ 'Work Dir', 'M', 'file1' ],
-              [ '',         'D', 'file2' ],
-            ]
-    """
-
-    rawWorkDirLines = []
-
-    rawWorkDirList = fileStatuses[KEY_FILE_STATUSES_WORK_DIR]
-
-    for i, workDirFile in enumerate(rawWorkDirList):
-        rawWorkDirLines.append(
-            ['Work Dir' if i == 0 else ''] +
-            utilGetWorkDirFileAsTwoColumns(workDirFile)
-        )
-
-    return rawWorkDirLines
 
 #-------------------------------------------------------------------------------
 def utilGetRawStageLines(fileStatuses):
@@ -1538,6 +1478,47 @@ def utilGetRawUntrackedLines(fileStatuses):
         )
 
     return rawUntrackedLines
+
+#-------------------------------------------------------------------------------
+def utilGetRawWorkDirLines(fileStatuses):
+    """
+    Get the "raw" lines for all workdir files.
+
+    Args
+        Dictionary with the following key (among others)
+            KEY_FILE_STATUSES_WORK_DIR: List of Dictionaries as returned by
+                                        gitGetFileStatuses()
+
+        Note: We pass the full fileStatuses object rather than just the List we
+              need since that would required testing doit(), which is only
+              testable manually.
+
+    Return
+        List of 'lines', where each line is itself a List of columns
+
+        Each line has 3 columns:
+            'Work Dir' title (first line only),
+            changeType,
+            filename
+
+        Example:
+            [
+              [ 'Work Dir', 'M', 'file1' ],
+              [ '',         'D', 'file2' ],
+            ]
+    """
+
+    rawWorkDirLines = []
+
+    rawWorkDirList = fileStatuses[KEY_FILE_STATUSES_WORK_DIR]
+
+    for i, workDirFile in enumerate(rawWorkDirList):
+        rawWorkDirLines.append(
+            ['Work Dir' if i == 0 else ''] +
+            utilGetWorkDirFileAsTwoColumns(workDirFile)
+        )
+
+    return rawWorkDirLines
 
 #-------------------------------------------------------------------------------
 def utilGetStagedFileAsTwoColumns(stagedFile):
@@ -1659,6 +1640,26 @@ def utilGetTargetBranch(gitsummaryConfig, branch, localBranches):
         targetBranch = defaultTarget if defaultTarget in localBranches else ''
 
     return targetBranch
+
+
+#-------------------------------------------------------------------------------
+def utilGetWorkDirFileAsTwoColumns(workDirFile):
+    """
+    Get the specified workDirFile formatted as two columns
+
+    Args
+        Dictionary workDirFile  - One workDirFile as returned by
+                                  gitGetFileStatuses
+
+    Return
+        List of String - First element:  Change type
+                                         Examples: 'D', 'M'
+                       - Second element: Filename
+    """
+    return [
+        workDirFile[KEY_FILE_STATUSES_TYPE],
+        workDirFile[KEY_FILE_STATUSES_FILENAME],
+    ]
 
 #-------------------------------------------------------------------------------
 def utilPrintHelp(commandName):
