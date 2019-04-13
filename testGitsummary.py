@@ -128,6 +128,28 @@ def execute(command):
     )
 
 #-----------------------------------------------------------------------------
+def modifyAndCommitFile(
+    filename,
+    contents = 'default contents',
+    commitMsg = 'Default commit message'
+):
+    """
+    Modify the specified file (creating it if it doesn't exist), with the
+    specified contents, in the current working directory then 'git add' and
+    'git commit'.
+
+    Args
+        String filename  - The name of the file
+        String contents  - The contents for the file
+        String commitMsg - The commit message to use
+    """
+    modifiedFile = open(filename, 'w')
+    modifiedFile.write(contents)
+    modifiedFile.close()
+    execute(['git', 'add', filename])
+    execute(['git', 'commit', '-m', commitMsg])
+
+#-----------------------------------------------------------------------------
 class Test_fsGetConfigFullyQualifiedFilename(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
@@ -606,6 +628,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                 },
             ],
             gs.KEY_FILE_STATUSES_WORK_DIR: [],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -627,6 +650,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                 },
             ],
             gs.KEY_FILE_STATUSES_WORK_DIR: [],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -646,6 +670,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                 },
             ],
             gs.KEY_FILE_STATUSES_WORK_DIR: [],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -671,6 +696,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                 },
             ],
             gs.KEY_FILE_STATUSES_WORK_DIR: [],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -690,6 +716,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
                 },
             ],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -709,6 +736,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: testFile,
                 },
             ],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -722,70 +750,52 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
         self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
 
-    def util_testUnmergedFile(self, testFile):
-        # Unmerged files are created by merge conflicts, and git always
-        # says both the stage and workdir are unmerged
+    def util_testUnmergedFile(self, testFile1, testFile2):
+        # Unmerged files are created by merge conflicts.
+        # Files that are added by both branches are signified by 'A'
+        # Files that are modified by both branches are signified by 'U'
         EXPECTED_RESULT = {
-            gs.KEY_FILE_STATUSES_STAGE: [
+            gs.KEY_FILE_STATUSES_STAGE: [],
+            gs.KEY_FILE_STATUSES_WORK_DIR: [],
+            gs.KEY_FILE_STATUSES_UNMERGED: [
                 {
                     gs.KEY_FILE_STATUSES_TYPE: 'U',
-                    gs.KEY_FILE_STATUSES_FILENAME: testFile,
+                    gs.KEY_FILE_STATUSES_FILENAME: testFile1,
                 },
-            ],
-            gs.KEY_FILE_STATUSES_WORK_DIR: [
                 {
-                    gs.KEY_FILE_STATUSES_TYPE: 'U',
-                    gs.KEY_FILE_STATUSES_FILENAME: testFile,
+                    gs.KEY_FILE_STATUSES_TYPE: 'A',
+                    gs.KEY_FILE_STATUSES_FILENAME: testFile2,
                 },
             ],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
 
-        # LOCAL1 and LOCAL2 will both modify the same file, thus resulting
-        # in a merge conflict
-        LOCAL1 = 'local1'
-        LOCAL2 = 'local2'
-        REMOTE = 'remote'
+        # BRANCH1 and BRANCH2 will each:
+        #   - modify testFile1
+        #   - add testFile2
+        BRANCH1 = 'branch1'
+        BRANCH2 = 'branch2'
 
-        createEmptyRemoteLocalPair(REMOTE, LOCAL1)
-        execute(['git', 'clone', REMOTE, LOCAL2])
+        # Create the common git history on master that each branch will work from
+        execute(['git', 'init'])
+        createAndCommitFile(testFile1)
 
-        # LOCAL1 and LOCAL2 need to operate on the same git history, thus
-        # need to create a common empty file for them to work on first
-        os.chdir(LOCAL1)
-        createAndCommitFile(testFile, 'Created in local1')
-        execute(['git', 'push'])
+        # Make the changes in BRANCH1
+        execute(['git', 'checkout', '-b', BRANCH1, 'master'])
+        modifyAndCommitFile(testFile1, 'abcde')
+        modifyAndCommitFile(testFile2, 'abcde')
 
-        os.chdir('..')
-        os.chdir(LOCAL2)
-        execute(['git', 'pull'])
+        # Make the changes in BRANCH2
+        execute(['git', 'checkout', '-b', BRANCH2, 'master'])
+        modifyAndCommitFile(testFile1, 'fghij')
+        modifyAndCommitFile(testFile2, 'fghij')
 
-        # Make the changes in LOCAL1, which will conflict with changes to be
-        # done in LOCAL2
-        os.chdir('..')
-        os.chdir(LOCAL1)
-        testFileHandle = open(testFile, 'w')
-        testFileHandle.write('Changes from local1')
-        testFileHandle.close()
-        execute(['git', 'add', testFile])
-        execute(['git', 'commit', '-m', 'commit from local1'])
-        execute(['git', 'push'])
-
-        # Make the conflicting changes in LOCAL2
-        os.chdir('..')
-        os.chdir(LOCAL2)
-        testFileHandle = open(testFile, 'w')
-        testFileHandle.write('The front fell off')
-        testFileHandle.close()
-        execute(['git', 'add', testFile])
-        execute(['git', 'commit', '-m', 'commit from local2'])
-
-        # Force the merge conflict
+        # Merge BRANCH1 into BRANCH2, thereby causing the merge conflicts.
         # Can't use execute() helper since 'git pull' will return a non-zero
         # exit status
         subprocess.run(
-            ['git', 'pull'],
+            ['git', 'merge', BRANCH1],
             stdout = subprocess.DEVNULL,
             stderr = subprocess.DEVNULL,
             check=False
@@ -797,6 +807,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         EXPECTED_RESULT = {
             gs.KEY_FILE_STATUSES_STAGE: [],
             gs.KEY_FILE_STATUSES_WORK_DIR: [],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [testFile],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -821,6 +832,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         statuses = gs.gitGetFileStatuses()
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_STAGE])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_WORK_DIR])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNMERGED])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNTRACKED])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNKNOWN])
 
@@ -834,6 +846,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                 },
             ],
             gs.KEY_FILE_STATUSES_WORK_DIR: [],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -852,6 +865,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         EXPECTED_RESULT = {
             gs.KEY_FILE_STATUSES_STAGE: [],
             gs.KEY_FILE_STATUSES_WORK_DIR: [],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [TEST_FILE],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -869,6 +883,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         statuses = gs.gitGetFileStatuses()
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_STAGE])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_WORK_DIR])
+        self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNMERGED])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNTRACKED])
         self.assertEqual([], statuses[gs.KEY_FILE_STATUSES_UNKNOWN])
 
@@ -892,7 +907,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         self.util_testWorkDirModifiedFile('testfile')
 
     def test_unmergedFile(self):
-        self.util_testUnmergedFile('testfile')
+        self.util_testUnmergedFile('testfile1', 'testfile2')
 
     def test_untrackedFile(self):
         self.util_testUntrackedFile('testfile')
@@ -917,7 +932,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         self.util_testWorkDirModifiedFile('testfile with spaces')
 
     def test_unmergedFileWithSpaces(self):
-        self.util_testUnmergedFile('testfile with spaces')
+        self.util_testUnmergedFile('testfile1 with spaces', 'testfile2 with spaces')
 
     def test_untrackedFileWithSpaces(self):
         self.util_testUntrackedFile('testfile with spaces')
@@ -943,6 +958,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
                 },
             ],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [],
             gs.KEY_FILE_STATUSES_UNKNOWN: [],
         }
@@ -1006,6 +1022,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
                     gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE4,
                 },
             ],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
             gs.KEY_FILE_STATUSES_UNTRACKED: [
                 TEST_FILE5,
                 TEST_FILE6,
