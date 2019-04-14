@@ -86,10 +86,10 @@ def createScenarioAllSections():
     # Create the initial files, which will be used for the 'Modified' section
     utilExecute(['git', 'init'])
     for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
-        utilModifyAndCommitFile(aFile)
+        utilCreateAndCommitFile(aFile)
 
     # Create the two stashes
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
+    utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
 
     stashedFileHandle = open(FILE_FOR_STASH, 'w')
     stashedFileHandle.write('a')
@@ -159,7 +159,7 @@ def createScenarioDemo():
     utilExecute(['git', 'clone', REMOTE, LOCAL])
     os.chdir(LOCAL)
 
-    utilModifyAndCommitFile(WORK_FILE, 'contents1', 'commit1')
+    utilCreateAndCommitFile(WORK_FILE, 'contents1', 'commit1')
     utilExecute(['git', 'push'])
 
     utilExecute(['git', 'checkout', '-b', 'develop', 'master'])
@@ -209,10 +209,10 @@ def createScenarioDemo():
 
     # Create the initial files, which will be used for the 'Modified' section
     for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
-        utilModifyAndCommitFile(aFile)
+        utilCreateAndCommitFile(aFile)
 
     # Create the two stashes
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
+    utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
 
     stashedFileHandle = open(FILE_FOR_STASH, 'w')
     stashedFileHandle.write('a')
@@ -250,28 +250,59 @@ def createScenarioDetachedHead():
         - Detached head state
     """
     utilExecute(['git', 'init'])
-    utilModifyAndCommitFile('file1')
+    utilCreateAndCommitFile('file1')
     previousCommitHash = subprocess.check_output(
         ['git', 'rev-list', '--max-count=1', 'master'],
         universal_newlines = True
     ).splitlines()[0]
-    utilModifyAndCommitFile('file2')
+    utilCreateAndCommitFile('file2')
     utilExecute(['git', 'checkout', previousCommitHash])
 
+#-----------------------------------------------------------------------------
+# Helpers
+#-----------------------------------------------------------------------------
+def utilCreateAndCommitFile(
+    filename,
+    contents = 'Default contents',
+    commitMsg = 'Commit message'
+):
+    """
+    Create the specified file with the specified contents in the current working
+    directory then 'git add' and 'git commit'.
+
+    An error will be thrown if the file exists already.
+
+    Args
+        String filename  - The name of the file to create
+        String contents  - The contents to be written to the file
+        String commitMsg - The commit message to use
+    """
+    newFile = open(filename, 'x')
+    newFile.write(contents)
+    newFile.close()
+    utilExecute(['git', 'add', filename])
+    utilExecute(['git', 'commit', '-m', commitMsg])
+
+#-----------------------------------------------------------------------------
 def utilModifyAndCommitFile(
     filename,
     contents = 'default contents',
     commitMsg = 'Default commit message'
 ):
     """
-    Modify (or create if it doesn't exist) the specified file, with the specified
-    contents, in the current working directory then 'git add' and 'git commit'.
+    Replace the contents of the specified file with the specified contents, in
+    the current working directory then 'git add' and 'git commit'.
+
+    Throws an error if the file does not already exist.
 
     Args
         String filename  - The name of the file
-        String contents  - The contents for the file
+        String contents  - The contents to be written to the file
         String commitMsg - The commit message to use
     """
+    if (not os.path.isfile(filename)):
+        raise Exception('File does not exist')
+
     modifiedFile = open(filename, 'w')
     modifiedFile.write(contents)
     modifiedFile.close()
