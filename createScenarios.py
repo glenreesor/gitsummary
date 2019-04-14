@@ -75,54 +75,92 @@ def createScenarioAllSections():
         - Each section of gitsummary output will have two entries
     """
 
-    STAGED_FILE_1 = 'staged-file1'
-    STAGED_FILE_2 = 'staged-file2'
-    MODIFIED_FILE_1 = 'modified-file1'
-    MODIFIED_FILE_2 = 'modified-file2'
+    STAGE_FILE_1 = 'stage-file1'
+    STAGE_FILE_2 = 'stage-file2'
+    WORK_DIR_FILE_1 = 'workdir-file1'
+    WORK_DIR_FILE_2 = 'workdir-file2'
     FILE_FOR_STASH = 'file-for-stash'
     UNTRACKED_FILE_1 = 'untracked-file1'
     UNTRACKED_FILE_2 = 'untracked-file2'
+    UNMERGED_FILE_1 = 'unmerged-file1'
+    UNMERGED_FILE_2 = 'unmerged-file2'
 
-    # Create the initial files, which will be used for the 'Modified' section
+    #---------------------------------------------------------------------------
+    # Create repo and an initial file, since otherwise ref 'master' won't exist
+    #---------------------------------------------------------------------------
     utilExecute(['git', 'init'])
-    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
-        utilCreateAndCommitFile(aFile)
+    utilCreateAndCommitFile('kangaroo')
+
+    #---------------------------------------------------------------------------
+    # Create the branch and files that will be used to create the merge conflicts
+    #---------------------------------------------------------------------------
+    utilExecute(['git', 'checkout', '-b', 'branch1', 'master'])
+    for aFile in [UNMERGED_FILE_1, UNMERGED_FILE_2]:
+        utilCreateAndCommitFile(aFile, 'abcdefg')
+
+    #---------------------------------------------------------------------------
+    # Switch to another branch to do everything else
+    #---------------------------------------------------------------------------
+    utilExecute(['git', 'checkout', '-b', 'dev', 'master'])
+
+    #---------------------------------
+    # First do things that require commits
+    #---------------------------------
 
     # Create the two stashes
     utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
 
-    stashedFileHandle = open(FILE_FOR_STASH, 'w')
-    stashedFileHandle.write('a')
-    stashedFileHandle.close()
+    fileHandle = open(FILE_FOR_STASH, 'w')
+    fileHandle.write('a')
+    fileHandle.close()
     utilExecute(['git', 'stash'])
 
     utilModifyAndCommitFile(FILE_FOR_STASH, 'contents2', 'Fix something')
-    stashedFileHandle = open(FILE_FOR_STASH, 'w')
-    stashedFileHandle.write('b')
-    stashedFileHandle.close()
+    fileHandle = open(FILE_FOR_STASH, 'w')
+    fileHandle.write('b')
+    fileHandle.close()
     utilExecute(['git', 'stash'])
 
+    # Make the changes that will cause merge conflicts
+    for aFile in [UNMERGED_FILE_1, UNMERGED_FILE_2]:
+        utilCreateAndCommitFile(aFile, 'hijkellomellop')
+
+    # Create the initial files which will be used for the 'Work Dir' section
+    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+        utilCreateAndCommitFile(aFile)
+
+    #---------------------------------
+    # Now do things that don't require commits
+    #---------------------------------
+
+    # Create the merge conflict
+    # Can't use utilExecute() helper since 'git merge' will return a non-zero
+    # exit status
+    subprocess.run(
+        ['git', 'merge', 'branch1'],
+        stdout = subprocess.DEVNULL,
+        stderr = subprocess.DEVNULL,
+        check=False
+    )
+
     # Stage changes
-    for aFile in [STAGED_FILE_1, STAGED_FILE_2]:
-        stagedFileHandle = open(aFile, 'w')
-        stagedFileHandle.write('a')
-        stagedFileHandle.close()
+    for aFile in [STAGE_FILE_1, STAGE_FILE_2]:
+        fileHandle = open(aFile, 'w')
+        fileHandle.write('a')
+        fileHandle.close()
         utilExecute(['git', 'add', aFile])
 
-    # Modified files
-    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
-        modifiedFileHandle = open(aFile, 'w')
-        modifiedFileHandle.write('a')
-        modifiedFileHandle.close()
+    # Work Dir changes
+    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+        fileHandle = open(aFile, 'w')
+        fileHandle.write('a')
+        fileHandle.close()
 
     # Untracked files
     for aFile in [UNTRACKED_FILE_1, UNTRACKED_FILE_2]:
-        untrackedFileHandle = open(aFile, 'w')
-        untrackedFileHandle.write('a')
-        untrackedFileHandle.close()
-
-    # Make another branch
-    utilExecute(['git', 'checkout', '-b', 'dev'])
+        fileHandle = open(aFile, 'w')
+        fileHandle.write('a')
+        fileHandle.close()
 
 def createScenarioDemo():
     """
@@ -136,7 +174,7 @@ def createScenarioDemo():
                                                                make-faster
                       hotfix-fix-something-bad
 
-        - Staged files etc will be setup on make-faster, hence "X"
+        - Stage files etc will be setup on make-faster, hence "X"
           in "commitX" above, and below in remotes
 
         - Remotes:
@@ -199,50 +237,50 @@ def createScenarioDemo():
     #-------------------------------------------------------------------------
     # Setup files to get two entries in each section of gitsummary output
     #-------------------------------------------------------------------------
-    STAGED_FILE_1 = 'app.js'
-    STAGED_FILE_2 = '.eslintrc'
-    MODIFIED_FILE_1 = 'index.html'
-    MODIFIED_FILE_2 = 'app.css'
+    STAGE_FILE_1 = 'app.js'
+    STAGE_FILE_2 = '.eslintrc'
+    WORK_DIR_FILE_1 = 'index.html'
+    WORK_DIR_FILE_2 = 'app.css'
     FILE_FOR_STASH = 'file-for-stash'
     UNTRACKED_FILE_1 = 'todo.txt'
     UNTRACKED_FILE_2 = 'test.output'
 
     # Create the initial files, which will be used for the 'Modified' section
-    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
+    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
         utilCreateAndCommitFile(aFile)
 
     # Create the two stashes
     utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
 
-    stashedFileHandle = open(FILE_FOR_STASH, 'w')
-    stashedFileHandle.write('a')
-    stashedFileHandle.close()
+    fileHandle = open(FILE_FOR_STASH, 'w')
+    fileHandle.write('a')
+    fileHandle.close()
     utilExecute(['git', 'stash'])
 
     utilModifyAndCommitFile(FILE_FOR_STASH, 'contents2', 'Fix something')
-    stashedFileHandle = open(FILE_FOR_STASH, 'w')
-    stashedFileHandle.write('b')
-    stashedFileHandle.close()
+    fileHandle = open(FILE_FOR_STASH, 'w')
+    fileHandle.write('b')
+    fileHandle.close()
     utilExecute(['git', 'stash'])
 
     # Stage changes
-    for aFile in [STAGED_FILE_1, STAGED_FILE_2]:
-        stagedFileHandle = open(aFile, 'w')
-        stagedFileHandle.write('a')
-        stagedFileHandle.close()
+    for aFile in [STAGE_FILE_1, STAGE_FILE_2]:
+        fileHandle = open(aFile, 'w')
+        fileHandle.write('a')
+        fileHandle.close()
         utilExecute(['git', 'add', aFile])
 
     # Modified files
-    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
-        modifiedFileHandle = open(aFile, 'w')
-        modifiedFileHandle.write('a')
-        modifiedFileHandle.close()
+    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+        fileHandle = open(aFile, 'w')
+        fileHandle.write('a')
+        fileHandle.close()
 
     # Untracked files
     for aFile in [UNTRACKED_FILE_1, UNTRACKED_FILE_2]:
-        untrackedFileHandle = open(aFile, 'w')
-        untrackedFileHandle.write('a')
-        untrackedFileHandle.close()
+        fileHandle = open(aFile, 'w')
+        fileHandle.write('a')
+        fileHandle.close()
 
 def createScenarioDetachedHead():
     """
