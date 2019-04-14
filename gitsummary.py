@@ -284,7 +284,7 @@ def doit(options):
     # truncated as required
     #---------------------------------------------------------------------------
     try:
-        (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size();
+        (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
     except:
         SCREEN_WIDTH = 80
 
