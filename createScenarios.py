@@ -110,15 +110,12 @@ def createScenarioAllSections():
     # Create the two stashes
     utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
 
-    fileHandle = open(FILE_FOR_STASH, 'w')
-    fileHandle.write('a')
-    fileHandle.close()
+    utilModifyFile(FILE_FOR_STASH, 'contents2')
     utilExecute(['git', 'stash'])
 
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents2', 'Fix something')
-    fileHandle = open(FILE_FOR_STASH, 'w')
-    fileHandle.write('b')
-    fileHandle.close()
+    # Make a commit so the second stash will be on a different commit
+    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents3', 'Fix something')
+    utilModifyFile(FILE_FOR_STASH, 'contents4')
     utilExecute(['git', 'stash'])
 
     # Make the changes that will cause merge conflicts
@@ -145,22 +142,16 @@ def createScenarioAllSections():
 
     # Stage changes
     for aFile in [STAGE_FILE_1, STAGE_FILE_2]:
-        fileHandle = open(aFile, 'w')
-        fileHandle.write('a')
-        fileHandle.close()
+        utilCreateFile(aFile)
         utilExecute(['git', 'add', aFile])
 
     # Work Dir changes
     for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
-        fileHandle = open(aFile, 'w')
-        fileHandle.write('a')
-        fileHandle.close()
+        utilModifyFile(aFile, 'modified contents')
 
     # Untracked files
     for aFile in [UNTRACKED_FILE_1, UNTRACKED_FILE_2]:
-        fileHandle = open(aFile, 'w')
-        fileHandle.write('a')
-        fileHandle.close()
+        utilCreateFile(aFile)
 
 def createScenarioDemo():
     """
@@ -252,35 +243,26 @@ def createScenarioDemo():
     # Create the two stashes
     utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
 
-    fileHandle = open(FILE_FOR_STASH, 'w')
-    fileHandle.write('a')
-    fileHandle.close()
+    utilModifyFile(FILE_FOR_STASH, 'contents2')
     utilExecute(['git', 'stash'])
 
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents2', 'Fix something')
-    fileHandle = open(FILE_FOR_STASH, 'w')
-    fileHandle.write('b')
-    fileHandle.close()
+    # Commit a change so the next stash is on a different commit
+    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents3', 'Fix something')
+    utilModifyFile(FILE_FOR_STASH, 'contents4')
     utilExecute(['git', 'stash'])
 
     # Stage changes
     for aFile in [STAGE_FILE_1, STAGE_FILE_2]:
-        fileHandle = open(aFile, 'w')
-        fileHandle.write('a')
-        fileHandle.close()
+        utilCreateFile(aFile)
         utilExecute(['git', 'add', aFile])
 
-    # Modified files
+    # Work Dir files
     for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
-        fileHandle = open(aFile, 'w')
-        fileHandle.write('a')
-        fileHandle.close()
+        utilModifyFile(aFile, 'modified contents')
 
     # Untracked files
     for aFile in [UNTRACKED_FILE_1, UNTRACKED_FILE_2]:
-        fileHandle = open(aFile, 'w')
-        fileHandle.write('a')
-        fileHandle.close()
+        utilCreateFile(aFile)
 
 def createScenarioDetachedHead():
     """
@@ -299,6 +281,22 @@ def createScenarioDetachedHead():
 #-----------------------------------------------------------------------------
 # Helpers
 #-----------------------------------------------------------------------------
+def utilCreateFile(filename, contents = 'Default contents'):
+    """
+    Create the specified file with the specified contents in the current working
+    directory.
+
+    An exception will be thrown if the file exists already.
+
+    Args
+        String filename  - The name of the file to create
+        String contents  - The contents to be written to the file
+    """
+    newFile = open(filename, 'x')
+    newFile.write(contents)
+    newFile.close()
+
+#-----------------------------------------------------------------------------
 def utilCreateAndCommitFile(
     filename,
     contents = 'Default contents',
@@ -308,7 +306,7 @@ def utilCreateAndCommitFile(
     Create the specified file with the specified contents in the current working
     directory then 'git add' and 'git commit'.
 
-    An error will be thrown if the file exists already.
+    An exception will be thrown if the file exists already.
 
     Args
         String filename  - The name of the file to create
@@ -322,9 +320,28 @@ def utilCreateAndCommitFile(
     utilExecute(['git', 'commit', '-m', commitMsg])
 
 #-----------------------------------------------------------------------------
+def utilModifyFile(filename, contents = 'default modified contents'):
+    """
+    Replace the contents of the specified file with the specified contents, in
+    the current working directory.
+
+    Throws an error if the file does not already exist.
+
+    Args
+        String filename  - The name of the file
+        String contents  - The contents to be written to the file
+    """
+    if (not os.path.isfile(filename)):
+        raise Exception('File does not exist')
+
+    modifiedFile = open(filename, 'w')
+    modifiedFile.write(contents)
+    modifiedFile.close()
+
+#-----------------------------------------------------------------------------
 def utilModifyAndCommitFile(
     filename,
-    contents = 'default contents',
+    contents = 'default modified contents',
     commitMsg = 'Default commit message'
 ):
     """
@@ -353,7 +370,7 @@ def utilExecute(command):
     We redirect stderr as well because git sends some informative output there,
     which clutters the testing output.
 
-    An error will be thrown if the command has a non-zero exit code.
+    An exception will be thrown if the command has a non-zero exit code.
 
     Args
         List command - The command and args to execute
