@@ -804,7 +804,7 @@ class Test_gitGetFileStatuses(unittest.TestCase):
         createAndCommitFile(testFile2, 'fghij')
 
         # Merge BRANCH1 into BRANCH2, thereby causing the merge conflicts.
-        # Can't use execute() helper since 'git pull' will return a non-zero
+        # Can't use execute() helper since 'git merge' will return a non-zero
         # exit status
         subprocess.run(
             ['git', 'merge', BRANCH1],
