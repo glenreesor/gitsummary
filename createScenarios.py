@@ -75,54 +75,83 @@ def createScenarioAllSections():
         - Each section of gitsummary output will have two entries
     """
 
-    STAGED_FILE_1 = 'staged-file1'
-    STAGED_FILE_2 = 'staged-file2'
-    MODIFIED_FILE_1 = 'modified-file1'
-    MODIFIED_FILE_2 = 'modified-file2'
+    STAGE_FILE_1 = 'stage-file1'
+    STAGE_FILE_2 = 'stage-file2'
+    WORK_DIR_FILE_1 = 'workdir-file1'
+    WORK_DIR_FILE_2 = 'workdir-file2'
     FILE_FOR_STASH = 'file-for-stash'
     UNTRACKED_FILE_1 = 'untracked-file1'
     UNTRACKED_FILE_2 = 'untracked-file2'
+    UNMERGED_FILE_1 = 'unmerged-file1'
+    UNMERGED_FILE_2 = 'unmerged-file2'
 
-    # Create the initial files, which will be used for the 'Modified' section
+    #---------------------------------------------------------------------------
+    # Create repo and an initial file, since otherwise ref 'master' won't exist
+    #---------------------------------------------------------------------------
     utilExecute(['git', 'init'])
-    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
-        utilModifyAndCommitFile(aFile)
+    utilCreateAndCommitFile('kangaroo')
+
+    #---------------------------------------------------------------------------
+    # Create the branch and files that will be used to create the merge conflicts
+    #---------------------------------------------------------------------------
+    utilExecute(['git', 'checkout', '-b', 'branch1', 'master'])
+    for aFile in [UNMERGED_FILE_1, UNMERGED_FILE_2]:
+        utilCreateAndCommitFile(aFile, 'abcdefg')
+
+    #---------------------------------------------------------------------------
+    # Switch to another branch to do everything else
+    #---------------------------------------------------------------------------
+    utilExecute(['git', 'checkout', '-b', 'dev', 'master'])
+
+    #---------------------------------
+    # First do things that require commits
+    #---------------------------------
 
     # Create the two stashes
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
+    utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
 
-    stashedFileHandle = open(FILE_FOR_STASH, 'w')
-    stashedFileHandle.write('a')
-    stashedFileHandle.close()
+    utilModifyFile(FILE_FOR_STASH, 'contents2')
     utilExecute(['git', 'stash'])
 
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents2', 'Fix something')
-    stashedFileHandle = open(FILE_FOR_STASH, 'w')
-    stashedFileHandle.write('b')
-    stashedFileHandle.close()
+    # Make a commit so the second stash will be on a different commit
+    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents3', 'Fix something')
+    utilModifyFile(FILE_FOR_STASH, 'contents4')
     utilExecute(['git', 'stash'])
+
+    # Make the changes that will cause merge conflicts
+    for aFile in [UNMERGED_FILE_1, UNMERGED_FILE_2]:
+        utilCreateAndCommitFile(aFile, 'hijkellomellop')
+
+    # Create the initial files which will be used for the 'Work Dir' section
+    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+        utilCreateAndCommitFile(aFile)
+
+    #---------------------------------
+    # Now do things that don't require commits
+    #---------------------------------
+
+    # Create the merge conflict
+    # Can't use utilExecute() helper since 'git merge' will return a non-zero
+    # exit status
+    subprocess.run(
+        ['git', 'merge', 'branch1'],
+        stdout = subprocess.DEVNULL,
+        stderr = subprocess.DEVNULL,
+        check=False
+    )
 
     # Stage changes
-    for aFile in [STAGED_FILE_1, STAGED_FILE_2]:
-        stagedFileHandle = open(aFile, 'w')
-        stagedFileHandle.write('a')
-        stagedFileHandle.close()
+    for aFile in [STAGE_FILE_1, STAGE_FILE_2]:
+        utilCreateFile(aFile)
         utilExecute(['git', 'add', aFile])
 
-    # Modified files
-    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
-        modifiedFileHandle = open(aFile, 'w')
-        modifiedFileHandle.write('a')
-        modifiedFileHandle.close()
+    # Work Dir changes
+    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+        utilModifyFile(aFile, 'modified contents')
 
     # Untracked files
     for aFile in [UNTRACKED_FILE_1, UNTRACKED_FILE_2]:
-        untrackedFileHandle = open(aFile, 'w')
-        untrackedFileHandle.write('a')
-        untrackedFileHandle.close()
-
-    # Make another branch
-    utilExecute(['git', 'checkout', '-b', 'dev'])
+        utilCreateFile(aFile)
 
 def createScenarioDemo():
     """
@@ -136,7 +165,7 @@ def createScenarioDemo():
                                                                make-faster
                       hotfix-fix-something-bad
 
-        - Staged files etc will be setup on make-faster, hence "X"
+        - Stage files etc will be setup on make-faster, hence "X"
           in "commitX" above, and below in remotes
 
         - Remotes:
@@ -159,7 +188,7 @@ def createScenarioDemo():
     utilExecute(['git', 'clone', REMOTE, LOCAL])
     os.chdir(LOCAL)
 
-    utilModifyAndCommitFile(WORK_FILE, 'contents1', 'commit1')
+    utilCreateAndCommitFile(WORK_FILE, 'contents1', 'commit1')
     utilExecute(['git', 'push'])
 
     utilExecute(['git', 'checkout', '-b', 'develop', 'master'])
@@ -199,50 +228,41 @@ def createScenarioDemo():
     #-------------------------------------------------------------------------
     # Setup files to get two entries in each section of gitsummary output
     #-------------------------------------------------------------------------
-    STAGED_FILE_1 = 'app.js'
-    STAGED_FILE_2 = '.eslintrc'
-    MODIFIED_FILE_1 = 'index.html'
-    MODIFIED_FILE_2 = 'app.css'
+    STAGE_FILE_1 = 'app.js'
+    STAGE_FILE_2 = '.eslintrc'
+    WORK_DIR_FILE_1 = 'index.html'
+    WORK_DIR_FILE_2 = 'app.css'
     FILE_FOR_STASH = 'file-for-stash'
     UNTRACKED_FILE_1 = 'todo.txt'
     UNTRACKED_FILE_2 = 'test.output'
 
     # Create the initial files, which will be used for the 'Modified' section
-    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
-        utilModifyAndCommitFile(aFile)
+    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+        utilCreateAndCommitFile(aFile)
 
     # Create the two stashes
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
+    utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
 
-    stashedFileHandle = open(FILE_FOR_STASH, 'w')
-    stashedFileHandle.write('a')
-    stashedFileHandle.close()
+    utilModifyFile(FILE_FOR_STASH, 'contents2')
     utilExecute(['git', 'stash'])
 
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents2', 'Fix something')
-    stashedFileHandle = open(FILE_FOR_STASH, 'w')
-    stashedFileHandle.write('b')
-    stashedFileHandle.close()
+    # Commit a change so the next stash is on a different commit
+    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents3', 'Fix something')
+    utilModifyFile(FILE_FOR_STASH, 'contents4')
     utilExecute(['git', 'stash'])
 
     # Stage changes
-    for aFile in [STAGED_FILE_1, STAGED_FILE_2]:
-        stagedFileHandle = open(aFile, 'w')
-        stagedFileHandle.write('a')
-        stagedFileHandle.close()
+    for aFile in [STAGE_FILE_1, STAGE_FILE_2]:
+        utilCreateFile(aFile)
         utilExecute(['git', 'add', aFile])
 
-    # Modified files
-    for aFile in [MODIFIED_FILE_1, MODIFIED_FILE_2]:
-        modifiedFileHandle = open(aFile, 'w')
-        modifiedFileHandle.write('a')
-        modifiedFileHandle.close()
+    # Work Dir files
+    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+        utilModifyFile(aFile, 'modified contents')
 
     # Untracked files
     for aFile in [UNTRACKED_FILE_1, UNTRACKED_FILE_2]:
-        untrackedFileHandle = open(aFile, 'w')
-        untrackedFileHandle.write('a')
-        untrackedFileHandle.close()
+        utilCreateFile(aFile)
 
 def createScenarioDetachedHead():
     """
@@ -250,28 +270,94 @@ def createScenarioDetachedHead():
         - Detached head state
     """
     utilExecute(['git', 'init'])
-    utilModifyAndCommitFile('file1')
+    utilCreateAndCommitFile('file1')
     previousCommitHash = subprocess.check_output(
         ['git', 'rev-list', '--max-count=1', 'master'],
         universal_newlines = True
     ).splitlines()[0]
-    utilModifyAndCommitFile('file2')
+    utilCreateAndCommitFile('file2')
     utilExecute(['git', 'checkout', previousCommitHash])
 
-def utilModifyAndCommitFile(
+#-----------------------------------------------------------------------------
+# Helpers
+#-----------------------------------------------------------------------------
+def utilCreateFile(filename, contents = 'Default contents'):
+    """
+    Create the specified file with the specified contents in the current working
+    directory.
+
+    An exception will be thrown if the file exists already.
+
+    Args
+        String filename  - The name of the file to create
+        String contents  - The contents to be written to the file
+    """
+    newFile = open(filename, 'x')
+    newFile.write(contents)
+    newFile.close()
+
+#-----------------------------------------------------------------------------
+def utilCreateAndCommitFile(
     filename,
-    contents = 'default contents',
-    commitMsg = 'Default commit message'
+    contents = 'Default contents',
+    commitMsg = 'Commit message'
 ):
     """
-    Modify (or create if it doesn't exist) the specified file, with the specified
-    contents, in the current working directory then 'git add' and 'git commit'.
+    Create the specified file with the specified contents in the current working
+    directory then 'git add' and 'git commit'.
+
+    An exception will be thrown if the file exists already.
+
+    Args
+        String filename  - The name of the file to create
+        String contents  - The contents to be written to the file
+        String commitMsg - The commit message to use
+    """
+    newFile = open(filename, 'x')
+    newFile.write(contents)
+    newFile.close()
+    utilExecute(['git', 'add', filename])
+    utilExecute(['git', 'commit', '-m', commitMsg])
+
+#-----------------------------------------------------------------------------
+def utilModifyFile(filename, contents = 'default modified contents'):
+    """
+    Replace the contents of the specified file with the specified contents, in
+    the current working directory.
+
+    Throws an error if the file does not already exist.
 
     Args
         String filename  - The name of the file
-        String contents  - The contents for the file
+        String contents  - The contents to be written to the file
+    """
+    if (not os.path.isfile(filename)):
+        raise Exception('File does not exist')
+
+    modifiedFile = open(filename, 'w')
+    modifiedFile.write(contents)
+    modifiedFile.close()
+
+#-----------------------------------------------------------------------------
+def utilModifyAndCommitFile(
+    filename,
+    contents = 'default modified contents',
+    commitMsg = 'Default commit message'
+):
+    """
+    Replace the contents of the specified file with the specified contents, in
+    the current working directory then 'git add' and 'git commit'.
+
+    Throws an error if the file does not already exist.
+
+    Args
+        String filename  - The name of the file
+        String contents  - The contents to be written to the file
         String commitMsg - The commit message to use
     """
+    if (not os.path.isfile(filename)):
+        raise Exception('File does not exist')
+
     modifiedFile = open(filename, 'w')
     modifiedFile.write(contents)
     modifiedFile.close()
@@ -284,7 +370,7 @@ def utilExecute(command):
     We redirect stderr as well because git sends some informative output there,
     which clutters the testing output.
 
-    An error will be thrown if the command has a non-zero exit code.
+    An exception will be thrown if the command has a non-zero exit code.
 
     Args
         List command - The command and args to execute

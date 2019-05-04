@@ -2,13 +2,13 @@
 - use createScenarios.py to create folders that satisfy the test criteria
   listed below
 - setup:
-    alias gitsummarytesting=/path/to/gitsummary.py
+    alias gst=/path/to/gitsummary.py
 
 Test    Description                     Scenario        Commandline and Expected Results
 1       Folder not tracked by git          n/a
                                                         Commandline:
                                                             cd /
-                                                            gitsummarytesting
+                                                            gst
 
                                                         Expected Output:
                                                             Failure: ['git', 'status', '--porcelain=2']
@@ -16,50 +16,53 @@ Test    Description                     Scenario        Commandline and Expected
 
 2       Detached head state             detached-head
                                                         Commandline:
-                                                            gitsummarytesting
+                                                            gst
 
                                                         Expected Result:
                                                             - Current branch indicator beside "Detached Head"
 
 3       Sections listed and colorized   all-sections
                                                         Commandline:
-                                                            gitsummarytesting
+                                                            gst
 
                                                         Expected Result:
                                                             - each section listed, has two entries, and colorized properly:
                                                                 Stashes
-                                                                Staged
-                                                                Modified
+                                                                Stage
+                                                                Work Dir
+                                                                Unmerged
                                                                 Untracked
                                                                 All branches
 
 4       Order for --custom              all-sections
                                                         Commandline:
-                                                            gitsummarytesting --custom branch-all untracked modified staged stashes
+                                                            gst --custom branch-all untracked unmerged workdir stage stashes
 
                                                         Expected Result:
                                                             - Sections listed in the following order:
                                                                 Branches (all)
                                                                 Untracked
-                                                                Modified
-                                                                Staged
+                                                                Unmerged
+                                                                Work Dir
+                                                                Stage
                                                                 Stashes
 
 5       --custom branch-current         all-sections
                                                         Commandline:
-                                                            gitsummarytesting --custom branch-current untracked modified staged stashes
+                                                            gst --custom branch-current untracked unmerged workdir stage stashes
 
                                                         Expected Result:
                                                             - Sections listed in the following order:
                                                                 Branch (current)
                                                                 Untracked
-                                                                Modified
-                                                                Staged
+                                                                Unmerged
+                                                                Work Dir
+                                                                Stage
                                                                 Stashes
 
 6       Redirecting to a file           all-sections
                                                         Commandline:
-                                                            gitsummarytesting > gitsummary.out
+                                                            gst > gitsummary.out
                                                             cat gitsummary.out
 
                                                         Expected Result:
@@ -68,7 +71,7 @@ Test    Description                     Scenario        Commandline and Expected
 
 7       Line width                      all-sections
                                                         Commandline:
-                                                            gitsummarytesting
+                                                            gst
 
                                                         Expected Result:
                                                             - Matches width of current window (except in gitbash terminal)

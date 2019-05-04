@@ -22,12 +22,12 @@ import re
 import subprocess
 import sys
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 VERSION = '3.1.0'
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Constants that have user exposure (so don't change the values)
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 KEY_CONFIG_DEFAULT_TARGET = 'defaultTarget'
 KEY_CONFIG_BRANCHES = 'branches'
 KEY_CONFIG_BRANCH_NAME = 'name'
@@ -36,21 +36,23 @@ KEY_CONFIG_BRANCH_TARGET = 'target'
 
 OPTIONS_SECTION_BRANCH_ALL = 'branch-all'
 OPTIONS_SECTION_BRANCH_CURRENT = 'branch-current'
-OPTIONS_SECTION_MODIFIED = 'modified'
-OPTIONS_SECTION_STAGED = 'staged'
+OPTIONS_SECTION_STAGE = 'stage'
 OPTIONS_SECTION_STASHES = 'stashes'
+OPTIONS_SECTION_UNMERGED = 'unmerged'
 OPTIONS_SECTION_UNTRACKED = 'untracked'
+OPTIONS_SECTION_WORK_DIR = 'workdir'
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 KEY_COMMIT_SHORT_HASH = 'shortHash'
 KEY_COMMIT_DESCRIPTION = 'description'
 
-KEY_FILE_STATUSES_STAGED = 'staged'
-KEY_FILE_STATUSES_MODIFIED = 'modified'
-KEY_FILE_STATUSES_UNTRACKED = 'untracked'
+KEY_FILE_STATUSES_STAGE = 'stage'
 KEY_FILE_STATUSES_UNKNOWN = 'unknown'
+KEY_FILE_STATUSES_UNMERGED = 'unmerged'
+KEY_FILE_STATUSES_UNTRACKED = 'untracked'
+KEY_FILE_STATUSES_WORK_DIR = 'workdir'
 
 KEY_FILE_STATUSES_TYPE = 'type'
 KEY_FILE_STATUSES_FILENAME = 'filename'
@@ -67,16 +69,17 @@ KEY_STASH_FULL_HASH = 'fullHash'
 KEY_STASH_NAME = 'name'
 KEY_STASH_DESCRIPTION = 'description'
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Other constants so we can catch typos by linting
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 OPTIONS_SECTIONS = [
     OPTIONS_SECTION_BRANCH_ALL,
     OPTIONS_SECTION_BRANCH_CURRENT,
-    OPTIONS_SECTION_MODIFIED,
-    OPTIONS_SECTION_STAGED,
+    OPTIONS_SECTION_STAGE,
     OPTIONS_SECTION_STASHES,
+    OPTIONS_SECTION_UNMERGED,
     OPTIONS_SECTION_UNTRACKED,
+    OPTIONS_SECTION_WORK_DIR,
 ]
 
 TEXT_BOLD = 'bold'
@@ -87,9 +90,9 @@ TEXT_NORMAL = 'normal'
 TEXT_YELLOW = 'yellow'
 TEXT_RED = 'red'
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Constants exposed for testing purposes
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
 # Branch names are based on:
 #   https://nvie.com/posts/a-successful-git-branching-model/
@@ -123,7 +126,7 @@ CONFIG_DEFAULT = {
 
 CONFIG_FILENAME = '.gitsummaryconfig'
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def doit(options):
     """
     Orchestrate all output
@@ -137,10 +140,13 @@ def doit(options):
     Stashes   stash@{0} This is a stash
               stash@{1} This is another stash
 
-    Staged    M filename1
+    Stage     A filename1
+              A filename2
+
+    Work Dir  M filename1
               M filename2
 
-    Modified  M filename1
+    Unmerged  A filename1
               M filename2
 
     Untracked filename1
@@ -152,9 +158,9 @@ def doit(options):
        featureBranch       .  .     .  .  dev
     """
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Set configuration options
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     configToUse = fsGetConfigToUse()
     if configToUse[KEY_RETURN_STATUS]:
         gitsummaryConfig = configToUse[KEY_RETURN_VALUE]
@@ -163,7 +169,7 @@ def doit(options):
             print(line)
         sys.exit()
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Assemble the raw output lines(no colors, padding, or truncation)
     #
     # Each element in raw*Lines below:
@@ -174,7 +180,7 @@ def doit(options):
     # Later steps will:
     #   - pad/truncate columns to ensure proper line length
     #   - add colors
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
 
     fileStatuses = gitGetFileStatuses()
     currentBranch = gitGetCurrentBranch()
@@ -191,15 +197,21 @@ def doit(options):
             else []
         )
 
-    rawStagedLines = (
-        utilGetRawStagedLines(fileStatuses)
-            if OPTIONS_SECTION_STAGED in options[KEY_OPTIONS_SECTION_LIST]
+    rawStageLines = (
+        utilGetRawStageLines(fileStatuses)
+            if OPTIONS_SECTION_STAGE in options[KEY_OPTIONS_SECTION_LIST]
             else []
         )
 
-    rawModifiedLines = (
-        utilGetRawModifiedLines(fileStatuses)
-            if OPTIONS_SECTION_MODIFIED in options[KEY_OPTIONS_SECTION_LIST]
+    rawWorkDirLines = (
+        utilGetRawWorkDirLines(fileStatuses)
+            if OPTIONS_SECTION_WORK_DIR in options[KEY_OPTIONS_SECTION_LIST]
+            else []
+        )
+
+    rawUnmergedLines = (
+        utilGetRawUnmergedLines(fileStatuses)
+            if OPTIONS_SECTION_UNMERGED in options[KEY_OPTIONS_SECTION_LIST]
             else []
         )
 
@@ -226,49 +238,54 @@ def doit(options):
     else:
         rawBranchLines = []
 
-    #-------------------------------------------------------------------------
-    # For each section of output (stashes, staged, etc):
+    #---------------------------------------------------------------------------
+    # For each section of output (stashes, stage, etc):
     #   - Determine maximum widths for each column of each line, so we can
     #     align columns within each section
     #
     # Each xyzMaxColumnWidths will be a List of numbers, where each number
     # is the maximum width of the corresponding column.
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     stashesMaxColumnWidths = utilGetMaxColumnWidths(rawStashLines)
-    stagedMaxColumnWidths = utilGetMaxColumnWidths(rawStagedLines)
-    modifiedMaxColumnWidths = utilGetMaxColumnWidths(rawModifiedLines)
+    stageMaxColumnWidths = utilGetMaxColumnWidths(rawStageLines)
+    workDirMaxColumnWidths = utilGetMaxColumnWidths(rawWorkDirLines)
+    unmergedMaxColumnWidths = utilGetMaxColumnWidths(rawUnmergedLines)
     untrackedMaxColumnWidths = utilGetMaxColumnWidths(rawUntrackedLines)
     branchesMaxColumnWidths = utilGetMaxColumnWidths(rawBranchLines)
 
-    #-------------------------------------------------------------------------
-    # Ensure that title column for each of stashes, staged, modified, and
-    # untracked is the same width so they line up
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
+    # Ensure that title column for each of stashes, stage, work dir, unmerged,
+    # and untracked is the same width so they line up
+    #---------------------------------------------------------------------------
     maxTitleWidths = max(
         stashesMaxColumnWidths[0] if len(stashesMaxColumnWidths) > 0 else 0,
-        stagedMaxColumnWidths[0] if len(stagedMaxColumnWidths) > 0 else 0,
-        modifiedMaxColumnWidths[0] if len(modifiedMaxColumnWidths) > 0 else 0,
+        stageMaxColumnWidths[0] if len(stageMaxColumnWidths) > 0 else 0,
+        workDirMaxColumnWidths[0] if len(workDirMaxColumnWidths) > 0 else 0,
+        unmergedMaxColumnWidths[0] if len(unmergedMaxColumnWidths) > 0 else 0,
         untrackedMaxColumnWidths[0] if len(untrackedMaxColumnWidths) > 0 else 0,
     )
 
     if len(stashesMaxColumnWidths) > 0:
         stashesMaxColumnWidths[0] = maxTitleWidths
 
-    if len(stagedMaxColumnWidths) > 0:
-        stagedMaxColumnWidths[0] = maxTitleWidths
+    if len(stageMaxColumnWidths) > 0:
+        stageMaxColumnWidths[0] = maxTitleWidths
 
-    if len(modifiedMaxColumnWidths) > 0:
-        modifiedMaxColumnWidths[0] = maxTitleWidths
+    if len(workDirMaxColumnWidths) > 0:
+        workDirMaxColumnWidths[0] = maxTitleWidths
+
+    if len(unmergedMaxColumnWidths) > 0:
+        unmergedMaxColumnWidths[0] = maxTitleWidths
 
     if len(untrackedMaxColumnWidths) > 0:
         untrackedMaxColumnWidths[0] = maxTitleWidths
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Get all of our lines (still in columns) with each column padded or
     # truncated as required
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     try:
-        (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size();
+        (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
     except:
         SCREEN_WIDTH = 80
 
@@ -282,20 +299,28 @@ def doit(options):
         rawStashLines,
     )
 
-    alignedStagedLines = utilGetColumnAlignedLines(
+    alignedStageLines = utilGetColumnAlignedLines(
         SCREEN_WIDTH,
         TRUNCATION_INDICATOR,
         2,
-        stagedMaxColumnWidths,
-        rawStagedLines,
+        stageMaxColumnWidths,
+        rawStageLines,
     )
 
-    alignedModifiedLines = utilGetColumnAlignedLines(
+    alignedWorkDirLines = utilGetColumnAlignedLines(
         SCREEN_WIDTH,
         TRUNCATION_INDICATOR,
         2,
-        modifiedMaxColumnWidths,
-        rawModifiedLines,
+        workDirMaxColumnWidths,
+        rawWorkDirLines,
+    )
+
+    alignedUnmergedLines = utilGetColumnAlignedLines(
+        SCREEN_WIDTH,
+        TRUNCATION_INDICATOR,
+        2,
+        unmergedMaxColumnWidths,
+        rawUnmergedLines,
     )
 
     alignedUntrackedLines = utilGetColumnAlignedLines(
@@ -314,24 +339,30 @@ def doit(options):
         rawBranchLines,
     )
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Final step: Create a single string for each line, with required colors
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     styledStashLines = []
     for line in alignedStashLines:
         styledStashLines.append(
             line[0] + ' ' + utilGetStyledText([TEXT_GREEN], line[1]) + ' ' + line[2]
         )
 
-    styledStagedLines = []
-    for line in alignedStagedLines:
-        styledStagedLines.append(
+    styledStageLines = []
+    for line in alignedStageLines:
+        styledStageLines.append(
             line[0] + ' ' + utilGetStyledText([TEXT_GREEN], line[1] + ' ' + line[2])
         )
 
-    styledModifiedLines = []
-    for line in alignedModifiedLines:
-        styledModifiedLines.append(
+    styledWorkDirLines = []
+    for line in alignedWorkDirLines:
+        styledWorkDirLines.append(
+            line[0] + ' ' + utilGetStyledText([TEXT_RED], line[1] + ' ' + line[2])
+        )
+
+    styledUnmergedLines = []
+    for line in alignedUnmergedLines:
+        styledUnmergedLines.append(
             line[0] + ' ' + utilGetStyledText([TEXT_RED], line[1] + ' ' + line[2])
         )
 
@@ -360,23 +391,25 @@ def doit(options):
             line[4]
         )
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Print all our beautifully formatted output
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     previousSectionHadOutput = False
     for section in options[KEY_OPTIONS_SECTION_LIST]:
         if section == OPTIONS_SECTION_BRANCH_ALL or section == OPTIONS_SECTION_BRANCH_CURRENT:
             sectionLines = styledBranchLines
-        elif section == OPTIONS_SECTION_MODIFIED:
-            sectionLines = styledModifiedLines
-        elif section == OPTIONS_SECTION_STAGED:
-            sectionLines = styledStagedLines
+        elif section == OPTIONS_SECTION_STAGE:
+            sectionLines = styledStageLines
         elif section == OPTIONS_SECTION_STASHES:
             sectionLines = styledStashLines
+        elif section == OPTIONS_SECTION_UNMERGED:
+            sectionLines = styledUnmergedLines
         elif section == OPTIONS_SECTION_UNTRACKED:
             sectionLines = styledUntrackedLines
+        elif section == OPTIONS_SECTION_WORK_DIR:
+            sectionLines = styledWorkDirLines
         else:
-            print('Whoa! Something went wrong! Unknown section: ' + section)
+            print('Whoa! Something went wrong! Unknown --custom section: ' + section)
             sys.exit(1)
 
         if previousSectionHadOutput:
@@ -385,9 +418,9 @@ def doit(options):
             print(line)
         previousSectionHadOutput = True if len(sectionLines) > 0 else False
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Notify user if git returned something we didn't know how to handle
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     rawUnknownFileList = fileStatuses[KEY_FILE_STATUSES_UNKNOWN]
     if len(rawUnknownFileList) > 0:
         print('git returned some unexpected output:')
@@ -397,14 +430,14 @@ def doit(options):
 
         print('\nPlease notify the gitsummary author.')
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Filesystem Interface Layer
 #
 # These functions form the interface with the filesystem, for operations other
 # than running git.
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def fsGetConfigFullyQualifiedFilename():
     """
     Return the fully qualified path to the closest CONFIG_FILENAME
@@ -436,7 +469,7 @@ def fsGetConfigFullyQualifiedFilename():
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def fsGetConfigToUse():
     """
     Get the configuration object to use -- either user-specified or default
@@ -481,7 +514,7 @@ def fsGetConfigToUse():
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def fsGetValidatedUserConfig(fullyQualifiedFilename):
     """
     Get the user specified gitsummary configuration
@@ -531,7 +564,7 @@ def fsGetValidatedUserConfig(fullyQualifiedFilename):
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Git Interface Layer
 #
 # These functions form the lower layer interface with git. They are the only
@@ -546,9 +579,9 @@ def fsGetValidatedUserConfig(fullyQualifiedFilename):
 #   - They assume there is at least one commit, thus will produce unexpected
 #     results or throw exceptions if run immediately after 'git init'.
 #     It's too much of a pain to deal with this edge case.
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetCommitDetails(fullHash):
     """
     Get the details of the commit corresponding to the specified fullHash.
@@ -579,7 +612,7 @@ def gitGetCommitDetails(fullHash):
 
     return description
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
     """
     Get a list of commits that exist in branch1 but not branch2.
@@ -646,7 +679,7 @@ def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
 
     return commitList
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetCurrentBranch():
     """
     Get the name of the current branch.
@@ -671,48 +704,64 @@ def gitGetCurrentBranch():
 
     return currentBranch
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetFileStatuses():
     """
-    Get statuses for all files that have been modified or are not tracked
+    Get file statuses for:
+        - differences between the stage and HEAD
+        - differences between the working directory and the stage
+        - untracked files
 
     Return
         Dictionary with the following contents:
-            KEY_FILE_STATUSES_STAGED:    []   - staged files
-            KEY_FILE_STATUSES_MODIFIED:  []   - modified working dir files
-            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
+            KEY_FILE_STATUSES_STAGE:     []   - differences between the stage and
+                                                HEAD
             KEY_FILE_STATUSES_UNKNOWN:   []   - unknown git output
+            KEY_FILE_STATUSES_UNMERGED:  []   - unmerged changes
+            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
+            KEY_FILE_STATUSES_WORK_DIR:  []   - differences between the working
+                                                directory and the stage
 
         The elements of each list have the following formats (all keys prepended
         with 'KEY_FILE_STATUSES_', but ommitted here for brevity)
 
-        STAGED: Dictionary of the form:
+        STAGE: Dictionary of the form:
             TYPE           : String - The single letter code from 'git status --short'
-            FILENAME       : String - The filename
+            FILENAME       : String - The name of the file that's different
             NEW_FILENAME   : String - The new filename if the TYPE was one of
                                       'C' or 'R'
             HEURISTIC_SCORE: String - The value (0-100) that git assigns when
                                       deciding if the file was renamed/copied
 
-        MODIFIED: Dictionary of the form:
+        WORK_DIR: Dictionary of the form:
             TYPE           : String - The single letter code from 'git status --short'
-            FILENAME       : String - The filename
+            FILENAME       : String - The name of the file that's different
+
+        UNKNOWN: String - The raw git output that couldn't be parsed
+
+        UNMERGED: Dictionary of the form:
+            TYPE           : String - The single letter code from 'git status --short'
+            FILENAME       : String - The name of the file that's unmerged
 
         UNTRACKED: String - The name of the file that's untracked
 
-        UNKNOWN: String - The raw git output that couldn't be parsed
     """
-    TRACKED = 'tracked'
-    UNKNOWN_FORMAT = 'unknown-format'
-    UNTRACKED = 'untracked'
+
+    fileStatuses = {
+        KEY_FILE_STATUSES_STAGE: [],
+        KEY_FILE_STATUSES_UNKNOWN: [],
+        KEY_FILE_STATUSES_UNMERGED: [],
+        KEY_FILE_STATUSES_UNTRACKED: [],
+        KEY_FILE_STATUSES_WORK_DIR: [],
+    }
 
     output = gitUtilGetOutput(['git', 'status', '--porcelain=2'])
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # Each line of output describes one file.
-    # That description specifies how the committed file differs from:
-    #   - that file in the index (stage)
-    #   - that file in the working directory
+    # That description specifies how the file differs between:
+    #   - the index (stage) and HEAD (X)
+    #   - the working directory and the stage (Y)
     #
     # Each line of output will match one of the following patterns:
     #   1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
@@ -727,98 +776,110 @@ def gitGetFileStatuses():
     #   - an untracked file
     #
     # See the manpage for 'git status --porcelain=2' for full details
-    #-------------------------------------------------------------------------
-
-    fileStatuses = {
-        KEY_FILE_STATUSES_STAGED: [],
-        KEY_FILE_STATUSES_MODIFIED: [],
-        KEY_FILE_STATUSES_UNTRACKED: [],
-        KEY_FILE_STATUSES_UNKNOWN: [],
-    }
+    #     Note: It says it can indicate when a file is copied, however this
+    #           thread says that's false:
+    #               https://marc.info/?l=git&m=141730775928542&w=2
+    #---------------------------------------------------------------------------
 
     for outputLine in output:
-        #---------------------------------------------------------------------
-        # Different types of changes have different output formats. Get the
-        # data that we'll assemble later.
-        #   - filename       (all types)
-        #   - newFilename    (only renames or copies)
-        #   - heuristicScore (only renames or copies)
-        #---------------------------------------------------------------------
-        parseCode = TRACKED
+        lineType = outputLine[0]
 
-        # Note that we can't just split on spaces, since our filename may have
-        # spaces in it
+        if lineType in ['1', '2', 'u']:
+            stageCode = outputLine[2]
+            workDirCode = outputLine[3]
+        else:
+            stageCode = ''
+            workDirCode = ''
 
-        if outputLine[0] == '1':
-            # 1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
+        #-----------------------------------------------------------------------
+        # Changed file
+        # 1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
+        #-----------------------------------------------------------------------
+        if lineType == '1':
             match = re.search('^([^ ]+ ){8}(.+)$', outputLine)
             filename = match.group(2)
 
-        elif outputLine[0] == '2':
-            # 2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>[tab]<origPath>
+            if stageCode != '.':
+                fileStatuses[KEY_FILE_STATUSES_STAGE].append(
+                    {
+                        KEY_FILE_STATUSES_TYPE: stageCode,
+                        KEY_FILE_STATUSES_FILENAME: filename,
+                    }
+                )
+
+            if workDirCode != '.':
+                fileStatuses[KEY_FILE_STATUSES_WORK_DIR].append(
+                    {
+                        KEY_FILE_STATUSES_TYPE: workDirCode,
+                        KEY_FILE_STATUSES_FILENAME: filename,
+                    }
+                )
+
+        #-----------------------------------------------------------------------
+        # Renamed or copied file
+        # 2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>[tab]<origPath>
+        #-----------------------------------------------------------------------
+        elif lineType == '2':
             match = re.search('^([^ ]+ ){8}[A-Z]([^ ]+) (.+)\t(.+)$', outputLine)
+
             heuristicScore = match.group(2)
             newFilename = match.group(3)
             filename = match.group(4)
 
-        elif outputLine[0] == 'u':
-            # u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
+            if stageCode != '.':
+                fileStatuses[KEY_FILE_STATUSES_STAGE].append(
+                    {
+                        KEY_FILE_STATUSES_TYPE: stageCode,
+                        KEY_FILE_STATUSES_FILENAME: filename,
+                        KEY_FILE_STATUSES_NEW_FILENAME: newFilename,
+                        KEY_FILE_STATUSES_HEURISTIC_SCORE: heuristicScore,
+                    }
+                )
+
+            # Only the stage tracks whether a file has been renamed or copied
+            # (and the corresponding heuristic score).
+            # Since the working directory status is relative to the stage, the
+            # modified filename must be the renamed/copied one
+            if workDirCode != '.':
+                fileStatuses[KEY_FILE_STATUSES_WORK_DIR].append(
+                    {
+                        KEY_FILE_STATUSES_TYPE: workDirCode,
+                        KEY_FILE_STATUSES_FILENAME: newFilename,
+                    }
+                )
+
+        #-----------------------------------------------------------------------
+        # Unmerged file
+        #   u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
+        #-----------------------------------------------------------------------
+        elif lineType == 'u':
             match = re.search('^([^ ]+ ){10}(.+)$', outputLine)
             filename = match.group(2)
 
-        elif outputLine[0] == '?':
-            # ? <path>
-            parseCode = UNTRACKED
+            fileStatuses[KEY_FILE_STATUSES_UNMERGED].append(
+                {
+                    KEY_FILE_STATUSES_TYPE: stageCode,
+                    KEY_FILE_STATUSES_FILENAME: filename,
+                }
+            )
+
+        #-----------------------------------------------------------------------
+        # Untracked file
+        # ? <path>
+        #-----------------------------------------------------------------------
+        elif lineType == '?':
             filename = outputLine[2:]
-
-        else:
-            parseCode = UNKNOWN_FORMAT
-
-        #---------------------------------------------------------------------
-        # Build the dictionaries that will be returned for each of staged,
-        # modified, untracked, and unknown files. The latter being an unknown
-        # format (shouldn't happen).
-        #---------------------------------------------------------------------
-        if parseCode == UNKNOWN_FORMAT:
-            fileStatuses[KEY_FILE_STATUSES_UNKNOWN].append(outputLine)
-        elif parseCode == UNTRACKED:
             fileStatuses[KEY_FILE_STATUSES_UNTRACKED].append(filename)
+
+        #-----------------------------------------------------------------------
+        # Unknown git output
+        #-----------------------------------------------------------------------
         else:
-            # We're looking at an output line where outputLine[2:3] is the 'XY'
-            # that indicates how the committed file differs from the stage ('X')
-            # and the working dir ('Y').
-            #
-            # So append this file info to the appropriate list, based on the XY
-            # value.
-            for position in [2, 3]:
-                code = outputLine[position: position + 1]
-
-                # A code of '.' means this file is unchanged
-                if code != '.':
-                    thisFileStatus = {
-                        KEY_FILE_STATUSES_TYPE: code,
-                        KEY_FILE_STATUSES_FILENAME: filename,
-                    }
-
-                    # Get the info specific to renames or copies.
-                    # Note that the git status manpage says it can indicate when a
-                    # file is copied, however this thread says that's false:
-                    #   https://marc.info/?l=git&m=141730775928542&w=2
-                    #
-                    # We'll be on the safe side and look for copies anyway.
-                    if code in ['C', 'R']:
-                        thisFileStatus[KEY_FILE_STATUSES_NEW_FILENAME] = newFilename
-                        thisFileStatus[KEY_FILE_STATUSES_HEURISTIC_SCORE] = heuristicScore
-
-                    keyToUse = (
-                        KEY_FILE_STATUSES_STAGED if position == 2
-                        else KEY_FILE_STATUSES_MODIFIED
-                    )
-                    fileStatuses[keyToUse].append(thisFileStatus)
+            fileStatuses[KEY_FILE_STATUSES_UNKNOWN].append(outputLine)
 
     return fileStatuses
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetLocalBranches():
     """
     Get a list of local branch names.
@@ -846,7 +907,7 @@ def gitGetLocalBranches():
 
     return localBranches
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetRemoteTrackingBranch(localBranch):
     """
     Get the fully qualified name of the specified branch's remote tracking
@@ -864,7 +925,7 @@ def gitGetRemoteTrackingBranch(localBranch):
     """
     remoteTrackingBranch = ''
 
-    #-------------------------------------------------------------------------
+    #---------------------------------------------------------------------------
     # If there are any refs:
     #   - 'git for-each-ref' will tell us the remote branch
     #   - So just scan that output for 'localBranch'
@@ -920,7 +981,7 @@ def gitGetRemoteTrackingBranch(localBranch):
 
     return remoteTrackingBranch
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitGetStashes():
     """
     Get the list of stashes in the current repository.
@@ -975,15 +1036,15 @@ def gitGetStashes():
 
     return stashes
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Git Utility Layer
 #
 # Pretty boring layer -- just one function. Maybe there will be more in the
 # future.
 #
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def gitUtilGetOutput(command):
     """
     Get the output from running the specified git command.
@@ -1013,15 +1074,15 @@ def gitUtilGetOutput(command):
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 # Utility Layer
 #
 # These are utility functions that build various objects required to create
 # appropriate output. They don't run git directly, but may use functions from
 # the git layer.
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetAheadBehindString(ahead, behind):
     """
     Get a string of the form '+ahead -behind' that is used to indicate number
@@ -1062,7 +1123,7 @@ def utilGetAheadBehindString(ahead, behind):
 
     return formattedString
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetBranchAsFiveColumns(currentBranch, branch, targetBranch):
     """
     Get the specified branch formatted as five columns
@@ -1113,7 +1174,7 @@ def utilGetBranchAsFiveColumns(currentBranch, branch, targetBranch):
         targetBranch,
     ]
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetBranchOrder(gitsummaryConfig, branchList):
     """
     Return the branches in branchList in the order specified by the
@@ -1150,7 +1211,7 @@ def utilGetBranchOrder(gitsummaryConfig, branchList):
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetColumnAlignedLines(
     requiredWidth,
     truncIndicator,
@@ -1245,7 +1306,7 @@ def utilGetColumnAlignedLines(
 
     return alignedLines
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetMaxColumnWidths(lines):
     """
     Get the maximum width of each line of the specified lines.
@@ -1281,26 +1342,7 @@ def utilGetMaxColumnWidths(lines):
 
     return maxColumnWidths
 
-#-----------------------------------------------------------------------------
-def utilGetModifiedFileAsTwoColumns(modifiedFile):
-    """
-    Get the specified modifiedFile formatted as two columns
-
-    Args
-        Dictionary modifiedFile - One modifiedFile as returned by
-                                  gitGetFileStatuses
-
-    Return
-        List of String - First element:  Change type
-                                         Examples: 'D', 'M'
-                       - Second element: Filename
-    """
-    return [
-        modifiedFile[KEY_FILE_STATUSES_TYPE],
-        modifiedFile[KEY_FILE_STATUSES_FILENAME],
-    ]
-
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetRawBranchesLines(
     gitsummaryConfig,
     currentBranch,
@@ -1382,85 +1424,48 @@ def utilGetRawBranchesLines(
 
     return rawBranchLines
 
-#-----------------------------------------------------------------------------
-def utilGetRawModifiedLines(fileStatuses):
-    """
-    Get the "raw" lines for all modified files.
-
-    Args
-        Dictionary with the following contents:
-            KEY_FILE_STATUSES_STAGED:    []   - staged files
-            KEY_FILE_STATUSES_MODIFIED:  []   - modified working dir files
-            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
-            KEY_FILE_STATUSES_UNKNOWN:   []   - unknown git output
-
-    Return
-        List of 'lines', where each line is itself a List of columns
-
-        Each line has 3 columns:
-            'Modified' title (first line only),
-            changeType,
-            filename
-
-        Example:
-            [
-              [ 'Modified', 'M', 'file1' ],
-              [ '',         'D', 'file2' ],
-            ]
-    """
-
-    rawModifiedLines = []
-
-    rawModifiedList = fileStatuses[KEY_FILE_STATUSES_MODIFIED]
-
-    for i, modifiedFile in enumerate(rawModifiedList):
-        rawModifiedLines.append(
-            ['Modified' if i == 0 else ''] +
-            utilGetModifiedFileAsTwoColumns(modifiedFile)
-        )
-
-    return rawModifiedLines
-
-#-----------------------------------------------------------------------------
-def utilGetRawStagedLines(fileStatuses):
+#-------------------------------------------------------------------------------
+def utilGetRawStageLines(fileStatuses):
     """
     Get the "raw" lines for all staged files.
 
     Args
-        Dictionary with the following contents:
-            KEY_FILE_STATUSES_STAGED:    []   - staged files
-            KEY_FILE_STATUSES_MODIFIED:  []   - modified working dir files
-            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
-            KEY_FILE_STATUSES_UNKNOWN:   []   - unknown git output
+        Dictionary with the following key (among others):
+            KEY_FILE_STATUSES_STAGE: List of Dictionaries as returned by
+                                     gitGetFileStatuses()
+
+        Note: We pass the full fileStatuses object rather than just the List we
+              need since that would required testing doit(), which is only
+              testable manually.
 
     Return
         List of 'lines', where each line is itself a List of columns
 
         Each line has 3 columns:
-            'Staged' title (first line only),
+            'Stage' title (first line only),
             changeType,
             filename
 
         Example:
             [
-                [ 'Staged', 'M'     , 'file1' ],
-                [ ''      , 'A'     , 'file2' ],
-                [ ''      , 'R(100)', 'file3 -> newFile3' ],
+                [ 'Stage', 'M'     , 'file1' ],
+                [ ''     , 'A'     , 'file2' ],
+                [ ''     , 'R(100)', 'file3 -> newFile3' ],
             ]
     """
     rawStagedLines = []
 
-    rawStagedList = fileStatuses[KEY_FILE_STATUSES_STAGED]
+    rawStagedList = fileStatuses[KEY_FILE_STATUSES_STAGE]
 
     for i, stagedFile in enumerate(rawStagedList):
         rawStagedLines.append(
-            ['Staged' if i == 0 else ''] +
+            ['Stage' if i == 0 else ''] +
             utilGetStagedFileAsTwoColumns(stagedFile)
         )
 
     return rawStagedLines
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetRawStashLines():
     """
     Get the "raw" lines for all stashes.
@@ -1491,17 +1496,60 @@ def utilGetRawStashLines():
 
     return rawStashLines
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+def utilGetRawUnmergedLines(fileStatuses):
+    """
+    Get the "raw" lines for all unmerged files.
+
+    Args
+        Dictionary with the following key (among others)
+            KEY_FILE_STATUSES_UNMERGED: List of Dictionaries as returned by
+                                        gitGetFileStatuses()
+
+        Note: We pass the full fileStatuses object rather than just the List we
+              need since that would required testing doit(), which is only
+              testable manually.
+
+    Return
+        List of 'lines', where each line is itself a List of columns
+
+        Each line has 3 columns:
+            'Unmerged' title (first line only),
+            changeType,
+            filename
+
+        Example:
+            [
+              [ 'Unmerged', 'A', 'file1' ],
+              [ '',         'M', 'file2' ],
+            ]
+    """
+
+    rawUnmergedLines = []
+
+    rawUnmergedList = fileStatuses[KEY_FILE_STATUSES_UNMERGED]
+
+    for i, unmergedFile in enumerate(rawUnmergedList):
+        rawUnmergedLines.append(
+            ['Unmerged' if i == 0 else ''] +
+            utilGetUnmergedFileAsTwoColumns(unmergedFile)
+        )
+
+    return rawUnmergedLines
+
+#-------------------------------------------------------------------------------
 def utilGetRawUntrackedLines(fileStatuses):
     """
     Get the "raw" lines for all untracked files.
 
     Args
-        Dictionary with the following contents:
-            KEY_FILE_STATUSES_STAGED:    []   - staged files
-            KEY_FILE_STATUSES_MODIFIED:  []   - modified working dir files
-            KEY_FILE_STATUSES_UNTRACKED: []   - non-git tracked files
-            KEY_FILE_STATUSES_UNKNOWN:   []   - unknown git output
+        Dictionary with the following key (among others):
+            KEY_FILE_STATUSES_UNTRACKED: List of Dictionaries as returned by
+                                         gitGetFileStatuses()
+
+        Note: We pass the full fileStatuses object rather than just the List we
+              need since that would required testing doit(), which is only
+              testable manually.
 
     Return
         List of 'lines', where each line is itself a List of columns
@@ -1530,7 +1578,48 @@ def utilGetRawUntrackedLines(fileStatuses):
 
     return rawUntrackedLines
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+def utilGetRawWorkDirLines(fileStatuses):
+    """
+    Get the "raw" lines for all workdir files.
+
+    Args
+        Dictionary with the following key (among others)
+            KEY_FILE_STATUSES_WORK_DIR: List of Dictionaries as returned by
+                                        gitGetFileStatuses()
+
+        Note: We pass the full fileStatuses object rather than just the List we
+              need since that would required testing doit(), which is only
+              testable manually.
+
+    Return
+        List of 'lines', where each line is itself a List of columns
+
+        Each line has 3 columns:
+            'Work Dir' title (first line only),
+            changeType,
+            filename
+
+        Example:
+            [
+              [ 'Work Dir', 'M', 'file1' ],
+              [ '',         'D', 'file2' ],
+            ]
+    """
+
+    rawWorkDirLines = []
+
+    rawWorkDirList = fileStatuses[KEY_FILE_STATUSES_WORK_DIR]
+
+    for i, workDirFile in enumerate(rawWorkDirList):
+        rawWorkDirLines.append(
+            ['Work Dir' if i == 0 else ''] +
+            utilGetWorkDirFileAsTwoColumns(workDirFile)
+        )
+
+    return rawWorkDirLines
+
+#-------------------------------------------------------------------------------
 def utilGetStagedFileAsTwoColumns(stagedFile):
     """
     Get the specified stagedFile formatted as two columns
@@ -1564,7 +1653,7 @@ def utilGetStagedFileAsTwoColumns(stagedFile):
         fileDetails,
     ]
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetStashAsTwoColumns(stash):
     """
     Get the specified stash formatted as two columns
@@ -1581,7 +1670,7 @@ def utilGetStashAsTwoColumns(stash):
         stash[KEY_STASH_DESCRIPTION],
     ]
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetStyledText(styles, text):
     """
     Return the specified text in the specified style. As a convenience, 'text'
@@ -1619,7 +1708,7 @@ def utilGetStyledText(styles, text):
 
     return escapeStart + text + escapeEnd
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilGetTargetBranch(gitsummaryConfig, branch, localBranches):
     """
     Return the name of the target branch associated with 'branch', as specified
@@ -1651,7 +1740,45 @@ def utilGetTargetBranch(gitsummaryConfig, branch, localBranches):
 
     return targetBranch
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+def utilGetUnmergedFileAsTwoColumns(unmergedFile):
+    """
+    Get the specified unmergedFile formatted as two columns
+
+    Args
+        Dictionary unmergedFile - One unmergedFile as returned by
+                                  gitGetFileStatuses
+
+    Return
+        List of String - First element:  Change type
+                                         Examples: 'A', 'M'
+                       - Second element: Filename
+    """
+    return [
+        unmergedFile[KEY_FILE_STATUSES_TYPE],
+        unmergedFile[KEY_FILE_STATUSES_FILENAME],
+    ]
+
+#-------------------------------------------------------------------------------
+def utilGetWorkDirFileAsTwoColumns(workDirFile):
+    """
+    Get the specified workDirFile formatted as two columns
+
+    Args
+        Dictionary workDirFile  - One workDirFile as returned by
+                                  gitGetFileStatuses
+
+    Return
+        List of String - First element:  Change type
+                                         Examples: 'D', 'M'
+                       - Second element: Filename
+    """
+    return [
+        workDirFile[KEY_FILE_STATUSES_TYPE],
+        workDirFile[KEY_FILE_STATUSES_FILENAME],
+    ]
+
+#-------------------------------------------------------------------------------
 def utilPrintHelp(commandName):
     """
     Print the output corresponding to '--help'.
@@ -1660,21 +1787,22 @@ def utilPrintHelp(commandName):
         String commandName - The name this script was invoked with
     """
     print('Usage:')
-    print('    ' + commandName + ' [--custom [options]] | --help | --helpconfig | --version')
+    print('    ' + commandName + ' [--custom [sections]] | --help | --helpconfig | --version')
     print('')
     print('Print a summary of the current git repository\'s status:')
-    print('    - stashes, staged files, modified files, untracked files,')
+    print('    - stashes, stage changes, working directory changes, unmerged changes,')
+    print('      untracked files,')
     print('    - list of local branches, including the following for each:')
     print('          - number of commits ahead/behind its target branch')
     print('          - number of commits ahead/behind its remote branch')
     print('          - the name of its target branch')
     print()
     print('Flags:')
-    print('    --custom [options]')
+    print('    --custom [sections]')
     print('        - Show only the specified sections of output')
     print('        - Valid section names are:')
-    print('          \'stashes\', \'staged\', \'modified\', \'untracked\', \'branch-all\',')
-    print('          \'branch-current\'')
+    print('              stashes, stage, workdir, untracked, unmerged, branch-all,')
+    print('              branch-current')
     print('')
     print('    --help')
     print('        - Show this output')
@@ -1685,7 +1813,7 @@ def utilPrintHelp(commandName):
     print('    --version')
     print('        - Show current version')
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilPrintHelpConfig():
     """
     Print help output describing the configuration file
@@ -1753,7 +1881,7 @@ of the filesystem.
         configFilename = CONFIG_FILENAME,
     ))
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilValidateGitsummaryConfig(configObject):
     """
     Validate the specified configObject
@@ -1881,7 +2009,7 @@ def utilValidateGitsummaryConfig(configObject):
 
     return returnVal
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def utilValidateKeyPresenceAndType(
     testObject,
     key,
@@ -1916,14 +2044,15 @@ def utilValidateKeyPresenceAndType(
 
     return errors
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 def main():
-    # Default sections, in order, if user doesn't specify any
+    # Default sections, in order, to be used if user doesn't specify any
     options = {
         KEY_OPTIONS_SECTION_LIST: [
             OPTIONS_SECTION_STASHES,
-            OPTIONS_SECTION_STAGED,
-            OPTIONS_SECTION_MODIFIED,
+            OPTIONS_SECTION_STAGE,
+            OPTIONS_SECTION_WORK_DIR,
+            OPTIONS_SECTION_UNMERGED,
             OPTIONS_SECTION_UNTRACKED,
             OPTIONS_SECTION_BRANCH_ALL,
         ],
@@ -1962,6 +2091,6 @@ def main():
 
     doit(options)
 
-#-----------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 if __name__ == '__main__':
     main()
