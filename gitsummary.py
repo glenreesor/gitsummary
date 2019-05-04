@@ -409,7 +409,7 @@ def doit(options):
         elif section == OPTIONS_SECTION_WORK_DIR:
             sectionLines = styledWorkDirLines
         else:
-            print('Whoa! Something went wrong! Unknown section: ' + section)
+            print('Whoa! Something went wrong! Unknown --custom section: ' + section)
             sys.exit(1)
 
         if previousSectionHadOutput:
@@ -1801,8 +1801,8 @@ def utilPrintHelp(commandName):
     print('    --custom [sections]')
     print('        - Show only the specified sections of output')
     print('        - Valid section names are:')
-    print('          stashes, stage, workdir, untracked, unmerged, branch-all,')
-    print('          branch-current')
+    print('              stashes, stage, workdir, untracked, unmerged, branch-all,')
+    print('              branch-current')
     print('')
     print('    --help')
     print('        - Show this output')
