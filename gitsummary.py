@@ -843,7 +843,7 @@ def gitGetFileStatuses():
             if workDirCode != '.':
                 fileStatuses[KEY_FILE_STATUSES_WORK_DIR].append(
                     {
-                        KEY_FILE_STATUSES_TYPE: stageCode,
+                        KEY_FILE_STATUSES_TYPE: workDirCode,
                         KEY_FILE_STATUSES_FILENAME: newFilename,
                     }
                 )

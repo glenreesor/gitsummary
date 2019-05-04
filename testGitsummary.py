@@ -949,9 +949,10 @@ class Test_gitGetFileStatuses(unittest.TestCase):
     def test_untrackedFileWithSpaces(self):
         self.util_testUntrackedFile('testfile with spaces')
 
-    def test_multipleStatusesOnOneFile(self):
-        # This is a test where one file has changes in both the working
-        # directory and the stage. We accomplish by doing the following:
+    def test_multipleStatusesType1(self):
+        # This test corresponds to the git status line of type '1'.
+        # (One file modified in the stage and also modified in work dir.)
+        # We accomplish this by doing the following:
         #   - commit a new file
         #   - make a change and stage it
         #   - make another change in the working directory
@@ -988,6 +989,52 @@ class Test_gitGetFileStatuses(unittest.TestCase):
 
         # Modify but don't stage
         modifiedFile = open(TEST_FILE, 'w')
+        modifiedFile.write('b')
+        modifiedFile.close()
+
+        self.assertEqual(EXPECTED_RESULT, gs.gitGetFileStatuses())
+
+    def test_multipleStatusesType2(self):
+        # This test corresponds to the git status line of type '2'.
+        # (One file renamed in the stage and modified in work dir.)
+        # We accomplish this by doing the following:
+        #   - commit a new file
+        #   - rename the file (staged)
+        #   - make a change to the renamed file in the working directory
+
+        TEST_FILE = 'testfile'
+        RENAMED_FILE = 'testfile-renamed'
+
+        EXPECTED_RESULT = {
+            gs.KEY_FILE_STATUSES_STAGE: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'R',
+                    gs.KEY_FILE_STATUSES_FILENAME: TEST_FILE,
+                    gs.KEY_FILE_STATUSES_NEW_FILENAME: RENAMED_FILE,
+                    gs.KEY_FILE_STATUSES_HEURISTIC_SCORE: '100',
+                },
+            ],
+            gs.KEY_FILE_STATUSES_WORK_DIR: [
+                {
+                    gs.KEY_FILE_STATUSES_TYPE: 'M',
+                    gs.KEY_FILE_STATUSES_FILENAME: RENAMED_FILE,
+                },
+            ],
+            gs.KEY_FILE_STATUSES_UNMERGED: [],
+            gs.KEY_FILE_STATUSES_UNTRACKED: [],
+            gs.KEY_FILE_STATUSES_UNKNOWN: [],
+        }
+
+        createNonEmptyGitRepository()
+
+        # Create and commit
+        createAndCommitFile(TEST_FILE)
+
+        # Rename and stage
+        execute(['git', 'mv', TEST_FILE, RENAMED_FILE])
+
+        # Modify but don't stage
+        modifiedFile = open(RENAMED_FILE, 'w')
         modifiedFile.write('b')
         modifiedFile.close()
 
