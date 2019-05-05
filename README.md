@@ -51,21 +51,22 @@ You can specify your own merge targets in a `.gitsummaryconfig` file
 ## Usage
 ```
 Usage:
-    gitsummary.py [--custom [options]] | --help | --helpconfig | --version
+    ./gitsummary.py [--custom [sections]] | --help | --helpconfig | --version
 
 Print a summary of the current git repository's status:
-    - stashes, staged files, modified files, untracked files,
+    - stashes, stage changes, working directory changes, unmerged changes,
+      untracked files,
     - list of local branches, including the following for each:
           - number of commits ahead/behind its target branch
           - number of commits ahead/behind its remote branch
           - the name of its target branch
 
 Flags:
-    --custom [options]
-        - Show only the specified sections of output
+    --custom [sections]
+        - Show only the specified sections of output, in the order specified
         - Valid section names are:
-          'stashes', 'staged', 'modified', 'untracked', 'branch-all',
-          'branch-current'
+              stashes, stage, workdir, untracked, unmerged, branch-all,
+              branch-current
 
     --help
         - Show this output

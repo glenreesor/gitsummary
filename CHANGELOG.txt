@@ -1,3 +1,18 @@
+2019-05-05 - Version 3.2.0
+    - Change terminology to be more consistent with git:
+        - 'Modified' heading is now 'Work Dir'
+    - Corresponding changes to section names for '--custom' option:
+        -  'staged'   --> 'stage'
+        -  'modified' --> 'workdir'
+
+    - New Features:
+        - New section "Unmerged" (and the corresponding
+          '--custom' section 'unmerged')
+
+    - Bug Fixes:
+        - Properly handle case where a file is changed in the Stage and the
+          working directory
+
 2019-01-18 - Version 3.1.0
     - Add support for configurable branch targets and branch order via new
       .gitsummaryconfig file
