@@ -1799,7 +1799,7 @@ def utilPrintHelp(commandName):
     print()
     print('Flags:')
     print('    --custom [sections]')
-    print('        - Show only the specified sections of output')
+    print('        - Show only the specified sections of output, in the order specified')
     print('        - Valid section names are:')
     print('              stashes, stage, workdir, untracked, unmerged, branch-all,')
     print('              branch-current')
