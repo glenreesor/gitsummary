@@ -20,15 +20,15 @@ following branch information:
 - `develop`
     - In sync with its remote branch
     - 3 commits ahead of its merge target (`master`)
+- `hotfix-fix-something-bad`
+    - Has no remote branch
+    - 1 commit ahead of its merge target (`master`)
 - `make-awesome-new-thing`
     - Has no remote branch
     - 2 commits behind its merge target (`develop`)
 - `make-faster`
     - 7 commits ahead of its remote
     - 8 commits ahead of its merge target (`develop`)
-- `hotfix-fix-something-bad`
-    - Has no remote branch
-    - 1 commit ahead of its merge target (`master`)
 
 ## What is a 'Merge Target'?
 A merge target is the branch that `gitsummary` is expecting a particular branch
