@@ -82,11 +82,11 @@ OPTIONS_SECTIONS = [
     OPTIONS_SECTION_WORK_DIR,
 ]
 
-TEXT_BOLD = 'bold'
-TEXT_FLASHING = 'flashing'
+TEXT_BRIGHT = 'bright'
+TEXT_NORMAL = 'normal'
+
 TEXT_GREEN = 'green'
 TEXT_MAGENTA = 'magenta'
-TEXT_NORMAL = 'normal'
 TEXT_YELLOW = 'yellow'
 TEXT_RED = 'red'
 
@@ -380,8 +380,8 @@ def doit(options):
         # string (column 2) contains any digits
         differsFromRemote = re.search('[0-9]', line[2])
 
-        col0Format = [TEXT_MAGENTA] + ([TEXT_BOLD] if differsFromRemote else [])
-        possiblyBoldFormat = [TEXT_BOLD] if differsFromRemote else []
+        col0Format = [TEXT_MAGENTA] + ([TEXT_BRIGHT] if differsFromRemote else [])
+        possiblyBoldFormat = [TEXT_BRIGHT] if differsFromRemote else []
 
         styledBranchLines.append(
             utilGetStyledText(col0Format, line[0]) + ' ' +
@@ -1687,11 +1687,11 @@ def utilGetStyledText(styles, text):
     """
 
     ESCAPE_MAPPING = {
-        TEXT_BOLD: '1',
-        TEXT_FLASHING: '5',
+        TEXT_BRIGHT: '1',
+        TEXT_NORMAL: '0',
+
         TEXT_GREEN: '32',
         TEXT_MAGENTA: '35',
-        TEXT_NORMAL: '0',
         TEXT_RED: '31',
         TEXT_YELLOW: '33'
     }
