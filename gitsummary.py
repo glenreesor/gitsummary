@@ -249,7 +249,7 @@ def doit(options):
             gitsummaryConfig,
             currentBranch,
             localBranchesInDisplayOrder,
-            True
+            True,
         )
     else:
         rawBranchLines = []
@@ -451,6 +451,68 @@ def doit(options):
 
         print('\nPlease notify the gitsummary author.')
 
+#-------------------------------------------------------------------------------
+def shellPromptHelper():
+    #---------------------------------------------------------------------------
+    # Set configuration options
+    #---------------------------------------------------------------------------
+    configToUse = fsGetConfigToUse()
+    if configToUse[KEY_RETURN_STATUS]:
+        gitsummaryConfig = configToUse[KEY_RETURN_VALUE]
+    else:
+        for line in configToUse[KEY_RETURN_MESSAGES]:
+            print(line)
+        sys.exit()
+
+    #---------------------------------------------------------------------------
+    fileStatuses = gitGetFileStatuses()
+    currentBranch = gitGetCurrentBranch()
+    localBranches = gitGetLocalBranches()
+
+    remoteBranch = gitGetRemoteTrackingBranch(currentBranch)
+
+    targetBranch = utilGetTargetBranch(
+        gitsummaryConfig,
+        currentBranch,
+        localBranches
+    )
+
+    aheadOfRemote = (
+        '_' if remoteBranch == ''
+        else len(gitGetCommitsInFirstNotSecond(currentBranch, remoteBranch, True))
+    )
+
+    behindRemote = (
+        '_' if remoteBranch == ''
+        else len(gitGetCommitsInFirstNotSecond(remoteBranch, currentBranch, True))
+    )
+
+    aheadOfTarget = (
+        '_' if targetBranch == ''
+        else len(gitGetCommitsInFirstNotSecond(currentBranch, targetBranch, True))
+    )
+
+    behindTarget = (
+        '_' if targetBranch == ''
+        else len(gitGetCommitsInFirstNotSecond(targetBranch, currentBranch, True))
+    )
+
+    currentBranchToDisplay = currentBranch if currentBranch != '' else '_'
+    targetBranchToDisplay = targetBranch if targetBranch != '' else '_'
+
+    print(
+        len(gitGetStashes()),
+        len(fileStatuses[KEY_FILE_STATUSES_STAGE]),
+        len(fileStatuses[KEY_FILE_STATUSES_WORK_DIR]),
+        len(fileStatuses[KEY_FILE_STATUSES_UNMERGED]),
+        len(fileStatuses[KEY_FILE_STATUSES_UNTRACKED]),
+        currentBranchToDisplay,
+        aheadOfRemote,
+        behindRemote,
+        aheadOfTarget,
+        behindTarget,
+        targetBranchToDisplay
+    )
 #-------------------------------------------------------------------------------
 # Filesystem Interface Layer
 #
@@ -2105,6 +2167,10 @@ def main():
         ],
     }
 
+    # User will be requesting either normal output, or the shell prompt helper
+    # output
+    promptHelper = False
+
     # Parse the command line options
     i = 1
     while i < len(sys.argv):
@@ -2122,21 +2188,32 @@ def main():
                 else:
                     options[KEY_OPTIONS_SECTION_LIST].append(sys.argv[i])
                     i += 1
+
         elif sys.argv[i] == '--help':
             utilPrintHelp(sys.argv[0])
             sys.exit(0)
+
         elif sys.argv[i] == '--helpconfig':
             utilPrintHelpConfig()
             sys.exit(0)
+
+        elif sys.argv[i] == '--shellPromptHelper':
+            promptHelper = True
+            i+= 1
+
         elif sys.argv[i] == '--version':
             print(VERSION)
             sys.exit(0)
+
         else:
             print('Unknown command line argument: ' + sys.argv[i])
             print('See "' + sys.argv[0] + ' --help"')
             sys.exit(1)
 
-    doit(options)
+    if promptHelper:
+        shellPromptHelper()
+    else:
+        doit(options)
 
 #-------------------------------------------------------------------------------
 if __name__ == '__main__':
