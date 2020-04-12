@@ -1689,7 +1689,7 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
     # Tests
     #-------------------------------------------------------------------------
     def testNoLines(self):
-        REQUIRED_WIDTH = 80
+        MAX_WIDTH = 80
         TRUNC_INDICATOR = '...'
         VARIABLE_COLUMN = 3
         COLUMN_WIDTHS = [10, 10, 10, 10]
@@ -1700,7 +1700,7 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
         self.assertEqual(
             EXPECTED,
             gs.utilGetColumnAlignedLines(
-                REQUIRED_WIDTH,
+                MAX_WIDTH,
                 TRUNC_INDICATOR,
                 VARIABLE_COLUMN,
                 COLUMN_WIDTHS,
@@ -1708,8 +1708,8 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
             )
         )
 
-    def testNoModificationsRequired(self):
-        REQUIRED_WIDTH = 43     # Remember column separators
+    def testNoTruncOrPaddingRequired(self):
+        MAX_WIDTH = 80
         TRUNC_INDICATOR = '...'
         VARIABLE_COLUMN = 3
         COLUMN_WIDTHS = [10, 10, 10, 10]
@@ -1726,7 +1726,7 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
         self.assertEqual(
             EXPECTED,
             gs.utilGetColumnAlignedLines(
-                REQUIRED_WIDTH,
+                MAX_WIDTH,
                 TRUNC_INDICATOR,
                 VARIABLE_COLUMN,
                 COLUMN_WIDTHS,
@@ -1734,8 +1734,8 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
             )
         )
 
-    def testRequiredWidthTooNarrow(self):
-        REQUIRED_WIDTH = 30     # Remember column separators
+    def testMaxWidthTooNarrow(self):
+        MAX_WIDTH = 30
         TRUNC_INDICATOR = '...'
         VARIABLE_COLUMN = 3
         COLUMN_WIDTHS = [10, 10, 10, 10]
@@ -1752,7 +1752,7 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
         self.assertEqual(
             EXPECTED,
             gs.utilGetColumnAlignedLines(
-                REQUIRED_WIDTH,
+                MAX_WIDTH,
                 TRUNC_INDICATOR,
                 VARIABLE_COLUMN,
                 COLUMN_WIDTHS,
@@ -1761,24 +1761,24 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
         )
 
     def testNonVariableWidthColumnGetsPadded(self):
-        REQUIRED_WIDTH = 43     # Remember column separators
+        MAX_WIDTH = 80
         TRUNC_INDICATOR = '...'
         VARIABLE_COLUMN = 3
         COLUMN_WIDTHS = [10, 10, 10, 10]
         LINES = [
-            ['1234567890', '123456789', '12345678', '1234567890'],
-            ['1234567890', '123456789', '12345678', '1234567890'],
+            ['1234567890', '123456789', '1234567890', '1234567890'],
+            ['1234567890', '123456789', '12345678'  , '1234567890'],
         ]
 
         EXPECTED = [
-            ['1234567890', '123456789 ', '12345678  ', '1234567890'],
+            ['1234567890', '123456789 ', '1234567890', '1234567890'],
             ['1234567890', '123456789 ', '12345678  ', '1234567890'],
         ]
 
         self.assertEqual(
             EXPECTED,
             gs.utilGetColumnAlignedLines(
-                REQUIRED_WIDTH,
+                MAX_WIDTH,
                 TRUNC_INDICATOR,
                 VARIABLE_COLUMN,
                 COLUMN_WIDTHS,
@@ -1786,25 +1786,27 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
             )
         )
 
-    def testVariableWidthColumnPadAndTrunc(self):
-        REQUIRED_WIDTH = 43     # Remember column separators
+    def testVariableWidthColumnUnchangedAndPadAndTrunc(self):
+        MAX_WIDTH = 80
         TRUNC_INDICATOR = '...'
         VARIABLE_COLUMN = 3
         COLUMN_WIDTHS = [10, 10, 10, 10]
         LINES = [
-            ['1234567890', '1234567890', '1234567890', '123456789'],
-            ['1234567890', '1234567890', '1234567890', '1234567890a'],
+            ['1234567890', '1234567890', '1234567890', '1234567890'],
+            ['1234567890', '1234567890', '1234567890', '123456'],
+            ['1234567890', '1234567890', '1234567890', '1234567890ab'],
         ]
 
         EXPECTED = [
-            ['1234567890', '1234567890', '1234567890', '123456789 '],
+            ['1234567890', '1234567890', '1234567890', '1234567890'],
+            ['1234567890', '1234567890', '1234567890', '123456    '],
             ['1234567890', '1234567890', '1234567890', '1234567...'],
         ]
 
         self.assertEqual(
             EXPECTED,
             gs.utilGetColumnAlignedLines(
-                REQUIRED_WIDTH,
+                MAX_WIDTH,
                 TRUNC_INDICATOR,
                 VARIABLE_COLUMN,
                 COLUMN_WIDTHS,
@@ -1813,7 +1815,7 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
         )
 
     def testZeroLengthTruncIndicator(self):
-        REQUIRED_WIDTH = 43     # Remember column separators
+        MAX_WIDTH = 80
         TRUNC_INDICATOR = ''
         VARIABLE_COLUMN = 3
         COLUMN_WIDTHS = [10, 10, 10, 10]
@@ -1830,7 +1832,7 @@ class Test_utilGetColumnAlignedLines(unittest.TestCase):
         self.assertEqual(
             EXPECTED,
             gs.utilGetColumnAlignedLines(
-                REQUIRED_WIDTH,
+                MAX_WIDTH,
                 TRUNC_INDICATOR,
                 VARIABLE_COLUMN,
                 COLUMN_WIDTHS,
