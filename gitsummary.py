@@ -182,7 +182,7 @@ def doit(options):
         (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
         useColor = True
     else:
-        SCREEN_WIDTH = 80
+        SCREEN_WIDTH = -1
         useColor = False
 
     #---------------------------------------------------------------------------
@@ -1234,7 +1234,7 @@ def utilGetBranchOrder(gitsummaryConfig, branchList):
 
 #-------------------------------------------------------------------------------
 def utilGetColumnAlignedLines(
-    requiredWidth,
+    maxWidth,
     truncIndicator,
     variableColumn,
     columnWidths,
@@ -1242,19 +1242,21 @@ def utilGetColumnAlignedLines(
 ):
     """
     Get an array of lines (broken into columns) where columns are aligned and the
-    entire line is exactly 'requiredWidth' characters.
+    entire line is at most 'maxWidth' characters. Column alignment is achived
+    by padding or truncation as required.
 
-    All columns except the 'variableColumn' one will be treated as fixed width,
-    thus padding will be applied where appropriate.
-
-    The 'variableColumn' column will be padded or truncated to ensure the total
-    line width is exactly 'requiredWidth' characters.
+    To achieve column alignment:
+        - each column other than 'variableColumn' will be the widest width of
+          that column among all lines
+        - the width of 'variableColumn' will be either the widest width among
+          all lines, or truncated to ensure no lines are longer than maxWidth
 
     This function can be called with an empty List of lines, in which case an
     empty List will be returned.
 
     Args
-        Number requiredWidth  - The required line length
+        Number maxWidth       - The maximum line length
+                                -1 indicates no max length
         String truncIndicator - A string with which to replace the last
                                 len(truncIndicator) characters of a column if it
                                 needs to be truncated.
@@ -1277,7 +1279,7 @@ def utilGetColumnAlignedLines(
                (the padded/truncated columns). Example:
                     [
                         ['line1-col1       ', 'line1-col2    ', 'line1-col3-b'],
-                        ['line2-col1-bla   ', 'line2-col2-bla', 'line2-col3-b'],
+                        ['line2-col1-bla'   , 'line2-col2-bla', 'line2-col3-b'],
                     ]
     """
     if len(lines) == 0:
@@ -1285,39 +1287,43 @@ def utilGetColumnAlignedLines(
 
     alignedLines = []
 
-    # Get the width of all the static columns, so we can calculate how much is
-    # left for the variable width columns
-    staticWidth = sum(columnWidths) - columnWidths[variableColumn]
-    numColumns = len(columnWidths)
-    availableWidth = requiredWidth - staticWidth - (numColumns - 1)
+    # Determine how much (if any) must be truncated
+    if maxWidth == -1:
+        truncation = 0
+    else:
+        totalWidth = sum(columnWidths) + len(columnWidths) - 1
+        truncation = totalWidth - maxWidth if totalWidth > maxWidth else 0
+
+    # Determine required width of variable width column
+    variableColumnWidth = columnWidths[variableColumn] - truncation
 
     # Gracefully handle tiny screen width
-    if availableWidth < 0:
-        availableWidth = 0
+    if variableColumnWidth < 0:
+        variableColumnWidth = 1
 
     for line in lines:
         columns = []
 
         for i, column in enumerate(line):
             if i != variableColumn:
-                # This is a column to be padded out to the required max width
+                # This is a column to be padded out so all lines align
                 formatString = '{0:<' + str(columnWidths[i]) + '}'
                 formattedColumn = formatString.format(column)
             else:
                 # This is a column that needs to be padded or truncated to
-                # ensure total line width is 'requiredWidth'
+                # ensure max line width is 'requiredWidth'
                 formatString = (
                     '{0:<' +
-                    str(availableWidth) +
+                    str(variableColumnWidth) +
                     '.' +
-                    str(availableWidth) +
+                    str(variableColumnWidth) +
                     '}'
                 )
                 formattedColumn = formatString.format(column)
 
                 # If we truncated this column, replace the last n characters
                 # with the requested truncation indicator
-                if len(column) > availableWidth and truncIndicator != '':
+                if len(column) > variableColumnWidth and truncIndicator != '':
                     formattedColumn = (
                         formattedColumn[0:-len(truncIndicator)] + truncIndicator
                     )
