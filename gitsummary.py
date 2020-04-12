@@ -176,6 +176,16 @@ def doit(options):
         sys.exit()
 
     #---------------------------------------------------------------------------
+    # Figure out if we're running interactively, and set options as appropriate
+    #---------------------------------------------------------------------------
+    if sys.stdout.isatty():
+        (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
+        useColor = True
+    else:
+        SCREEN_WIDTH = 80
+        useColor = False
+
+    #---------------------------------------------------------------------------
     # Assemble the raw output lines(no colors, padding, or truncation)
     #
     # Each element in raw*Lines below:
@@ -290,11 +300,6 @@ def doit(options):
     # Get all of our lines (still in columns) with each column padded or
     # truncated as required
     #---------------------------------------------------------------------------
-    try:
-        (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
-    except:
-        SCREEN_WIDTH = 80
-
     TRUNCATION_INDICATOR = '...'
 
     alignedStashLines = utilGetColumnAlignedLines(
@@ -348,17 +353,19 @@ def doit(options):
     #---------------------------------------------------------------------------
     # Final step: Create a single string for each line, with required colors
     #---------------------------------------------------------------------------
+    getStyledText = utilGetStyledText if useColor else utilNoopGetStyledText
+
     styledStashLines = []
     for line in alignedStashLines:
         styledStashLines.append(
-            line[0] + ' ' + utilGetStyledText([TEXT_GREEN], line[1]) + ' ' + line[2]
+            line[0] + ' ' + getStyledText([TEXT_GREEN], line[1]) + ' ' + line[2]
         )
 
     styledStageLines = []
     for line in alignedStageLines:
         styledStageLines.append(
             line[0] + ' ' + (
-                utilGetStyledText([TEXT_BRIGHT, TEXT_GREEN], line[1] + ' ' + line[2])
+                getStyledText([TEXT_BRIGHT, TEXT_GREEN], line[1] + ' ' + line[2])
             )
         )
 
@@ -366,7 +373,7 @@ def doit(options):
     for line in alignedWorkDirLines:
         styledWorkDirLines.append(
             line[0] + ' ' + (
-                utilGetStyledText([TEXT_BRIGHT, TEXT_MAGENTA], line[1] + ' ' + line[2])
+                getStyledText([TEXT_BRIGHT, TEXT_MAGENTA], line[1] + ' ' + line[2])
             )
         )
 
@@ -374,14 +381,14 @@ def doit(options):
     for line in alignedUnmergedLines:
         styledUnmergedLines.append(
             line[0] + ' ' + (
-                utilGetStyledText([TEXT_BRIGHT, TEXT_RED], line[1] + ' ' + line[2])
+                getStyledText([TEXT_BRIGHT, TEXT_RED], line[1] + ' ' + line[2])
             )
         )
 
     styledUntrackedLines = []
     for line in alignedUntrackedLines:
         styledUntrackedLines.append(
-            line[0] + ' ' + utilGetStyledText([TEXT_CYAN], line[1])
+            line[0] + ' ' + getStyledText([TEXT_CYAN], line[1])
         )
 
     styledBranchLines = []
@@ -398,11 +405,11 @@ def doit(options):
             formats += [TEXT_CYAN]
 
         styledBranchLines.append(
-            utilGetStyledText(formats, line[0]) + ' ' +
-            utilGetStyledText(formats, line[1]) + ' ' +
-            utilGetStyledText(formats, line[2]) + ' ' +
-            utilGetStyledText(formats, line[3]) + ' ' +
-            utilGetStyledText(formats, line[4])
+            getStyledText(formats, line[0]) + ' ' +
+            getStyledText(formats, line[1]) + ' ' +
+            getStyledText(formats, line[2]) + ' ' +
+            getStyledText(formats, line[3]) + ' ' +
+            getStyledText(formats, line[4])
         )
 
     #---------------------------------------------------------------------------
@@ -1795,6 +1802,22 @@ def utilGetWorkDirFileAsTwoColumns(workDirFile):
         workDirFile[KEY_FILE_STATUSES_TYPE],
         workDirFile[KEY_FILE_STATUSES_FILENAME],
     ]
+
+#-------------------------------------------------------------------------------
+def utilNoopGetStyledText(styles, text):
+    """
+    Return the specified text unmodified. This is used as a replacement for
+    utilGetStyledText() when no escape codes should be generated
+
+    Args
+
+        List   styles - Ignored
+        String text   - The text to be returned
+
+    Return
+        String The unmodified text
+    """
+    return text
 
 #-------------------------------------------------------------------------------
 def utilPrintHelp(commandName):
