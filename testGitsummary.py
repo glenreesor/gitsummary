@@ -1484,7 +1484,7 @@ class Test_utilGetBranchAsFiveColumns(unittest.TestCase):
             ''
         )
 
-        self.assertEqual('*', result[0])
+        self.assertEqual(gs.CURRENT_BRANCH_INDICATOR, result[0])
         self.assertEqual(CURRENT_BRANCH, result[1])
         self.assertEqual(gs.utilGetAheadBehindString('', ''), result[2])
         self.assertEqual(gs.utilGetAheadBehindString('', ''), result[3])
@@ -1541,7 +1541,7 @@ class Test_utilGetBranchAsFiveColumns(unittest.TestCase):
             ''
         )
 
-        self.assertEqual('*', result[0])
+        self.assertEqual(gs.CURRENT_BRANCH_INDICATOR, result[0])
         self.assertEqual('master', result[1])
         self.assertEqual(gs.utilGetAheadBehindString(1, 2), result[2])
         self.assertEqual(gs.utilGetAheadBehindString('', ''), result[3])
@@ -2170,13 +2170,13 @@ class Test_utilGetStyledText(unittest.TestCase):
     def testOneStyle(self):
         self.assertEqual(
             '\033[1mtest\033[0m',
-            gs.utilGetStyledText([gs.TEXT_BOLD], 'test')
+            gs.utilGetStyledText([gs.TEXT_BRIGHT], 'test')
         )
 
     def testMultipleStyles(self):
         self.assertEqual(
-            '\033[1;5mtest\033[0m',
-            gs.utilGetStyledText([gs.TEXT_BOLD, gs.TEXT_FLASHING], 'test')
+            '\033[1;30mtest\033[0m',
+            gs.utilGetStyledText([gs.TEXT_BRIGHT, gs.TEXT_BLACK], 'test')
         )
 
 #-----------------------------------------------------------------------------
