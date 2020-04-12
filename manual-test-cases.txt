@@ -75,5 +75,8 @@ Test    Description                     Scenario        Commandline and Expected
                                                             gst
 
                                                         Expected Result:
-                                                            - Matches width of current window (except in gitbash terminal)
+                                                            - No lines wrap
+                                                            - Branch name(s) truncated so no wrap
+                                                            - Doesn't apply to gitbash
+                                                              terminal
 
