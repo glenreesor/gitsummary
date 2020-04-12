@@ -72,6 +72,8 @@ KEY_STASH_DESCRIPTION = 'description'
 #-------------------------------------------------------------------------------
 # Other constants so we can catch typos by linting
 #-------------------------------------------------------------------------------
+CURRENT_BRANCH_INDICATOR = '>'
+
 OPTIONS_SECTIONS = [
     OPTIONS_SECTION_BRANCH_ALL,
     OPTIONS_SECTION_BRANCH_CURRENT,
@@ -82,13 +84,17 @@ OPTIONS_SECTIONS = [
     OPTIONS_SECTION_WORK_DIR,
 ]
 
-TEXT_BOLD = 'bold'
-TEXT_FLASHING = 'flashing'
+TEXT_BRIGHT = 'bright'
+TEXT_NORMAL = 'normal'
+
+TEXT_BLACK = 'black'
+TEXT_BLUE = 'blue'
+TEXT_CYAN = 'cyan'
 TEXT_GREEN = 'green'
 TEXT_MAGENTA = 'magenta'
-TEXT_NORMAL = 'normal'
 TEXT_YELLOW = 'yellow'
 TEXT_RED = 'red'
+TEXT_WHITE = 'white'
 
 #-------------------------------------------------------------------------------
 # Constants exposed for testing purposes
@@ -154,7 +160,7 @@ def doit(options):
 
                           Remote   Target
        master              .  .
-     * dev                 .  .     .  .  master
+     > dev                 .  .     .  .  master
        featureBranch       .  .     .  .  dev
     """
 
@@ -168,6 +174,16 @@ def doit(options):
         for line in configToUse[KEY_RETURN_MESSAGES]:
             print(line)
         sys.exit()
+
+    #---------------------------------------------------------------------------
+    # Figure out if we're running interactively, and set options as appropriate
+    #---------------------------------------------------------------------------
+    if sys.stdout.isatty():
+        (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
+        useColor = True
+    else:
+        SCREEN_WIDTH = 80
+        useColor = False
 
     #---------------------------------------------------------------------------
     # Assemble the raw output lines(no colors, padding, or truncation)
@@ -284,11 +300,6 @@ def doit(options):
     # Get all of our lines (still in columns) with each column padded or
     # truncated as required
     #---------------------------------------------------------------------------
-    try:
-        (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
-    except:
-        SCREEN_WIDTH = 80
-
     TRUNCATION_INDICATOR = '...'
 
     alignedStashLines = utilGetColumnAlignedLines(
@@ -342,53 +353,63 @@ def doit(options):
     #---------------------------------------------------------------------------
     # Final step: Create a single string for each line, with required colors
     #---------------------------------------------------------------------------
+    getStyledText = utilGetStyledText if useColor else utilNoopGetStyledText
+
     styledStashLines = []
     for line in alignedStashLines:
         styledStashLines.append(
-            line[0] + ' ' + utilGetStyledText([TEXT_GREEN], line[1]) + ' ' + line[2]
+            line[0] + ' ' + getStyledText([TEXT_GREEN], line[1]) + ' ' + line[2]
         )
 
     styledStageLines = []
     for line in alignedStageLines:
         styledStageLines.append(
-            line[0] + ' ' + utilGetStyledText([TEXT_GREEN], line[1] + ' ' + line[2])
+            line[0] + ' ' + (
+                getStyledText([TEXT_BRIGHT, TEXT_GREEN], line[1] + ' ' + line[2])
+            )
         )
 
     styledWorkDirLines = []
     for line in alignedWorkDirLines:
         styledWorkDirLines.append(
-            line[0] + ' ' + utilGetStyledText([TEXT_RED], line[1] + ' ' + line[2])
+            line[0] + ' ' + (
+                getStyledText([TEXT_BRIGHT, TEXT_MAGENTA], line[1] + ' ' + line[2])
+            )
         )
 
     styledUnmergedLines = []
     for line in alignedUnmergedLines:
         styledUnmergedLines.append(
-            line[0] + ' ' + utilGetStyledText([TEXT_RED], line[1] + ' ' + line[2])
+            line[0] + ' ' + (
+                getStyledText([TEXT_BRIGHT, TEXT_RED], line[1] + ' ' + line[2])
+            )
         )
 
     styledUntrackedLines = []
     for line in alignedUntrackedLines:
         styledUntrackedLines.append(
-            line[0] + ' ' + utilGetStyledText([TEXT_YELLOW], line[1])
+            line[0] + ' ' + getStyledText([TEXT_CYAN], line[1])
         )
 
     styledBranchLines = []
     for line in alignedBranchLines:
-        # Indicator, name, and remote need to be bold if the branch differs
-        # from its remote.
-        # We know a branch differs from its remote if the remote ahead/behind
-        # string (column 2) contains any digits
+        # Entire line is bright if it's the current branch
+        # Remote Ahead/Behind are cyan if branch differs from its remote
+        #   We know a branch differs from its remote if the remote ahead/behind
+        #   string (column 2) contains any digits
+        isCurrentBranch = (re.search(CURRENT_BRANCH_INDICATOR, line[0]))
         differsFromRemote = re.search('[0-9]', line[2])
 
-        col0Format = [TEXT_MAGENTA] + ([TEXT_BOLD] if differsFromRemote else [])
-        possiblyBoldFormat = [TEXT_BOLD] if differsFromRemote else []
+        formats = [TEXT_BRIGHT] if isCurrentBranch else []
+        if differsFromRemote:
+            formats += [TEXT_CYAN]
 
         styledBranchLines.append(
-            utilGetStyledText(col0Format, line[0]) + ' ' +
-            utilGetStyledText(possiblyBoldFormat, line[1]) + ' ' +
-            utilGetStyledText(possiblyBoldFormat, line[2]) + ' ' +
-            line[3] + ' ' +
-            line[4]
+            getStyledText(formats, line[0]) + ' ' +
+            getStyledText(formats, line[1]) + ' ' +
+            getStyledText(formats, line[2]) + ' ' +
+            getStyledText(formats, line[3]) + ' ' +
+            getStyledText(formats, line[4])
         )
 
     #---------------------------------------------------------------------------
@@ -1136,8 +1157,8 @@ def utilGetBranchAsFiveColumns(currentBranch, branch, targetBranch):
                                '' if there is no target branch
 
     Return
-        List of String - First element : '*' if branch is the current branch
-                                         (otherwise '')
+        List of String - First element : CURRENT_BRANCH_INDICATOR if branch is
+                                         the current branch (otherwise '')
                        - Second element: branch name
                        - Third element : commits ahead/behind remote branch
                        - Fourth element: commits ahead/behind target branch
@@ -1145,7 +1166,7 @@ def utilGetBranchAsFiveColumns(currentBranch, branch, targetBranch):
     """
     remoteBranch = gitGetRemoteTrackingBranch(branch)
 
-    currentBranchIndicator = '*' if branch == currentBranch else ''
+    currentBranchIndicator = CURRENT_BRANCH_INDICATOR if branch == currentBranch else ''
     aheadOfRemote = (
         '' if remoteBranch == ''
         else len(gitGetCommitsInFirstNotSecond(branch, remoteBranch, True))
@@ -1357,7 +1378,7 @@ def utilGetRawBranchesLines(
                                           gitsummary configuration
         String         currentBranch    - The name of the current branch.
                                           Used to determine which branch line
-                                          should have the '*' indicator
+                                          should have the CURRENT_BRANCH_INDICATOR
         List of String localBranches    - All local branches, in the order they
                                           should appear in the returned list
         Boolean        showAllBranches  - Whether to show all branches (True)
@@ -1376,7 +1397,7 @@ def utilGetRawBranchesLines(
         Example:
             [
               [ '' , ''       , '  Remote', '  Target', ''],
-              [ '*', 'dev'    , '+1  -2'  , '+3  -4'  , 'master' ],
+              [ '>', 'dev'    , '+1  -2'  , '+3  -4'  , 'master' ],
               [ '' , 'branch1', '+1  -2'  , '+3  -4'  , 'dev' ],
             ]
     """
@@ -1687,13 +1708,17 @@ def utilGetStyledText(styles, text):
     """
 
     ESCAPE_MAPPING = {
-        TEXT_BOLD: '1',
-        TEXT_FLASHING: '5',
+        TEXT_BRIGHT: '1',
+        TEXT_NORMAL: '0',
+
+        TEXT_BLACK: '30',
+        TEXT_BLUE: '34',
+        TEXT_CYAN: '36',
         TEXT_GREEN: '32',
         TEXT_MAGENTA: '35',
-        TEXT_NORMAL: '0',
         TEXT_RED: '31',
-        TEXT_YELLOW: '33'
+        TEXT_YELLOW: '33',
+        TEXT_WHITE: '37'
     }
 
     if len(styles) == 0:
@@ -1777,6 +1802,22 @@ def utilGetWorkDirFileAsTwoColumns(workDirFile):
         workDirFile[KEY_FILE_STATUSES_TYPE],
         workDirFile[KEY_FILE_STATUSES_FILENAME],
     ]
+
+#-------------------------------------------------------------------------------
+def utilNoopGetStyledText(styles, text):
+    """
+    Return the specified text unmodified. This is used as a replacement for
+    utilGetStyledText() when no escape codes should be generated
+
+    Args
+
+        List   styles - Ignored
+        String text   - The text to be returned
+
+    Return
+        String The unmodified text
+    """
+    return text
 
 #-------------------------------------------------------------------------------
 def utilPrintHelp(commandName):

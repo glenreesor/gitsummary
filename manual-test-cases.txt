@@ -60,14 +60,15 @@ Test    Description                     Scenario        Commandline and Expected
                                                                 Stage
                                                                 Stashes
 
-6       Redirecting to a file           all-sections
+6       Works if stdout isn't a tty     all-sections
                                                         Commandline:
                                                             gst > gitsummary.out
                                                             cat gitsummary.out
 
                                                         Expected Result:
-                                                            - gitsummary.py didn't fail
-                                                            - the output is not empty
+                                                            - the output is:
+                                                                - not colorized
+                                                                - not truncated
 
 7       Line width                      all-sections
                                                         Commandline:
