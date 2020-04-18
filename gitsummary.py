@@ -34,13 +34,24 @@ KEY_CONFIG_BRANCH_NAME = 'name'
 KEY_CONFIG_BRANCH_ORDER = 'branchOrder'
 KEY_CONFIG_BRANCH_TARGET = 'target'
 
-OPTIONS_OUTPUT_BRANCH_ALL = 'branch-all'
-OPTIONS_OUTPUT_BRANCH_CURRENT = 'branch-current'
+# Output options common to both fullRepoOutput and shellHelper
 OPTIONS_OUTPUT_STAGE = 'stage'
 OPTIONS_OUTPUT_STASHES = 'stashes'
 OPTIONS_OUTPUT_UNMERGED = 'unmerged'
 OPTIONS_OUTPUT_UNTRACKED = 'untracked'
 OPTIONS_OUTPUT_WORK_DIR = 'workdir'
+
+# Output options applicable to only fullRepoOutput
+OPTIONS_OUTPUT_BRANCH_ALL = 'branch-all'
+OPTIONS_OUTPUT_BRANCH_CURRENT = 'branch-current'
+
+# Output options applicable to only shellHelper
+OPTIONS_OUTPUT_BRANCH_NAME = 'branch-name'
+OPTIONS_OUTPUT_TARGET_BRANCH = 'target-branch'
+OPTIONS_OUTPUT_AHEAD_REMOTE = 'ahead-remote'
+OPTIONS_OUTPUT_AHEAD_TARGET = 'ahead-target'
+OPTIONS_OUTPUT_BEHIND_REMOTE = 'behind-remote'
+OPTIONS_OUTPUT_BEHIND_TARGET = 'behind-target'
 
 #-------------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
@@ -59,7 +70,7 @@ KEY_FILE_STATUSES_FILENAME = 'filename'
 KEY_FILE_STATUSES_NEW_FILENAME = 'newFilename'
 KEY_FILE_STATUSES_HEURISTIC_SCORE = 'heuristicScore'
 
-KEY_OPTIONS_SELECTED_OUTPUT = 'optionsCustomList'
+KEY_OPTIONS_SELECTED_OUTPUT = 'optionsSelectedOutput'
 
 KEY_RETURN_STATUS = 'returnStatus'
 KEY_RETURN_MESSAGES = 'returnMessages'
@@ -73,16 +84,6 @@ KEY_STASH_DESCRIPTION = 'description'
 # Other constants so we can catch typos by linting
 #-------------------------------------------------------------------------------
 CURRENT_BRANCH_INDICATOR = '>'
-
-OPTIONS_OUTPUTS = [
-    OPTIONS_OUTPUT_BRANCH_ALL,
-    OPTIONS_OUTPUT_BRANCH_CURRENT,
-    OPTIONS_OUTPUT_STAGE,
-    OPTIONS_OUTPUT_STASHES,
-    OPTIONS_OUTPUT_UNMERGED,
-    OPTIONS_OUTPUT_UNTRACKED,
-    OPTIONS_OUTPUT_WORK_DIR,
-]
 
 TEXT_BRIGHT = 'bright'
 TEXT_NORMAL = 'normal'
@@ -133,9 +134,9 @@ CONFIG_DEFAULT = {
 CONFIG_FILENAME = '.gitsummaryconfig'
 
 #-------------------------------------------------------------------------------
-def doit(options):
+def fullRepoOutput(options):
     """
-    Orchestrate all output
+    Orchestrate all output (full repository)
 
     Args
         Dictionary options - A dictionary with the following key:
@@ -452,7 +453,30 @@ def doit(options):
         print('\nPlease notify the gitsummary author.')
 
 #-------------------------------------------------------------------------------
-def shellPromptHelper():
+def shellPromptHelper(options):
+    """
+    Orchestrate output for the shell prompt helper functionality
+
+    Output is a single line of space-separated values as specified in options:
+        - The following values are the number of corresponding entities:
+            - STASHES, STAGE, WORK_DIR, UNMERGED, UNTRACKED
+
+        - The following values are either numbers or "_" if current branch
+          does not have a remote tracking branch:
+            - AHEAD_REMOTE, BEHIND_REMOTE
+
+        - The following values are either numbers or "_" if current branch
+          does not have a target branch
+            - AHEAD_TARGET, BEHIND_TARGET
+
+        - The following values are strings or '_' if not applicable:
+            - BRANCH_NAME, TARGET_NAME
+
+    Args
+        Dictionary options - A dictionary with the following key:
+                                KEY_OPTIONS_SELECTED_OUTPUT : List of String
+    """
+
     #---------------------------------------------------------------------------
     # Set configuration options
     #---------------------------------------------------------------------------
@@ -465,54 +489,132 @@ def shellPromptHelper():
         sys.exit()
 
     #---------------------------------------------------------------------------
-    fileStatuses = gitGetFileStatuses()
+    # Get all required output
+    #---------------------------------------------------------------------------
+    optionsAsSet = set(options[KEY_OPTIONS_SELECTED_OUTPUT])
+
     currentBranch = gitGetCurrentBranch()
     localBranches = gitGetLocalBranches()
 
-    remoteBranch = gitGetRemoteTrackingBranch(currentBranch)
+    if OPTIONS_OUTPUT_STASHES in options[KEY_OPTIONS_SELECTED_OUTPUT]:
+        numStashes = len(gitGetStashes())
 
-    targetBranch = utilGetTargetBranch(
-        gitsummaryConfig,
-        currentBranch,
-        localBranches
+    # Getting file statuses is expensive, so only do it if output requiring
+    # file statuses has been requested
+    fileStatusesRequired = (
+        len(optionsAsSet.intersection(
+            [
+                OPTIONS_OUTPUT_STAGE,
+                OPTIONS_OUTPUT_WORK_DIR,
+                OPTIONS_OUTPUT_UNMERGED,
+                OPTIONS_OUTPUT_UNTRACKED,
+            ]
+        )) > 0
     )
 
-    aheadOfRemote = (
-        '_' if remoteBranch == ''
-        else len(gitGetCommitsInFirstNotSecond(currentBranch, remoteBranch, True))
+    if fileStatusesRequired:
+        fileStatuses = gitGetFileStatuses()
+
+        numStage = len(fileStatuses[KEY_FILE_STATUSES_STAGE])
+        numWorkDir = len(fileStatuses[KEY_FILE_STATUSES_WORK_DIR])
+        numUnmerged = len(fileStatuses[KEY_FILE_STATUSES_UNMERGED])
+        numUntracked = len(fileStatuses[KEY_FILE_STATUSES_UNTRACKED])
+
+    # Remote tracking branch stats
+    remoteRequired = (
+        len(optionsAsSet.intersection(
+            [
+                 OPTIONS_OUTPUT_AHEAD_REMOTE,
+                 OPTIONS_OUTPUT_BEHIND_REMOTE,
+            ]
+        )) > 0
     )
 
-    behindRemote = (
-        '_' if remoteBranch == ''
-        else len(gitGetCommitsInFirstNotSecond(remoteBranch, currentBranch, True))
+    if remoteRequired:
+        remoteBranch = gitGetRemoteTrackingBranch(currentBranch)
+
+        numAheadRemote = (
+            '_' if remoteBranch == ''
+            else len(gitGetCommitsInFirstNotSecond(currentBranch, remoteBranch, True))
+        )
+
+        numBehindRemote = (
+            '_' if remoteBranch == ''
+            else len(gitGetCommitsInFirstNotSecond(remoteBranch, currentBranch, True))
+        )
+
+    # Target tracking branch stats
+    targetRequired = (
+        len(optionsAsSet.intersection(
+            [
+                 OPTIONS_OUTPUT_AHEAD_TARGET,
+                 OPTIONS_OUTPUT_BEHIND_TARGET,
+            ]
+        )) > 0
     )
 
-    aheadOfTarget = (
-        '_' if targetBranch == ''
-        else len(gitGetCommitsInFirstNotSecond(currentBranch, targetBranch, True))
-    )
+    if targetRequired:
+        targetBranch = utilGetTargetBranch(
+            gitsummaryConfig,
+            currentBranch,
+            localBranches
+        )
 
-    behindTarget = (
-        '_' if targetBranch == ''
-        else len(gitGetCommitsInFirstNotSecond(targetBranch, currentBranch, True))
-    )
+        numAheadTarget = (
+            '_' if targetBranch == ''
+            else len(gitGetCommitsInFirstNotSecond(currentBranch, targetBranch, True))
+        )
 
-    currentBranchToDisplay = currentBranch if currentBranch != '' else '_'
-    targetBranchToDisplay = targetBranch if targetBranch != '' else '_'
+        numBehindTarget = (
+            '_' if targetBranch == ''
+            else len(gitGetCommitsInFirstNotSecond(targetBranch, currentBranch, True))
+        )
 
-    print(
-        len(gitGetStashes()),
-        len(fileStatuses[KEY_FILE_STATUSES_STAGE]),
-        len(fileStatuses[KEY_FILE_STATUSES_WORK_DIR]),
-        len(fileStatuses[KEY_FILE_STATUSES_UNMERGED]),
-        len(fileStatuses[KEY_FILE_STATUSES_UNTRACKED]),
-        currentBranchToDisplay,
-        aheadOfRemote,
-        behindRemote,
-        aheadOfTarget,
-        behindTarget,
-        targetBranchToDisplay
-    )
+    #---------------------------------------------------------------------------
+    # Assemble output in the requested order
+    #---------------------------------------------------------------------------
+    outputString = ''
+    for output in options[KEY_OPTIONS_SELECTED_OUTPUT]:
+
+        if output == OPTIONS_OUTPUT_STASHES:
+            outputString = outputString + ' ' + str(numStashes)
+
+        if output == OPTIONS_OUTPUT_STAGE:
+            outputString = outputString + ' ' + str(numStage)
+
+        if output == OPTIONS_OUTPUT_WORK_DIR:
+            outputString = outputString + ' ' + str(numWorkDir)
+
+        if output == OPTIONS_OUTPUT_UNMERGED:
+            outputString = outputString + ' ' + str(numUnmerged)
+
+        if output == OPTIONS_OUTPUT_UNTRACKED:
+            outputString = outputString + ' ' + str(numUntracked)
+
+        if output == OPTIONS_OUTPUT_AHEAD_REMOTE:
+            outputString = outputString + ' ' + str(numAheadRemote)
+
+        if output == OPTIONS_OUTPUT_BEHIND_REMOTE:
+            outputString = outputString + ' ' + str(numBehindRemote)
+
+        if output == OPTIONS_OUTPUT_AHEAD_TARGET:
+            outputString = outputString + ' ' + str(numAheadTarget)
+
+        if output == OPTIONS_OUTPUT_BEHIND_TARGET:
+            outputString = outputString + ' ' + str(numBehindTarget)
+
+        if output == OPTIONS_OUTPUT_BRANCH_NAME:
+            outputString = outputString + ' ' + (
+                currentBranch if currentBranch != '' else '_'
+            )
+
+        if output == OPTIONS_OUTPUT_TARGET_BRANCH:
+            outputString = outputString + ' ' + (
+                targetBranch if targetBranch != '' else '_'
+            )
+
+    print(outputString)
+
 #-------------------------------------------------------------------------------
 # Filesystem Interface Layer
 #
@@ -2155,34 +2257,54 @@ def utilValidateKeyPresenceAndType(
 
 #-------------------------------------------------------------------------------
 def main():
-    # Default sections, in order, to be used if user doesn't specify any
-    options = {
-        KEY_OPTIONS_SELECTED_OUTPUT: [
-            OPTIONS_OUTPUT_STASHES,
-            OPTIONS_OUTPUT_STAGE,
-            OPTIONS_OUTPUT_WORK_DIR,
-            OPTIONS_OUTPUT_UNMERGED,
-            OPTIONS_OUTPUT_UNTRACKED,
-            OPTIONS_OUTPUT_BRANCH_ALL,
-        ],
-    }
+    # Default output, in order, to be used if user doesn't specify any
+    if len(sys.argv) > 1 and sys.argv[1] == 'shell-prompt-helper':
+        requestedCmd = shellPromptHelper
+        firstOptionIndex = 2
+        defaultOptions = {
+            KEY_OPTIONS_SELECTED_OUTPUT: [
+                OPTIONS_OUTPUT_STASHES,
+                OPTIONS_OUTPUT_STAGE,
+                OPTIONS_OUTPUT_WORK_DIR,
+                OPTIONS_OUTPUT_UNMERGED,
+                OPTIONS_OUTPUT_UNTRACKED,
+                OPTIONS_OUTPUT_AHEAD_REMOTE,
+                OPTIONS_OUTPUT_BEHIND_REMOTE,
+                OPTIONS_OUTPUT_AHEAD_TARGET,
+                OPTIONS_OUTPUT_BEHIND_TARGET,
+                OPTIONS_OUTPUT_BRANCH_NAME,
+                OPTIONS_OUTPUT_TARGET_BRANCH,
+            ],
+        }
+    else:
+        requestedCmd = fullRepoOutput
+        firstOptionIndex = 1
+        defaultOptions = {
+            KEY_OPTIONS_SELECTED_OUTPUT: [
+                OPTIONS_OUTPUT_STASHES,
+                OPTIONS_OUTPUT_STAGE,
+                OPTIONS_OUTPUT_WORK_DIR,
+                OPTIONS_OUTPUT_UNMERGED,
+                OPTIONS_OUTPUT_UNTRACKED,
+                OPTIONS_OUTPUT_BRANCH_ALL,
+            ],
+        }
 
-    # User will be requesting either normal output, or the shell prompt helper
-    # output
-    promptHelper = False
+    options = defaultOptions.copy()
 
     # Parse the command line options
-    i = 1
+    i = firstOptionIndex
     while i < len(sys.argv):
         if sys.argv[i] == '--custom':
             customDone = False
             options[KEY_OPTIONS_SELECTED_OUTPUT] = []
+
             i += 1
             while i < len(sys.argv) and not customDone:
                 arg = sys.argv[i]
                 if arg.startswith('--'):
                     customDone = True
-                elif arg not in OPTIONS_OUTPUTS:
+                elif arg not in defaultOptions[KEY_OPTIONS_SELECTED_OUTPUT]:
                     print('Unknown --custom option: ' + arg)
                     sys.exit(1)
                 else:
@@ -2197,10 +2319,6 @@ def main():
             utilPrintHelpConfig()
             sys.exit(0)
 
-        elif sys.argv[i] == '--shellPromptHelper':
-            promptHelper = True
-            i+= 1
-
         elif sys.argv[i] == '--version':
             print(VERSION)
             sys.exit(0)
@@ -2210,10 +2328,7 @@ def main():
             print('See "' + sys.argv[0] + ' --help"')
             sys.exit(1)
 
-    if promptHelper:
-        shellPromptHelper()
-    else:
-        doit(options)
+    requestedCmd(options)
 
 #-------------------------------------------------------------------------------
 if __name__ == '__main__':
