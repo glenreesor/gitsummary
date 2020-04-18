@@ -34,13 +34,13 @@ KEY_CONFIG_BRANCH_NAME = 'name'
 KEY_CONFIG_BRANCH_ORDER = 'branchOrder'
 KEY_CONFIG_BRANCH_TARGET = 'target'
 
-OPTIONS_SECTION_BRANCH_ALL = 'branch-all'
-OPTIONS_SECTION_BRANCH_CURRENT = 'branch-current'
-OPTIONS_SECTION_STAGE = 'stage'
-OPTIONS_SECTION_STASHES = 'stashes'
-OPTIONS_SECTION_UNMERGED = 'unmerged'
-OPTIONS_SECTION_UNTRACKED = 'untracked'
-OPTIONS_SECTION_WORK_DIR = 'workdir'
+OPTIONS_OUTPUT_BRANCH_ALL = 'branch-all'
+OPTIONS_OUTPUT_BRANCH_CURRENT = 'branch-current'
+OPTIONS_OUTPUT_STAGE = 'stage'
+OPTIONS_OUTPUT_STASHES = 'stashes'
+OPTIONS_OUTPUT_UNMERGED = 'unmerged'
+OPTIONS_OUTPUT_UNTRACKED = 'untracked'
+OPTIONS_OUTPUT_WORK_DIR = 'workdir'
 
 #-------------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
@@ -59,7 +59,7 @@ KEY_FILE_STATUSES_FILENAME = 'filename'
 KEY_FILE_STATUSES_NEW_FILENAME = 'newFilename'
 KEY_FILE_STATUSES_HEURISTIC_SCORE = 'heuristicScore'
 
-KEY_OPTIONS_SECTION_LIST = 'optionsCustomList'
+KEY_OPTIONS_SELECTED_OUTPUT = 'optionsCustomList'
 
 KEY_RETURN_STATUS = 'returnStatus'
 KEY_RETURN_MESSAGES = 'returnMessages'
@@ -74,14 +74,14 @@ KEY_STASH_DESCRIPTION = 'description'
 #-------------------------------------------------------------------------------
 CURRENT_BRANCH_INDICATOR = '>'
 
-OPTIONS_SECTIONS = [
-    OPTIONS_SECTION_BRANCH_ALL,
-    OPTIONS_SECTION_BRANCH_CURRENT,
-    OPTIONS_SECTION_STAGE,
-    OPTIONS_SECTION_STASHES,
-    OPTIONS_SECTION_UNMERGED,
-    OPTIONS_SECTION_UNTRACKED,
-    OPTIONS_SECTION_WORK_DIR,
+OPTIONS_OUTPUTS = [
+    OPTIONS_OUTPUT_BRANCH_ALL,
+    OPTIONS_OUTPUT_BRANCH_CURRENT,
+    OPTIONS_OUTPUT_STAGE,
+    OPTIONS_OUTPUT_STASHES,
+    OPTIONS_OUTPUT_UNMERGED,
+    OPTIONS_OUTPUT_UNTRACKED,
+    OPTIONS_OUTPUT_WORK_DIR,
 ]
 
 TEXT_BRIGHT = 'bright'
@@ -139,7 +139,7 @@ def doit(options):
 
     Args
         Dictionary options - A dictionary with the following key:
-                                KEY_OPTIONS_SECTION_LIST : List of String
+                                KEY_OPTIONS_SELECTED_OUTPUT : List of String
 
     Example:
 
@@ -209,42 +209,42 @@ def doit(options):
 
     rawStashLines = (
         utilGetRawStashLines()
-            if OPTIONS_SECTION_STASHES in options[KEY_OPTIONS_SECTION_LIST]
+            if OPTIONS_OUTPUT_STASHES in options[KEY_OPTIONS_SELECTED_OUTPUT]
             else []
         )
 
     rawStageLines = (
         utilGetRawStageLines(fileStatuses)
-            if OPTIONS_SECTION_STAGE in options[KEY_OPTIONS_SECTION_LIST]
+            if OPTIONS_OUTPUT_STAGE in options[KEY_OPTIONS_SELECTED_OUTPUT]
             else []
         )
 
     rawWorkDirLines = (
         utilGetRawWorkDirLines(fileStatuses)
-            if OPTIONS_SECTION_WORK_DIR in options[KEY_OPTIONS_SECTION_LIST]
+            if OPTIONS_OUTPUT_WORK_DIR in options[KEY_OPTIONS_SELECTED_OUTPUT]
             else []
         )
 
     rawUnmergedLines = (
         utilGetRawUnmergedLines(fileStatuses)
-            if OPTIONS_SECTION_UNMERGED in options[KEY_OPTIONS_SECTION_LIST]
+            if OPTIONS_OUTPUT_UNMERGED in options[KEY_OPTIONS_SELECTED_OUTPUT]
             else []
         )
 
     rawUntrackedLines = (
         utilGetRawUntrackedLines(fileStatuses)
-            if OPTIONS_SECTION_UNTRACKED in options[KEY_OPTIONS_SECTION_LIST]
+            if OPTIONS_OUTPUT_UNTRACKED in options[KEY_OPTIONS_SELECTED_OUTPUT]
             else []
         )
 
-    if OPTIONS_SECTION_BRANCH_CURRENT in options[KEY_OPTIONS_SECTION_LIST]:
+    if OPTIONS_OUTPUT_BRANCH_CURRENT in options[KEY_OPTIONS_SELECTED_OUTPUT]:
         rawBranchLines = utilGetRawBranchesLines(
             gitsummaryConfig,
             currentBranch,
             localBranchesInDisplayOrder,
             False,
         )
-    elif OPTIONS_SECTION_BRANCH_ALL in options[KEY_OPTIONS_SECTION_LIST]:
+    elif OPTIONS_OUTPUT_BRANCH_ALL in options[KEY_OPTIONS_SELECTED_OUTPUT]:
         rawBranchLines = utilGetRawBranchesLines(
             gitsummaryConfig,
             currentBranch,
@@ -416,18 +416,18 @@ def doit(options):
     # Print all our beautifully formatted output
     #---------------------------------------------------------------------------
     previousSectionHadOutput = False
-    for section in options[KEY_OPTIONS_SECTION_LIST]:
-        if section == OPTIONS_SECTION_BRANCH_ALL or section == OPTIONS_SECTION_BRANCH_CURRENT:
+    for section in options[KEY_OPTIONS_SELECTED_OUTPUT]:
+        if section == OPTIONS_OUTPUT_BRANCH_ALL or section == OPTIONS_OUTPUT_BRANCH_CURRENT:
             sectionLines = styledBranchLines
-        elif section == OPTIONS_SECTION_STAGE:
+        elif section == OPTIONS_OUTPUT_STAGE:
             sectionLines = styledStageLines
-        elif section == OPTIONS_SECTION_STASHES:
+        elif section == OPTIONS_OUTPUT_STASHES:
             sectionLines = styledStashLines
-        elif section == OPTIONS_SECTION_UNMERGED:
+        elif section == OPTIONS_OUTPUT_UNMERGED:
             sectionLines = styledUnmergedLines
-        elif section == OPTIONS_SECTION_UNTRACKED:
+        elif section == OPTIONS_OUTPUT_UNTRACKED:
             sectionLines = styledUntrackedLines
-        elif section == OPTIONS_SECTION_WORK_DIR:
+        elif section == OPTIONS_OUTPUT_WORK_DIR:
             sectionLines = styledWorkDirLines
         else:
             print('Whoa! Something went wrong! Unknown --custom section: ' + section)
@@ -2157,13 +2157,13 @@ def utilValidateKeyPresenceAndType(
 def main():
     # Default sections, in order, to be used if user doesn't specify any
     options = {
-        KEY_OPTIONS_SECTION_LIST: [
-            OPTIONS_SECTION_STASHES,
-            OPTIONS_SECTION_STAGE,
-            OPTIONS_SECTION_WORK_DIR,
-            OPTIONS_SECTION_UNMERGED,
-            OPTIONS_SECTION_UNTRACKED,
-            OPTIONS_SECTION_BRANCH_ALL,
+        KEY_OPTIONS_SELECTED_OUTPUT: [
+            OPTIONS_OUTPUT_STASHES,
+            OPTIONS_OUTPUT_STAGE,
+            OPTIONS_OUTPUT_WORK_DIR,
+            OPTIONS_OUTPUT_UNMERGED,
+            OPTIONS_OUTPUT_UNTRACKED,
+            OPTIONS_OUTPUT_BRANCH_ALL,
         ],
     }
 
@@ -2176,17 +2176,17 @@ def main():
     while i < len(sys.argv):
         if sys.argv[i] == '--custom':
             customDone = False
-            options[KEY_OPTIONS_SECTION_LIST] = []
+            options[KEY_OPTIONS_SELECTED_OUTPUT] = []
             i += 1
             while i < len(sys.argv) and not customDone:
                 arg = sys.argv[i]
                 if arg.startswith('--'):
                     customDone = True
-                elif arg not in OPTIONS_SECTIONS:
+                elif arg not in OPTIONS_OUTPUTS:
                     print('Unknown --custom option: ' + arg)
                     sys.exit(1)
                 else:
-                    options[KEY_OPTIONS_SECTION_LIST].append(sys.argv[i])
+                    options[KEY_OPTIONS_SELECTED_OUTPUT].append(sys.argv[i])
                     i += 1
 
         elif sys.argv[i] == '--help':
