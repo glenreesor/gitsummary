@@ -36,7 +36,7 @@ GITSUMMARY=gitsummary.py   # Include path if not in $PATH
 declare -A show prefix suffix styles
 
 show['numStashes']=boolean      ; prefix['numStashes']=◆        ; suffix['numStashes']=''      ; styles['numStashes']='bright fg-green'
-show['numStage']=num            ; prefix['numStage']=●          ; suffix['numStage']=''        ; styles['numStage']='bright fg-green'
+show['numStage']=num            ; prefix['numStage']=⦁        ; suffix['numStage']=''        ; styles['numStage']='bright fg-green'
 show['numWorkDir']=num          ; prefix['numWorkDir']=⛌        ; suffix['numWorkDir']=''      ; styles['numWorkDir']='bright fg-magenta'
 show['numUnmerged']=num         ; prefix['numUnmerged']=‼       ; suffix['numUnmerged']=''     ; styles['numUnmerged']='blink bright fg-red'
 show['numUntracked']=boolean    ; prefix['numUntracked']='...'  ; suffix['numUntracked']=''    ; styles['numUntracked']='fg-cyan'
