@@ -71,19 +71,21 @@ def setupScenario(scenarioFolder, scenarioSetupFn):
 
 def createScenarioAllSections():
     """
-    In the current folder, create the environment for:
-        - Each section of gitsummary output will have two entries
+    In the current folder, create the following environment. We want unique
+    numbers for ease of testing the shell helper option.
+        - 2 stashes
+        - 3 staged files
+        - 4 modified workdir files
+        - 5 merge conflicts
+        - 6 untracked files
     """
 
-    STAGE_FILE_1 = 'stage-file1'
-    STAGE_FILE_2 = 'stage-file2'
-    WORK_DIR_FILE_1 = 'workdir-file1'
-    WORK_DIR_FILE_2 = 'workdir-file2'
-    FILE_FOR_STASH = 'file-for-stash'
-    UNTRACKED_FILE_1 = 'untracked-file1'
-    UNTRACKED_FILE_2 = 'untracked-file2'
-    UNMERGED_FILE_1 = 'unmerged-file1'
-    UNMERGED_FILE_2 = 'unmerged-file2'
+    CONFLICT_BRANCH = 'f/conflict-branch'
+    STASH_FILE = 'file-for-stash'
+    STAGED_FILES = ['1-Hewey', '2-Louie', '3-Dewey']
+    WORKDIR_FILES = ['1-Egon', '2-Winston', '3-Peter', '4-Ray']
+    UNMERGED_FILES = ['1-Ron', '2-Fred', '3-George', '4-Percy', '5-Ginny']
+    UNTRACKED_FILES = ['1-Luke', '2-Han', '3-Leia', '4-Chewie', '5-3PO', '6-R2']
 
     #---------------------------------------------------------------------------
     # Create repo and an initial file, since otherwise ref 'master' won't exist
@@ -94,36 +96,36 @@ def createScenarioAllSections():
     #---------------------------------------------------------------------------
     # Create the branch and files that will be used to create the merge conflicts
     #---------------------------------------------------------------------------
-    utilExecute(['git', 'checkout', '-b', 'branch1', 'master'])
-    for aFile in [UNMERGED_FILE_1, UNMERGED_FILE_2]:
-        utilCreateAndCommitFile(aFile, 'abcdefg')
+    utilExecute(['git', 'checkout', '-b', CONFLICT_BRANCH, 'master'])
+    for aFile in UNMERGED_FILES:
+        utilCreateAndCommitFile(aFile, 'Commit comment')
 
     #---------------------------------------------------------------------------
-    # Switch to another branch to do everything else
+    # Switch to new 'dev', where we're going to setup all required files and commits
     #---------------------------------------------------------------------------
     utilExecute(['git', 'checkout', '-b', 'dev', 'master'])
 
     #---------------------------------
-    # First do things that require commits
+    # First do things that require commits or stashing
     #---------------------------------
 
-    # Create the two stashes
-    utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
+    # Stashes
+    utilCreateAndCommitFile(STASH_FILE, 'The front fell off', 'Commit msg')
 
-    utilModifyFile(FILE_FOR_STASH, 'contents2')
-    utilExecute(['git', 'stash'])
+    # First stash
+    utilModifyFile(STASH_FILE, 'Oh! I turned it off!')
+    utilExecute(['git', 'stash', 'push', '-m', 'Some pretty amazing work here'])
 
-    # Make a commit so the second stash will be on a different commit
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents3', 'Fix something')
-    utilModifyFile(FILE_FOR_STASH, 'contents4')
-    utilExecute(['git', 'stash'])
+    # Second stash
+    utilModifyFile(STASH_FILE, 'Yes, I am a ninja')
+    utilExecute(['git', 'stash', 'push', '-m', 'Started doing something'])
 
     # Make the changes that will cause merge conflicts
-    for aFile in [UNMERGED_FILE_1, UNMERGED_FILE_2]:
+    for aFile in UNMERGED_FILES:
         utilCreateAndCommitFile(aFile, 'hijkellomellop')
 
     # Create the initial files which will be used for the 'Work Dir' section
-    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+    for aFile in WORKDIR_FILES:
         utilCreateAndCommitFile(aFile)
 
     #---------------------------------
@@ -134,23 +136,23 @@ def createScenarioAllSections():
     # Can't use utilExecute() helper since 'git merge' will return a non-zero
     # exit status
     subprocess.run(
-        ['git', 'merge', 'branch1'],
+        ['git', 'merge', CONFLICT_BRANCH],
         stdout = subprocess.DEVNULL,
         stderr = subprocess.DEVNULL,
         check=False
     )
 
     # Stage changes
-    for aFile in [STAGE_FILE_1, STAGE_FILE_2]:
+    for aFile in STAGED_FILES:
         utilCreateFile(aFile)
         utilExecute(['git', 'add', aFile])
 
     # Work Dir changes
-    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+    for aFile in WORKDIR_FILES:
         utilModifyFile(aFile, 'modified contents')
 
     # Untracked files
-    for aFile in [UNTRACKED_FILE_1, UNTRACKED_FILE_2]:
+    for aFile in UNTRACKED_FILES:
         utilCreateFile(aFile)
 
 def createScenarioDemo():
