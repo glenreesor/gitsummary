@@ -42,6 +42,10 @@ def main():
 
     os.chdir(destFolder)
     setupScenario('all-sections', createScenarioAllSections)
+    setupScenario(
+        'ahead-behind-remote-and-target',
+        createScenarioAheadBehindRemoteAndTarget
+    )
     setupScenario('demo', createScenarioDemo)
     setupScenario('detached-head', createScenarioDetachedHead)
 
@@ -68,6 +72,125 @@ def setupScenario(scenarioFolder, scenarioSetupFn):
     os.chdir(scenarioFolder)
     scenarioSetupFn()
     os.chdir(cwd)
+
+def createScenarioAheadBehindRemoteAndTarget():
+    """
+    In the current folder, create an environment where a branch is:
+        - ahead and behind its remote branch
+        - ahead and behind its target branch
+
+    We want unique numbers for testing the shell helper option.
+
+              rm1 --- rm2 (Remote Master)
+             /
+            /- m1 --- m2 --- m3 --- m4 (Master)
+           /
+    common1                    rd1 --- rd2 (Remote Dev)
+           \                  /
+            common2 -- common3
+                              \
+                               d1 (Dev)
+
+    This will result in:
+         master:
+            - ahead of its remote by 4
+            - behind its remote by 2
+
+         dev:
+            - ahead of its remote by 1
+            - behind its remote by 2
+            - ahead of its target by 3
+            - behind its target by 4
+    """
+    MY_FILE = 'myFile'
+    parent = os.getcwd()
+
+    #-------------------------------------------------------------------------
+    # Create the above scenario using 3 repos:
+    #   - REMOTE
+    #   - LOCAL, which will end up with the above scenario
+    #   - LOCAL-HELPER, which will be used to push to REMOTE, so LOCAL will
+    #     end up being behind REMOTE as appropriate
+    #-------------------------------------------------------------------------
+    REMOTE = 'remote'
+    LOCAL = 'local'
+    LOCAL_HELPER = 'local-helper'
+
+    #-------------------------------------------------------------------------
+    # REMOTE Step 1:
+    #   - Create master: 'common1'
+    #   - Create dev: 'common2', 'common3'
+    #-------------------------------------------------------------------------
+    utilExecute(['git', 'init', '--bare', REMOTE])
+
+    utilExecute(['git', 'clone', REMOTE, LOCAL_HELPER])
+    os.chdir(LOCAL_HELPER)
+
+    utilCreateAndCommitFile(MY_FILE, 'common1', 'common1')
+    utilExecute(['git', 'push'])
+
+    utilExecute(['git', 'checkout', '-b', 'dev'])
+    utilModifyAndCommitFile(MY_FILE, 'common2', 'common2')
+    utilModifyAndCommitFile(MY_FILE, 'common3', 'common3')
+
+    utilExecute(['git', 'push', '--set-upstream', 'origin', 'dev'])
+
+    #-------------------------------------------------------------------------
+    # LOCAL Step 1:
+    #   - Clone from REMOTE so we get 'common1', 'common2', 'common3'
+    #   - This is all we want in common with REMOTE
+    #-------------------------------------------------------------------------
+    os.chdir(parent)
+    utilExecute(['git', 'clone', REMOTE, LOCAL])
+
+    #-------------------------------------------------------------------------
+    # REMOTE Step 2:
+    #   - Create the commits that will not be pulled by LOCAL:
+    #       - master: rm1, rm2
+    #       - dev: rd1, rd2
+    #-------------------------------------------------------------------------
+    os.chdir(parent)
+    os.chdir(LOCAL_HELPER)
+
+    utilExecute(['git', 'checkout', 'master'])
+    utilModifyAndCommitFile(MY_FILE, 'rm1', 'rm1')
+    utilModifyAndCommitFile(MY_FILE, 'rm2', 'rm2')
+    utilExecute(['git', 'push'])
+
+    utilExecute(['git', 'checkout', 'dev'])
+    utilModifyAndCommitFile(MY_FILE, 'rd1', 'rd1')
+    utilModifyAndCommitFile(MY_FILE, 'rd2', 'rd2')
+    utilExecute(['git', 'push'])
+
+    #-------------------------------------------------------------------------
+    # LOCAL Step 2:
+    #   - Create remaining commits:
+    #       - master: m1, m2, m3, m4
+    #       - dev: d1
+    #   - fetch from remote so we're aware of being ahead/behind
+    #
+    #-------------------------------------------------------------------------
+    os.chdir(parent)
+    os.chdir(LOCAL)
+
+    utilExecute(['git', 'checkout', 'master'])
+    utilModifyAndCommitFile(MY_FILE, 'm1', 'm1')
+    utilModifyAndCommitFile(MY_FILE, 'm2', 'm2')
+    utilModifyAndCommitFile(MY_FILE, 'm3', 'm3')
+    utilModifyAndCommitFile(MY_FILE, 'm4', 'm4')
+
+    utilExecute(['git', 'checkout', 'dev'])
+    utilModifyAndCommitFile(MY_FILE, 'd1', 'd1')
+
+    utilExecute(['git', 'fetch'])
+
+    #-------------------------------------------------------------------------
+    # Final step: Create a file showing the expected ahead/behind numbers
+    #-------------------------------------------------------------------------
+    utilCreateFile(
+        'Expected Numbers.txt',
+        'Dev\n    Remote: +1   -2\n    Target: +3   -4\n'
+    )
 
 def createScenarioAllSections():
     """
