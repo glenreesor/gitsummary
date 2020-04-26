@@ -228,33 +228,28 @@ def createScenarioAllSections():
     #---------------------------------------------------------------------------
     utilExecute(['git', 'checkout', '-b', 'dev', 'master'])
 
-    #---------------------------------
-    # First do things that require commits or stashing
-    #---------------------------------
-
-    # Stashes
+    #---------------------------------------------------------------------------
+    # Step 1: Things that require commits or stashing
+    #   - 2 stashes
+    #   - commits to cause merge conflcits
+    #   - initial versions for Work Dir files
+    #---------------------------------------------------------------------------
     utilCreateAndCommitFile(STASH_FILE, 'The front fell off', 'Commit msg')
-
-    # First stash
     utilModifyFile(STASH_FILE, 'Oh! I turned it off!')
     utilExecute(['git', 'stash', 'push', '-m', 'Some pretty amazing work here'])
 
-    # Second stash
     utilModifyFile(STASH_FILE, 'Yes, I am a ninja')
     utilExecute(['git', 'stash', 'push', '-m', 'Started doing something'])
 
-    # Make the changes that will cause merge conflicts
     for aFile in UNMERGED_FILES:
         utilCreateAndCommitFile(aFile, 'hijkellomellop')
 
-    # Create the initial files which will be used for the 'Work Dir' section
     for aFile in WORKDIR_FILES:
         utilCreateAndCommitFile(aFile)
 
-    #---------------------------------
-    # Now do things that don't require commits
-    #---------------------------------
-
+    #---------------------------------------------------------------------------
+    # Step 2: Things that don't require commits
+    #---------------------------------------------------------------------------
     # Create the merge conflict
     # Can't use utilExecute() helper since 'git merge' will return a non-zero
     # exit status
