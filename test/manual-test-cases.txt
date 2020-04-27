@@ -3,6 +3,7 @@
   listed below
 - setup:
     alias gst=/path/to/gitsummary.py
+    alias gssht=/path/to/gitsummaryShellHelper.py
 
 Test    Description                     Scenario        Commandline and Expected Results
 1       Folder not tracked by git          n/a
@@ -80,3 +81,52 @@ Test    Description                     Scenario        Commandline and Expected
                                                             - Doesn't apply to gitbash
                                                               terminal
 
+8       gitsummaryShellHelper           n/a
+            - Valid show values (1)                     Commandline (from test folder):
+                                                            awk -v showNum=num -v showString=yes -f gitsummaryShellHelperTweaker.awk ../gitsummaryShellHelper.sh | bash
+
+                                                        Expected Result:
+                                                            - All values are shown, where:
+                                                                - those 'values' are the corresponding names like 'numStashes'
+                                                                - each value has a prefix of the form '_X_'
+                                                                - each value has a suffix of the form '_x_'
+                                                                - the separator is '|'
+                                                                - each value and the separator has a unique foreground/background color combination
+
+9       gitsummaryShellHelper           n/a
+            - Valid show values (2)                     Commandline (from test folder):
+                                                            awk -v showNum=boolean -v showString=no -f gitsummaryShellHelperTweaker.awk ../gitsummaryShellHelper.sh | bash
+
+                                                        Expected Result:
+                                                            - All values except branchName and targetBranch are shown, where:
+                                                                - those 'values' are just the unique suffixes ('_X_' etc)
+                                                                - the separator is '|'
+                                                                - each value and the separator has a unique foreground/background color combination
+
+10      gitsummaryShellHelper           n/a
+            - Invalid show value for numeric            Commandline (from test folder):
+                                                            awk -v showNum=blah -v showString=no -f gitsummaryShellHelperTweaker.awk ../gitsummaryShellHelper.sh | bash
+
+                                                        Expected Result:
+                                                            - "Invalid value for numStashes...."
+
+11      gitsummaryShellHelper           n/a
+            - Invalid show for value for string         Commandline (from test folder):
+                                                            awk -v showNum=num -v showString=blah -f gitsummaryShellHelperTweaker.awk ../gitsummaryShellHelper.sh | bash
+
+                                                        Expected Result:
+                                                            - "Invalid value for branchName...."
+
+12      gitsummaryShellHelper          all-sections
+        (With non-test data #1)                         Commandline
+                                                           gssht
+
+                                                        Expected Result:
+                                                            ◆ dev ⦁3 ⛌4 ‼5 ... +10 (master)
+
+13      gitsummaryShellHelper          ahead-behind-remote-and-target
+        (With non-test data #2)                         Commandline (from 'local' folder')
+                                                           gssht
+
+                                                        Expected Result:
+                                                            dev ... +1 -2 +3 -4 (master)
