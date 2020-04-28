@@ -761,9 +761,6 @@ def fsGetValidatedUserConfig(fullyQualifiedFilename):
 # Limitations of gitGet* functions:
 #   - They will fail with exceptions if the current working directory is not
 #     tracked by git.
-#   - They assume there is at least one commit, thus will produce unexpected
-#     results or throw exceptions if run immediately after 'git init'.
-#     It's too much of a pain to deal with this edge case.
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
