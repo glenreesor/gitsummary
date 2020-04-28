@@ -20,7 +20,7 @@ Test    Description                     Scenario        Commandline and Expected
                                                             gst
 
                                                         Expected Result:
-                                                            - Current branch indicator beside "Detached Head"
+                                                            - Current branch indicator beside a short commit hash
 
 3       Sections listed and colorized   all-sections
                                                         Commandline:
