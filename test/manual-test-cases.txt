@@ -3,7 +3,7 @@
   listed below
 - setup:
     alias gst=/path/to/gitsummary.py
-    alias gssht=/path/to/gitsummaryShellHelper.py
+    alias gssht=/path/to/gitsummaryShellHelper.sh
 
 Test    Description                     Scenario        Commandline and Expected Results
 1       Folder not tracked by git          n/a
