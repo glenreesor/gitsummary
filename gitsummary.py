@@ -34,13 +34,24 @@ KEY_CONFIG_BRANCH_NAME = 'name'
 KEY_CONFIG_BRANCH_ORDER = 'branchOrder'
 KEY_CONFIG_BRANCH_TARGET = 'target'
 
-OPTIONS_SECTION_BRANCH_ALL = 'branch-all'
-OPTIONS_SECTION_BRANCH_CURRENT = 'branch-current'
-OPTIONS_SECTION_STAGE = 'stage'
-OPTIONS_SECTION_STASHES = 'stashes'
-OPTIONS_SECTION_UNMERGED = 'unmerged'
-OPTIONS_SECTION_UNTRACKED = 'untracked'
-OPTIONS_SECTION_WORK_DIR = 'workdir'
+# Output options common to both fullRepoOutput and shellHelper
+OPTIONS_OUTPUT_STAGE = 'stage'
+OPTIONS_OUTPUT_STASHES = 'stashes'
+OPTIONS_OUTPUT_UNMERGED = 'unmerged'
+OPTIONS_OUTPUT_UNTRACKED = 'untracked'
+OPTIONS_OUTPUT_WORK_DIR = 'workdir'
+
+# Output options applicable to only fullRepoOutput
+OPTIONS_OUTPUT_BRANCH_ALL = 'branch-all'
+OPTIONS_OUTPUT_BRANCH_CURRENT = 'branch-current'
+
+# Output options applicable to only shellHelper
+OPTIONS_OUTPUT_BRANCH_NAME = 'branch-name'
+OPTIONS_OUTPUT_TARGET_BRANCH = 'target-branch'
+OPTIONS_OUTPUT_AHEAD_REMOTE = 'ahead-remote'
+OPTIONS_OUTPUT_AHEAD_TARGET = 'ahead-target'
+OPTIONS_OUTPUT_BEHIND_REMOTE = 'behind-remote'
+OPTIONS_OUTPUT_BEHIND_TARGET = 'behind-target'
 
 #-------------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
@@ -59,7 +70,7 @@ KEY_FILE_STATUSES_FILENAME = 'filename'
 KEY_FILE_STATUSES_NEW_FILENAME = 'newFilename'
 KEY_FILE_STATUSES_HEURISTIC_SCORE = 'heuristicScore'
 
-KEY_OPTIONS_SECTION_LIST = 'optionsCustomList'
+KEY_OPTIONS_SELECTED_OUTPUT = 'optionsSelectedOutput'
 
 KEY_RETURN_STATUS = 'returnStatus'
 KEY_RETURN_MESSAGES = 'returnMessages'
@@ -73,16 +84,6 @@ KEY_STASH_DESCRIPTION = 'description'
 # Other constants so we can catch typos by linting
 #-------------------------------------------------------------------------------
 CURRENT_BRANCH_INDICATOR = '>'
-
-OPTIONS_SECTIONS = [
-    OPTIONS_SECTION_BRANCH_ALL,
-    OPTIONS_SECTION_BRANCH_CURRENT,
-    OPTIONS_SECTION_STAGE,
-    OPTIONS_SECTION_STASHES,
-    OPTIONS_SECTION_UNMERGED,
-    OPTIONS_SECTION_UNTRACKED,
-    OPTIONS_SECTION_WORK_DIR,
-]
 
 TEXT_BRIGHT = 'bright'
 TEXT_NORMAL = 'normal'
@@ -133,13 +134,13 @@ CONFIG_DEFAULT = {
 CONFIG_FILENAME = '.gitsummaryconfig'
 
 #-------------------------------------------------------------------------------
-def doit(options):
+def fullRepoOutput(options):
     """
-    Orchestrate all output
+    Orchestrate all output (full repository)
 
     Args
         Dictionary options - A dictionary with the following key:
-                                KEY_OPTIONS_SECTION_LIST : List of String
+                                KEY_OPTIONS_SELECTED_OUTPUT : List of String
 
     Example:
 
@@ -209,47 +210,47 @@ def doit(options):
 
     rawStashLines = (
         utilGetRawStashLines()
-            if OPTIONS_SECTION_STASHES in options[KEY_OPTIONS_SECTION_LIST]
+            if OPTIONS_OUTPUT_STASHES in options[KEY_OPTIONS_SELECTED_OUTPUT]
             else []
         )
 
     rawStageLines = (
         utilGetRawStageLines(fileStatuses)
-            if OPTIONS_SECTION_STAGE in options[KEY_OPTIONS_SECTION_LIST]
+            if OPTIONS_OUTPUT_STAGE in options[KEY_OPTIONS_SELECTED_OUTPUT]
             else []
         )
 
     rawWorkDirLines = (
         utilGetRawWorkDirLines(fileStatuses)
-            if OPTIONS_SECTION_WORK_DIR in options[KEY_OPTIONS_SECTION_LIST]
+            if OPTIONS_OUTPUT_WORK_DIR in options[KEY_OPTIONS_SELECTED_OUTPUT]
             else []
         )
 
     rawUnmergedLines = (
         utilGetRawUnmergedLines(fileStatuses)
-            if OPTIONS_SECTION_UNMERGED in options[KEY_OPTIONS_SECTION_LIST]
+            if OPTIONS_OUTPUT_UNMERGED in options[KEY_OPTIONS_SELECTED_OUTPUT]
             else []
         )
 
     rawUntrackedLines = (
         utilGetRawUntrackedLines(fileStatuses)
-            if OPTIONS_SECTION_UNTRACKED in options[KEY_OPTIONS_SECTION_LIST]
+            if OPTIONS_OUTPUT_UNTRACKED in options[KEY_OPTIONS_SELECTED_OUTPUT]
             else []
         )
 
-    if OPTIONS_SECTION_BRANCH_CURRENT in options[KEY_OPTIONS_SECTION_LIST]:
+    if OPTIONS_OUTPUT_BRANCH_CURRENT in options[KEY_OPTIONS_SELECTED_OUTPUT]:
         rawBranchLines = utilGetRawBranchesLines(
             gitsummaryConfig,
             currentBranch,
             localBranchesInDisplayOrder,
             False,
         )
-    elif OPTIONS_SECTION_BRANCH_ALL in options[KEY_OPTIONS_SECTION_LIST]:
+    elif OPTIONS_OUTPUT_BRANCH_ALL in options[KEY_OPTIONS_SELECTED_OUTPUT]:
         rawBranchLines = utilGetRawBranchesLines(
             gitsummaryConfig,
             currentBranch,
             localBranchesInDisplayOrder,
-            True
+            True,
         )
     else:
         rawBranchLines = []
@@ -416,18 +417,18 @@ def doit(options):
     # Print all our beautifully formatted output
     #---------------------------------------------------------------------------
     previousSectionHadOutput = False
-    for section in options[KEY_OPTIONS_SECTION_LIST]:
-        if section == OPTIONS_SECTION_BRANCH_ALL or section == OPTIONS_SECTION_BRANCH_CURRENT:
+    for section in options[KEY_OPTIONS_SELECTED_OUTPUT]:
+        if section == OPTIONS_OUTPUT_BRANCH_ALL or section == OPTIONS_OUTPUT_BRANCH_CURRENT:
             sectionLines = styledBranchLines
-        elif section == OPTIONS_SECTION_STAGE:
+        elif section == OPTIONS_OUTPUT_STAGE:
             sectionLines = styledStageLines
-        elif section == OPTIONS_SECTION_STASHES:
+        elif section == OPTIONS_OUTPUT_STASHES:
             sectionLines = styledStashLines
-        elif section == OPTIONS_SECTION_UNMERGED:
+        elif section == OPTIONS_OUTPUT_UNMERGED:
             sectionLines = styledUnmergedLines
-        elif section == OPTIONS_SECTION_UNTRACKED:
+        elif section == OPTIONS_OUTPUT_UNTRACKED:
             sectionLines = styledUntrackedLines
-        elif section == OPTIONS_SECTION_WORK_DIR:
+        elif section == OPTIONS_OUTPUT_WORK_DIR:
             sectionLines = styledWorkDirLines
         else:
             print('Whoa! Something went wrong! Unknown --custom section: ' + section)
@@ -450,6 +451,169 @@ def doit(options):
             print(unknownOutput)
 
         print('\nPlease notify the gitsummary author.')
+
+#-------------------------------------------------------------------------------
+def shellPromptHelper(options):
+    """
+    Orchestrate output for the shell prompt helper functionality
+
+    Output is a single line of space-separated values as specified in options:
+        - The following values are the number of corresponding entities:
+            - STASHES, STAGE, WORK_DIR, UNMERGED, UNTRACKED
+
+        - The following values are either numbers or "_" if current branch
+          does not have a remote tracking branch:
+            - AHEAD_REMOTE, BEHIND_REMOTE
+
+        - The following values are either numbers or "_" if current branch
+          does not have a target branch
+            - AHEAD_TARGET, BEHIND_TARGET
+
+        - The following values are strings or '_' if not applicable:
+            - BRANCH_NAME, TARGET_NAME
+
+    Args
+        Dictionary options - A dictionary with the following key:
+                                KEY_OPTIONS_SELECTED_OUTPUT : List of String
+    """
+
+    #---------------------------------------------------------------------------
+    # Set configuration options
+    #---------------------------------------------------------------------------
+    configToUse = fsGetConfigToUse()
+    if configToUse[KEY_RETURN_STATUS]:
+        gitsummaryConfig = configToUse[KEY_RETURN_VALUE]
+    else:
+        for line in configToUse[KEY_RETURN_MESSAGES]:
+            print(line)
+        sys.exit()
+
+    #---------------------------------------------------------------------------
+    # Get all required output
+    #---------------------------------------------------------------------------
+    optionsAsSet = set(options[KEY_OPTIONS_SELECTED_OUTPUT])
+
+    currentBranch = gitGetCurrentBranch()
+    localBranches = gitGetLocalBranches()
+
+    if OPTIONS_OUTPUT_STASHES in options[KEY_OPTIONS_SELECTED_OUTPUT]:
+        numStashes = len(gitGetStashes())
+
+    # Getting file statuses is expensive, so only do it if output requiring
+    # file statuses has been requested
+    fileStatusesRequired = (
+        len(optionsAsSet.intersection(
+            [
+                OPTIONS_OUTPUT_STAGE,
+                OPTIONS_OUTPUT_WORK_DIR,
+                OPTIONS_OUTPUT_UNMERGED,
+                OPTIONS_OUTPUT_UNTRACKED,
+            ]
+        )) > 0
+    )
+
+    if fileStatusesRequired:
+        fileStatuses = gitGetFileStatuses()
+
+        numStage = len(fileStatuses[KEY_FILE_STATUSES_STAGE])
+        numWorkDir = len(fileStatuses[KEY_FILE_STATUSES_WORK_DIR])
+        numUnmerged = len(fileStatuses[KEY_FILE_STATUSES_UNMERGED])
+        numUntracked = len(fileStatuses[KEY_FILE_STATUSES_UNTRACKED])
+
+    # Remote tracking branch stats
+    remoteRequired = (
+        len(optionsAsSet.intersection(
+            [
+                 OPTIONS_OUTPUT_AHEAD_REMOTE,
+                 OPTIONS_OUTPUT_BEHIND_REMOTE,
+            ]
+        )) > 0
+    )
+
+    if remoteRequired:
+        remoteBranch = gitGetRemoteTrackingBranch(currentBranch)
+
+        numAheadRemote = (
+            '_' if remoteBranch == ''
+            else len(gitGetCommitsInFirstNotSecond(currentBranch, remoteBranch, True))
+        )
+
+        numBehindRemote = (
+            '_' if remoteBranch == ''
+            else len(gitGetCommitsInFirstNotSecond(remoteBranch, currentBranch, True))
+        )
+
+    # Target tracking branch stats
+    targetRequired = (
+        len(optionsAsSet.intersection(
+            [
+                 OPTIONS_OUTPUT_AHEAD_TARGET,
+                 OPTIONS_OUTPUT_BEHIND_TARGET,
+            ]
+        )) > 0
+    )
+
+    if targetRequired:
+        targetBranch = utilGetTargetBranch(
+            gitsummaryConfig,
+            currentBranch,
+            localBranches
+        )
+
+        numAheadTarget = (
+            '_' if targetBranch == ''
+            else len(gitGetCommitsInFirstNotSecond(currentBranch, targetBranch, True))
+        )
+
+        numBehindTarget = (
+            '_' if targetBranch == ''
+            else len(gitGetCommitsInFirstNotSecond(targetBranch, currentBranch, True))
+        )
+
+    #---------------------------------------------------------------------------
+    # Assemble output in the requested order
+    #---------------------------------------------------------------------------
+    outputString = ''
+    for output in options[KEY_OPTIONS_SELECTED_OUTPUT]:
+
+        if output == OPTIONS_OUTPUT_STASHES:
+            outputString = outputString + ' ' + str(numStashes)
+
+        if output == OPTIONS_OUTPUT_STAGE:
+            outputString = outputString + ' ' + str(numStage)
+
+        if output == OPTIONS_OUTPUT_WORK_DIR:
+            outputString = outputString + ' ' + str(numWorkDir)
+
+        if output == OPTIONS_OUTPUT_UNMERGED:
+            outputString = outputString + ' ' + str(numUnmerged)
+
+        if output == OPTIONS_OUTPUT_UNTRACKED:
+            outputString = outputString + ' ' + str(numUntracked)
+
+        if output == OPTIONS_OUTPUT_AHEAD_REMOTE:
+            outputString = outputString + ' ' + str(numAheadRemote)
+
+        if output == OPTIONS_OUTPUT_BEHIND_REMOTE:
+            outputString = outputString + ' ' + str(numBehindRemote)
+
+        if output == OPTIONS_OUTPUT_AHEAD_TARGET:
+            outputString = outputString + ' ' + str(numAheadTarget)
+
+        if output == OPTIONS_OUTPUT_BEHIND_TARGET:
+            outputString = outputString + ' ' + str(numBehindTarget)
+
+        if output == OPTIONS_OUTPUT_BRANCH_NAME:
+            outputString = outputString + ' ' + (
+                currentBranch if currentBranch != '' else '_'
+            )
+
+        if output == OPTIONS_OUTPUT_TARGET_BRANCH:
+            outputString = outputString + ' ' + (
+                targetBranch if targetBranch != '' else '_'
+            )
+
+    print(outputString)
 
 #-------------------------------------------------------------------------------
 # Filesystem Interface Layer
@@ -2093,50 +2257,78 @@ def utilValidateKeyPresenceAndType(
 
 #-------------------------------------------------------------------------------
 def main():
-    # Default sections, in order, to be used if user doesn't specify any
-    options = {
-        KEY_OPTIONS_SECTION_LIST: [
-            OPTIONS_SECTION_STASHES,
-            OPTIONS_SECTION_STAGE,
-            OPTIONS_SECTION_WORK_DIR,
-            OPTIONS_SECTION_UNMERGED,
-            OPTIONS_SECTION_UNTRACKED,
-            OPTIONS_SECTION_BRANCH_ALL,
-        ],
-    }
+    # Default output, in order, to be used if user doesn't specify any
+    if len(sys.argv) > 1 and sys.argv[1] == 'shell-prompt-helper':
+        requestedCmd = shellPromptHelper
+        firstOptionIndex = 2
+        defaultOptions = {
+            KEY_OPTIONS_SELECTED_OUTPUT: [
+                OPTIONS_OUTPUT_STASHES,
+                OPTIONS_OUTPUT_STAGE,
+                OPTIONS_OUTPUT_WORK_DIR,
+                OPTIONS_OUTPUT_UNMERGED,
+                OPTIONS_OUTPUT_UNTRACKED,
+                OPTIONS_OUTPUT_AHEAD_REMOTE,
+                OPTIONS_OUTPUT_BEHIND_REMOTE,
+                OPTIONS_OUTPUT_AHEAD_TARGET,
+                OPTIONS_OUTPUT_BEHIND_TARGET,
+                OPTIONS_OUTPUT_BRANCH_NAME,
+                OPTIONS_OUTPUT_TARGET_BRANCH,
+            ],
+        }
+    else:
+        requestedCmd = fullRepoOutput
+        firstOptionIndex = 1
+        defaultOptions = {
+            KEY_OPTIONS_SELECTED_OUTPUT: [
+                OPTIONS_OUTPUT_STASHES,
+                OPTIONS_OUTPUT_STAGE,
+                OPTIONS_OUTPUT_WORK_DIR,
+                OPTIONS_OUTPUT_UNMERGED,
+                OPTIONS_OUTPUT_UNTRACKED,
+                OPTIONS_OUTPUT_BRANCH_ALL,
+            ],
+        }
+
+    options = defaultOptions.copy()
 
     # Parse the command line options
-    i = 1
+    i = firstOptionIndex
     while i < len(sys.argv):
         if sys.argv[i] == '--custom':
             customDone = False
-            options[KEY_OPTIONS_SECTION_LIST] = []
+            options[KEY_OPTIONS_SELECTED_OUTPUT] = []
+
             i += 1
             while i < len(sys.argv) and not customDone:
                 arg = sys.argv[i]
                 if arg.startswith('--'):
                     customDone = True
-                elif arg not in OPTIONS_SECTIONS:
+                elif arg not in defaultOptions[KEY_OPTIONS_SELECTED_OUTPUT]:
                     print('Unknown --custom option: ' + arg)
                     sys.exit(1)
                 else:
-                    options[KEY_OPTIONS_SECTION_LIST].append(sys.argv[i])
+                    options[KEY_OPTIONS_SELECTED_OUTPUT].append(sys.argv[i])
                     i += 1
+
         elif sys.argv[i] == '--help':
             utilPrintHelp(sys.argv[0])
             sys.exit(0)
+
         elif sys.argv[i] == '--helpconfig':
             utilPrintHelpConfig()
             sys.exit(0)
+
         elif sys.argv[i] == '--version':
             print(VERSION)
             sys.exit(0)
+
         else:
             print('Unknown command line argument: ' + sys.argv[i])
             print('See "' + sys.argv[0] + ' --help"')
             sys.exit(1)
 
-    doit(options)
+    requestedCmd(options)
 
 #-------------------------------------------------------------------------------
 if __name__ == '__main__':

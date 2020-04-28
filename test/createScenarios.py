@@ -16,7 +16,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import sys
+sys.path.append('..')
 import gitsummary  # So we have access to the default .gitsummaryconfig
+
 import json
 import os
 import subprocess
@@ -42,6 +45,10 @@ def main():
 
     os.chdir(destFolder)
     setupScenario('all-sections', createScenarioAllSections)
+    setupScenario(
+        'ahead-behind-remote-and-target',
+        createScenarioAheadBehindRemoteAndTarget
+    )
     setupScenario('demo', createScenarioDemo)
     setupScenario('detached-head', createScenarioDetachedHead)
 
@@ -69,21 +76,142 @@ def setupScenario(scenarioFolder, scenarioSetupFn):
     scenarioSetupFn()
     os.chdir(cwd)
 
+def createScenarioAheadBehindRemoteAndTarget():
+    """
+    In the current folder, create an environment where a branch is:
+        - ahead and behind its remote branch
+        - ahead and behind its target branch
+
+    We want unique numbers for testing the shell helper option.
+
+              rm1 --- rm2 (Remote Master)
+             /
+            /- m1 --- m2 --- m3 --- m4 (Master)
+           /
+    common1                    rd1 --- rd2 (Remote Dev)
+           \                  /
+            common2 -- common3
+                              \
+                               d1 (Dev)
+
+    This will result in:
+         master:
+            - ahead of its remote by 4
+            - behind its remote by 2
+
+         dev:
+            - ahead of its remote by 1
+            - behind its remote by 2
+            - ahead of its target by 3
+            - behind its target by 4
+    """
+    MY_FILE = 'myFile'
+    parent = os.getcwd()
+
+    #-------------------------------------------------------------------------
+    # Create the above scenario using 3 repos:
+    #   - REMOTE
+    #   - LOCAL, which will end up with the above scenario
+    #   - LOCAL-HELPER, which will be used to push to REMOTE, so LOCAL will
+    #     end up being behind REMOTE as appropriate
+    #-------------------------------------------------------------------------
+    REMOTE = 'remote'
+    LOCAL = 'local'
+    LOCAL_HELPER = 'local-helper'
+
+    #-------------------------------------------------------------------------
+    # REMOTE Step 1:
+    #   - Create master: 'common1'
+    #   - Create dev: 'common2', 'common3'
+    #-------------------------------------------------------------------------
+    utilExecute(['git', 'init', '--bare', REMOTE])
+
+    utilExecute(['git', 'clone', REMOTE, LOCAL_HELPER])
+    os.chdir(LOCAL_HELPER)
+
+    utilCreateAndCommitFile(MY_FILE, 'common1', 'common1')
+    utilExecute(['git', 'push'])
+
+    utilExecute(['git', 'checkout', '-b', 'dev'])
+    utilModifyAndCommitFile(MY_FILE, 'common2', 'common2')
+    utilModifyAndCommitFile(MY_FILE, 'common3', 'common3')
+
+    utilExecute(['git', 'push', '--set-upstream', 'origin', 'dev'])
+
+    #-------------------------------------------------------------------------
+    # LOCAL Step 1:
+    #   - Clone from REMOTE so we get 'common1', 'common2', 'common3'
+    #   - This is all we want in common with REMOTE
+    #-------------------------------------------------------------------------
+    os.chdir(parent)
+    utilExecute(['git', 'clone', REMOTE, LOCAL])
+
+    #-------------------------------------------------------------------------
+    # REMOTE Step 2:
+    #   - Create the commits that will not be pulled by LOCAL:
+    #       - master: rm1, rm2
+    #       - dev: rd1, rd2
+    #-------------------------------------------------------------------------
+    os.chdir(parent)
+    os.chdir(LOCAL_HELPER)
+
+    utilExecute(['git', 'checkout', 'master'])
+    utilModifyAndCommitFile(MY_FILE, 'rm1', 'rm1')
+    utilModifyAndCommitFile(MY_FILE, 'rm2', 'rm2')
+    utilExecute(['git', 'push'])
+
+    utilExecute(['git', 'checkout', 'dev'])
+    utilModifyAndCommitFile(MY_FILE, 'rd1', 'rd1')
+    utilModifyAndCommitFile(MY_FILE, 'rd2', 'rd2')
+    utilExecute(['git', 'push'])
+
+    #-------------------------------------------------------------------------
+    # LOCAL Step 2:
+    #   - Create remaining commits:
+    #       - master: m1, m2, m3, m4
+    #       - dev: d1
+    #   - fetch from remote so we're aware of being ahead/behind
+    #
+    #-------------------------------------------------------------------------
+    os.chdir(parent)
+    os.chdir(LOCAL)
+
+    utilExecute(['git', 'checkout', 'master'])
+    utilModifyAndCommitFile(MY_FILE, 'm1', 'm1')
+    utilModifyAndCommitFile(MY_FILE, 'm2', 'm2')
+    utilModifyAndCommitFile(MY_FILE, 'm3', 'm3')
+    utilModifyAndCommitFile(MY_FILE, 'm4', 'm4')
+
+    utilExecute(['git', 'checkout', 'dev'])
+    utilModifyAndCommitFile(MY_FILE, 'd1', 'd1')
+
+    utilExecute(['git', 'fetch'])
+
+    #-------------------------------------------------------------------------
+    # Final step: Create a file showing the expected ahead/behind numbers
+    #-------------------------------------------------------------------------
+    utilCreateFile(
+        'Expected Numbers.txt',
+        'Dev\n    Remote: +1   -2\n    Target: +3   -4\n'
+    )
+
 def createScenarioAllSections():
     """
-    In the current folder, create the environment for:
-        - Each section of gitsummary output will have two entries
+    In the current folder, create the following environment. We want unique
+    numbers for ease of testing the shell helper option.
+        - 2 stashes
+        - 3 staged files
+        - 4 modified workdir files
+        - 5 merge conflicts
+        - 6 untracked files
     """
 
-    STAGE_FILE_1 = 'stage-file1'
-    STAGE_FILE_2 = 'stage-file2'
-    WORK_DIR_FILE_1 = 'workdir-file1'
-    WORK_DIR_FILE_2 = 'workdir-file2'
-    FILE_FOR_STASH = 'file-for-stash'
-    UNTRACKED_FILE_1 = 'untracked-file1'
-    UNTRACKED_FILE_2 = 'untracked-file2'
-    UNMERGED_FILE_1 = 'unmerged-file1'
-    UNMERGED_FILE_2 = 'unmerged-file2'
+    CONFLICT_BRANCH = 'f/conflict-branch'
+    STASH_FILE = 'file-for-stash'
+    STAGED_FILES = ['1-Hewey', '2-Louie', '3-Dewey']
+    WORKDIR_FILES = ['1-Egon', '2-Winston', '3-Peter', '4-Ray']
+    UNMERGED_FILES = ['1-Ron', '2-Fred', '3-George', '4-Percy', '5-Ginny']
+    UNTRACKED_FILES = ['1-Luke', '2-Han', '3-Leia', '4-Chewie', '5-3PO', '6-R2']
 
     #---------------------------------------------------------------------------
     # Create repo and an initial file, since otherwise ref 'master' won't exist
@@ -94,63 +222,58 @@ def createScenarioAllSections():
     #---------------------------------------------------------------------------
     # Create the branch and files that will be used to create the merge conflicts
     #---------------------------------------------------------------------------
-    utilExecute(['git', 'checkout', '-b', 'branch1', 'master'])
-    for aFile in [UNMERGED_FILE_1, UNMERGED_FILE_2]:
-        utilCreateAndCommitFile(aFile, 'abcdefg')
+    utilExecute(['git', 'checkout', '-b', CONFLICT_BRANCH, 'master'])
+    for aFile in UNMERGED_FILES:
+        utilCreateAndCommitFile(aFile, 'Commit comment')
 
     #---------------------------------------------------------------------------
-    # Switch to another branch to do everything else
+    # Switch to new 'dev', where we're going to setup all required files and commits
     #---------------------------------------------------------------------------
     utilExecute(['git', 'checkout', '-b', 'dev', 'master'])
 
-    #---------------------------------
-    # First do things that require commits
-    #---------------------------------
+    #---------------------------------------------------------------------------
+    # Step 1: Things that require commits or stashing
+    #   - 2 stashes
+    #   - commits to cause merge conflcits
+    #   - initial versions for Work Dir files
+    #---------------------------------------------------------------------------
+    utilCreateAndCommitFile(STASH_FILE, 'The front fell off', 'Commit msg')
+    utilModifyFile(STASH_FILE, 'Oh! I turned it off!')
+    utilExecute(['git', 'stash', 'push', '-m', 'Some pretty amazing work here'])
 
-    # Create the two stashes
-    utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
+    utilModifyFile(STASH_FILE, 'Yes, I am a ninja')
+    utilExecute(['git', 'stash', 'push', '-m', 'Started doing something'])
 
-    utilModifyFile(FILE_FOR_STASH, 'contents2')
-    utilExecute(['git', 'stash'])
-
-    # Make a commit so the second stash will be on a different commit
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents3', 'Fix something')
-    utilModifyFile(FILE_FOR_STASH, 'contents4')
-    utilExecute(['git', 'stash'])
-
-    # Make the changes that will cause merge conflicts
-    for aFile in [UNMERGED_FILE_1, UNMERGED_FILE_2]:
+    for aFile in UNMERGED_FILES:
         utilCreateAndCommitFile(aFile, 'hijkellomellop')
 
-    # Create the initial files which will be used for the 'Work Dir' section
-    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+    for aFile in WORKDIR_FILES:
         utilCreateAndCommitFile(aFile)
 
-    #---------------------------------
-    # Now do things that don't require commits
-    #---------------------------------
-
+    #---------------------------------------------------------------------------
+    # Step 2: Things that don't require commits
+    #---------------------------------------------------------------------------
     # Create the merge conflict
     # Can't use utilExecute() helper since 'git merge' will return a non-zero
     # exit status
     subprocess.run(
-        ['git', 'merge', 'branch1'],
+        ['git', 'merge', CONFLICT_BRANCH],
         stdout = subprocess.DEVNULL,
         stderr = subprocess.DEVNULL,
         check=False
     )
 
     # Stage changes
-    for aFile in [STAGE_FILE_1, STAGE_FILE_2]:
+    for aFile in STAGED_FILES:
         utilCreateFile(aFile)
         utilExecute(['git', 'add', aFile])
 
     # Work Dir changes
-    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
+    for aFile in WORKDIR_FILES:
         utilModifyFile(aFile, 'modified contents')
 
     # Untracked files
-    for aFile in [UNTRACKED_FILE_1, UNTRACKED_FILE_2]:
+    for aFile in UNTRACKED_FILES:
         utilCreateFile(aFile)
 
 def createScenarioDemo():
