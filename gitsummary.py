@@ -56,9 +56,6 @@ OPTIONS_OUTPUT_BEHIND_TARGET = 'behind-target'
 #-------------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
 #-------------------------------------------------------------------------------
-KEY_COMMIT_SHORT_HASH = 'shortHash'
-KEY_COMMIT_DESCRIPTION = 'description'
-
 KEY_FILE_STATUSES_STAGE = 'stage'
 KEY_FILE_STATUSES_UNKNOWN = 'unknown'
 KEY_FILE_STATUSES_UNMERGED = 'unmerged'
@@ -761,39 +758,28 @@ def fsGetValidatedUserConfig(fullyQualifiedFilename):
 # Limitations of gitGet* functions:
 #   - They will fail with exceptions if the current working directory is not
 #     tracked by git.
-#   - They assume there is at least one commit, thus will produce unexpected
-#     results or throw exceptions if run immediately after 'git init'.
-#     It's too much of a pain to deal with this edge case.
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
-def gitGetCommitDetails(fullHash):
+def gitGetCommitDescription(fullHash):
     """
-    Get the details of the commit corresponding to the specified fullHash.
+    Get a description for the specified commit using 'git describe --always'.
+    Thus output will be one of:
+        - tagname if the commit corresponds to a tag
+        - fancy description involving tagname and current hash if the commit
+          doesn't correspond to a tag, but there's at least one tag
+        - short hash if there are no tags in the repo
 
     Args
-        String fullHash - the full hash of the commit in question
+        String fullHash - the full hash of the commit in question.
+                          'HEAD' (and probably other commitish things) will
+                          also work.
 
     Return
-        Dictionary - With the following keys:
-            KEY_COMMIT_SHORT_HASH : String
-            KEY_COMMIT_DESCRIPTION: String
+        String - The output from 'git describe --always'
     """
 
-    # Strictly speaking, 'git show' isn't a plumbing command.
-    # But we're using it in a porcelain'ish way -- getting something formatted
-    # nicely. So we should be good.
-    output = gitUtilGetOutput(
-        ['git', 'show', fullHash, '--pretty=%h %s', '--no-patch']
-    )[0]
-    # Expected output:
-    # [short hash] [one line description]
-
-    split = output.split(' ', 1)
-    description = {
-        KEY_COMMIT_SHORT_HASH : split[0],
-        KEY_COMMIT_DESCRIPTION: split[1],
-    }
+    description = gitUtilGetOutput(['git', 'describe', '--always'])[0]
 
     return description
 
@@ -1234,7 +1220,7 @@ def gitUtilGetOutput(command):
     """
     Get the output from running the specified git command.
 
-    If there's an error, print the command and its output, then call sys.exit().
+    If there's an error, print the command and its output, then call sys.exit(1).
 
     Args
         List command - The git command to run, including the 'git' part
@@ -1602,13 +1588,15 @@ def utilGetRawBranchesLines(
             )
         )
 
-    # If we're in detached head state, add a branch line that indicates we're
+    # If we're in detached head state, add a branch line using the output of
+    # 'git describe --always' as the branch name.
     # in detached head state
     if currentBranch == '':
+        description = gitGetCommitDescription('HEAD')
         rawBranchLines.append(
             utilGetBranchAsFiveColumns(
-                'Detached Head',
-                'Detached Head',
+                description,
+                description,
                 ''
             )
         )

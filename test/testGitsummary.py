@@ -356,18 +356,18 @@ class Test_fsGetValidatedUserConfig(unittest.TestCase):
         self.assertTrue(len(returnVal[gs.KEY_RETURN_MESSAGES]) >0)
 
 #-----------------------------------------------------------------------------
-class Test_gitGetCommitDetails(unittest.TestCase):
+class Test_gitGetCommitDescription(unittest.TestCase):
     def setUp(self)   : commonTestSetUp(self)
     def tearDown(self): commonTestTearDown(self)
 
     #-------------------------------------------------------------------------
     # Tests
+    #   - If there are no tags, the DESCRIPTION will just be the short hash
+    #   - If there are tags, the DESCRIPTION will be the tag name
     #-------------------------------------------------------------------------
-    def test(self):
-        COMMIT_MSG = 'This is the message'
-
+    def testNoTagsUsingHash(self):
         createNonEmptyGitRepository()
-        createAndCommitFile('newFile', '', COMMIT_MSG)
+        createAndCommitFile('newFile', '', 'a')
 
         # rev-list output will be:
         # commit [fullHash]
@@ -379,11 +379,53 @@ class Test_gitGetCommitDetails(unittest.TestCase):
         fullHash = output[0].split(' ')[1]
         shortHash = output[1]
 
-        expectedResult = {
-            gs.KEY_COMMIT_SHORT_HASH: shortHash,
-            gs.KEY_COMMIT_DESCRIPTION: COMMIT_MSG,
-        }
-        self.assertEqual(expectedResult, gs.gitGetCommitDetails(fullHash))
+        expectedResult = shortHash
+        self.assertEqual(expectedResult, gs.gitGetCommitDescription(fullHash))
+
+    def testNoTagsUsingHEAD(self):
+        createNonEmptyGitRepository()
+        createAndCommitFile('newFile', '', 'a')
+
+        # rev-list output will be:
+        # commit [fullHash]
+        # [shortHash]
+        output = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', '--pretty=%h','master'],
+            universal_newlines = True
+        ).splitlines()
+        shortHash = output[1]
+
+        expectedResult = shortHash
+        self.assertEqual(expectedResult, gs.gitGetCommitDescription('HEAD'))
+
+    def testWithTagUsingHash(self):
+        TAG_NAME = '1.0'
+
+        createNonEmptyGitRepository()
+        createAndCommitFile('newFile', '', 'a')
+        execute(['git', 'tag', '-a', TAG_NAME, '-m', 'Tag commit msg'])
+
+        # rev-list output will be:
+        # commit [fullHash]
+        # [shortHash]
+        output = subprocess.check_output(
+            ['git', 'rev-list', '--max-count=1', '--pretty=%h','master'],
+            universal_newlines = True
+        ).splitlines()
+        fullHash = output[0].split(' ')[1]
+
+        expectedResult = TAG_NAME
+        self.assertEqual(expectedResult, gs.gitGetCommitDescription(fullHash))
+
+    def testWithTagUsingHEAD(self):
+        TAG_NAME = '1.0'
+
+        createNonEmptyGitRepository()
+        createAndCommitFile('newFile', '', 'a')
+        execute(['git', 'tag', '-a', TAG_NAME, '-m', 'Tag commit msg'])
+
+        expectedResult = TAG_NAME
+        self.assertEqual(expectedResult, gs.gitGetCommitDescription('HEAD'))
 
 #-----------------------------------------------------------------------------
 class Test_gitGetCommitsInFirstNotSecond(unittest.TestCase):
