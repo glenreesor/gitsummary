@@ -490,7 +490,11 @@ def shellPromptHelper(options):
     #---------------------------------------------------------------------------
     optionsAsSet = set(options[KEY_OPTIONS_SELECTED_OUTPUT])
 
+    # Get a description of HEAD if we're in detached head state
     currentBranch = gitGetCurrentBranch()
+    if currentBranch == '':
+        currentBranch = gitGetCommitDescription('HEAD')
+
     localBranches = gitGetLocalBranches()
 
     if OPTIONS_OUTPUT_STASHES in options[KEY_OPTIONS_SELECTED_OUTPUT]:
