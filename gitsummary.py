@@ -399,13 +399,12 @@ def fullRepoOutput(options):
         differsFromRemote = re.search('[0-9]', line[2])
 
         formats = [TEXT_BRIGHT] if isCurrentBranch else []
-        if differsFromRemote:
-            formats += [TEXT_CYAN]
+        remoteFormats = formats + ([TEXT_CYAN] if differsFromRemote else [])
 
         styledBranchLines.append(
             getStyledText(formats, line[0]) + ' ' +
             getStyledText(formats, line[1]) + ' ' +
-            getStyledText(formats, line[2]) + ' ' +
+            getStyledText(remoteFormats, line[2]) + ' ' +
             getStyledText(formats, line[3]) + ' ' +
             getStyledText(formats, line[4])
         )
