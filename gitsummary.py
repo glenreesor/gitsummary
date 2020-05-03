@@ -783,7 +783,7 @@ def gitGetCommitDescription(fullHash):
         String - The output from 'git describe --always'
     """
 
-    description = gitUtilGetOutput(['git', 'describe', '--always'])[0]
+    description = gitUtilGetOutput(['describe', '--always'])[0]
 
     return description
 
@@ -820,11 +820,11 @@ def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
     # (our ultimate goal) returns a non-zero exit code if either branch1 or
     # branch2 don't have any refs
     localBranchRefs = gitUtilGetOutput(
-        ['git', 'for-each-ref', HEAD_REF_PREFIX, '--format=%(refname)']
+        ['for-each-ref', HEAD_REF_PREFIX, '--format=%(refname)']
     )
 
     remoteBranchRefs = gitUtilGetOutput(
-        ['git', 'for-each-ref', REMOTE_REF_PREFIX, '--format=%(refname)']
+        ['for-each-ref', REMOTE_REF_PREFIX, '--format=%(refname)']
     )
 
     branch1Exists = (
@@ -840,13 +840,9 @@ def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
     if not branch1Exists:
         commitList = []
     elif not branch2Exists:
-        commitList = gitUtilGetOutput(
-            ['git', 'rev-list', topoFlag, branch1]
-        )
+        commitList = gitUtilGetOutput(['rev-list', topoFlag, branch1])
     else:
-        commitList = gitUtilGetOutput(
-            ['git', 'rev-list', topoFlag, branch1, '^' + branch2]
-        )
+        commitList = gitUtilGetOutput(['rev-list', topoFlag, branch1, '^' + branch2])
     # Expected output:
     # [full hash1]
     # [full hash2]
@@ -864,7 +860,7 @@ def gitGetCurrentBranch():
                - '' if HEAD does not correspond to a branch
                  (i.e. detached HEAD state)
     """
-    output = gitUtilGetOutput(['git', 'status', '--branch', '--porcelain=2'])
+    output = gitUtilGetOutput(['status', '--branch', '--porcelain=2'])
     # Expected output: a bunch of lines starting with '#', where we only care
     # about:
     #   # branch.head BRANCH
@@ -930,7 +926,7 @@ def gitGetFileStatuses():
         KEY_FILE_STATUSES_WORK_DIR: [],
     }
 
-    output = gitUtilGetOutput(['git', 'status', '--porcelain=2'])
+    output = gitUtilGetOutput(['status', '--porcelain=2'])
 
     #---------------------------------------------------------------------------
     # Each line of output describes one file.
@@ -1064,7 +1060,7 @@ def gitGetLocalBranches():
     """
 
     branchRefs = gitUtilGetOutput(
-        ['git', 'for-each-ref', 'refs/heads', '--format=%(refname)']
+        ['for-each-ref', 'refs/heads', '--format=%(refname)']
     )
     # Expected output:
     # refs/head/BRANCHNAME1
@@ -1115,7 +1111,6 @@ def gitGetRemoteTrackingBranch(localBranch):
     # spaces
     refsOutput = gitUtilGetOutput(
         [
-            'git',
             'for-each-ref',
             '--format=%(refname:short)\t%(upstream:short)',
         ]
@@ -1132,7 +1127,7 @@ def gitGetRemoteTrackingBranch(localBranch):
                 remoteTrackingBranch = split[1]
     else:
         # No refs, so there's only one branch
-        statusOutput = gitUtilGetOutput(['git', 'status', '--branch', '--porcelain=2'])
+        statusOutput = gitUtilGetOutput(['status', '--branch', '--porcelain=2'])
         # Expected output: a bunch of lines starting with '#', where we only care
         # about:
         #   # branch.head BRANCH
@@ -1173,13 +1168,7 @@ def gitGetStashes():
     # We can get around that by listing all refs and searching for 'refs/stash'
     # so we know if any stashes exist, and thus whether it's safe to use
     # 'git reflog refs/stash'
-    refs = gitUtilGetOutput(
-        [
-            'git',
-            'for-each-ref',
-            '--format=%(refname)',
-        ]
-    )
+    refs = gitUtilGetOutput(['for-each-ref', '--format=%(refname)'])
 
     if not 'refs/stash' in refs:
         # No stash ref exists, so there can't be any stashes.
@@ -1189,9 +1178,7 @@ def gitGetStashes():
     # place -- list the stashes
     stashes = []
 
-    output = gitUtilGetOutput(
-        ['git', 'reflog', '--no-abbrev-commit', 'refs/stash']
-    )
+    output = gitUtilGetOutput(['reflog', '--no-abbrev-commit', 'refs/stash'])
     # Expected output:
     # [full hash] refs/stash@{0}: [description]
     # [full hash] refs/stash@{1}: [description]
@@ -1227,7 +1214,9 @@ def gitUtilGetOutput(command):
     If there's an error, print the command and its output, then call sys.exit(1).
 
     Args
-        List command - The git command to run, including the 'git' part
+        List command - The git command to run, *excluding* the 'git' part
+                       (so this function can add optional args like
+                       --no-optional-locks)
 
     Return
         List of String - Each element is one line of output from the executed
@@ -1235,7 +1224,7 @@ def gitUtilGetOutput(command):
     """
     try:
         output = subprocess.check_output(
-            command,
+            ['git', '--no-optional-locks'] + command,
             stderr = subprocess.STDOUT,
             universal_newlines = True
         )
