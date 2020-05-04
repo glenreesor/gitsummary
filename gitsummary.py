@@ -69,6 +69,7 @@ KEY_FILE_STATUSES_HEURISTIC_SCORE = 'heuristicScore'
 
 KEY_OPTIONS_COLOR = 'optionsColor'
 KEY_OPTIONS_SELECTED_OUTPUT = 'optionsSelectedOutput'
+KEY_OPTIONS_MAX_WIDTH = 'optionsMaxWidth'
 
 KEY_RETURN_STATUS = 'returnStatus'
 KEY_RETURN_MESSAGES = 'returnMessages'
@@ -81,6 +82,8 @@ KEY_STASH_DESCRIPTION = 'description'
 OPTIONS_COLOR_AUTO = 'color-auto'
 OPTIONS_COLOR_NO = 'color-no'
 OPTIONS_COLOR_YES = 'color-yes'
+
+OPTIONS_MAX_WIDTH_AUTO = 'max-width-auto'
 
 #-------------------------------------------------------------------------------
 # Other constants so we can catch typos by linting
@@ -183,9 +186,19 @@ def fullRepoOutput(options):
     #---------------------------------------------------------------------------
     if sys.stdout.isatty():
         (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
+
         useColor = True and (options[KEY_OPTIONS_COLOR] != OPTIONS_COLOR_NO)
+        maxWidth = (
+            SCREEN_WIDTH
+                if options[KEY_OPTIONS_MAX_WIDTH] == OPTIONS_MAX_WIDTH_AUTO
+                else int(options[KEY_OPTIONS_MAX_WIDTH])
+        )
     else:
-        SCREEN_WIDTH = -1
+        maxWidth= (
+            -1
+                if options[KEY_OPTIONS_MAX_WIDTH] == OPTIONS_MAX_WIDTH_AUTO
+                else int(options[KEY_OPTIONS_MAX_WIDTH])
+        )
         useColor = False or (options[KEY_OPTIONS_COLOR] == OPTIONS_COLOR_YES)
 
     #---------------------------------------------------------------------------
@@ -306,7 +319,7 @@ def fullRepoOutput(options):
     TRUNCATION_INDICATOR = '...'
 
     alignedStashLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         2,
         stashesMaxColumnWidths,
@@ -314,7 +327,7 @@ def fullRepoOutput(options):
     )
 
     alignedStageLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         2,
         stageMaxColumnWidths,
@@ -322,7 +335,7 @@ def fullRepoOutput(options):
     )
 
     alignedWorkDirLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         2,
         workDirMaxColumnWidths,
@@ -330,7 +343,7 @@ def fullRepoOutput(options):
     )
 
     alignedUnmergedLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         2,
         unmergedMaxColumnWidths,
@@ -338,7 +351,7 @@ def fullRepoOutput(options):
     )
 
     alignedUntrackedLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         1,
         untrackedMaxColumnWidths,
@@ -346,7 +359,7 @@ def fullRepoOutput(options):
     )
 
     alignedBranchLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         1,
         branchesMaxColumnWidths,
@@ -2284,6 +2297,7 @@ def main():
         firstOptionIndex = 1
         defaultOptions = {
             KEY_OPTIONS_COLOR: OPTIONS_COLOR_AUTO,
+            KEY_OPTIONS_MAX_WIDTH: OPTIONS_MAX_WIDTH_AUTO,
             KEY_OPTIONS_SELECTED_OUTPUT: [
                 OPTIONS_OUTPUT_STASHES,
                 OPTIONS_OUTPUT_STAGE,
@@ -2321,6 +2335,23 @@ def main():
 
         elif sys.argv[i] == '--no-color':
             options[KEY_OPTIONS_COLOR] = OPTIONS_COLOR_NO
+            i += 1
+
+        elif sys.argv[i] == '--max-width':
+            i += 1
+            if (i < len(sys.argv)):
+                customWidth = sys.argv[i]
+                if not re.match('^[1-9][0-9]+', customWidth):
+                    print(
+                        '--max-width value of ' +
+                        '"' + customWidth + '"' +
+                        ' must be numeric and greater than 0')
+                    sys.exit(1)
+            else:
+                print('--max-width option is missing a width value')
+                sys.exit(1)
+
+            options[KEY_OPTIONS_MAX_WIDTH] = customWidth
             i += 1
 
         elif sys.argv[i] == '--help':
