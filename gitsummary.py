@@ -67,6 +67,7 @@ KEY_FILE_STATUSES_FILENAME = 'filename'
 KEY_FILE_STATUSES_NEW_FILENAME = 'newFilename'
 KEY_FILE_STATUSES_HEURISTIC_SCORE = 'heuristicScore'
 
+KEY_OPTIONS_COLOR = 'optionsColor'
 KEY_OPTIONS_SELECTED_OUTPUT = 'optionsSelectedOutput'
 
 KEY_RETURN_STATUS = 'returnStatus'
@@ -76,6 +77,10 @@ KEY_RETURN_VALUE = 'returnValue'
 KEY_STASH_FULL_HASH = 'fullHash'
 KEY_STASH_NAME = 'name'
 KEY_STASH_DESCRIPTION = 'description'
+
+OPTIONS_COLOR_AUTO = 'color-auto'
+OPTIONS_COLOR_NO = 'color-no'
+OPTIONS_COLOR_YES = 'color-yes'
 
 #-------------------------------------------------------------------------------
 # Other constants so we can catch typos by linting
@@ -178,10 +183,10 @@ def fullRepoOutput(options):
     #---------------------------------------------------------------------------
     if sys.stdout.isatty():
         (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
-        useColor = True
+        useColor = True and (options[KEY_OPTIONS_COLOR] != OPTIONS_COLOR_NO)
     else:
         SCREEN_WIDTH = -1
-        useColor = False
+        useColor = False or (options[KEY_OPTIONS_COLOR] == OPTIONS_COLOR_YES)
 
     #---------------------------------------------------------------------------
     # Assemble the raw output lines(no colors, padding, or truncation)
@@ -2278,6 +2283,7 @@ def main():
         requestedCmd = fullRepoOutput
         firstOptionIndex = 1
         defaultOptions = {
+            KEY_OPTIONS_COLOR: OPTIONS_COLOR_AUTO,
             KEY_OPTIONS_SELECTED_OUTPUT: [
                 OPTIONS_OUTPUT_STASHES,
                 OPTIONS_OUTPUT_STAGE,
@@ -2308,6 +2314,14 @@ def main():
                 else:
                     options[KEY_OPTIONS_SELECTED_OUTPUT].append(sys.argv[i])
                     i += 1
+
+        elif sys.argv[i] == '--color':
+            options[KEY_OPTIONS_COLOR] = OPTIONS_COLOR_YES
+            i += 1
+
+        elif sys.argv[i] == '--no-color':
+            options[KEY_OPTIONS_COLOR] = OPTIONS_COLOR_NO
+            i += 1
 
         elif sys.argv[i] == '--help':
             utilPrintHelp(sys.argv[0])
