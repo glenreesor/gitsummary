@@ -67,8 +67,6 @@ KEY_FILE_STATUSES_FILENAME = 'filename'
 KEY_FILE_STATUSES_NEW_FILENAME = 'newFilename'
 KEY_FILE_STATUSES_HEURISTIC_SCORE = 'heuristicScore'
 
-KEY_OPTIONS_SELECTED_OUTPUT = 'optionsSelectedOutput'
-
 KEY_RETURN_STATUS = 'returnStatus'
 KEY_RETURN_MESSAGES = 'returnMessages'
 KEY_RETURN_VALUE = 'returnValue'
@@ -76,6 +74,17 @@ KEY_RETURN_VALUE = 'returnValue'
 KEY_STASH_FULL_HASH = 'fullHash'
 KEY_STASH_NAME = 'name'
 KEY_STASH_DESCRIPTION = 'description'
+
+# Related to commandline options
+KEY_OPTIONS_COLOR = 'optionsColor'
+KEY_OPTIONS_SELECTED_OUTPUT = 'optionsSelectedOutput'
+KEY_OPTIONS_MAX_WIDTH = 'optionsMaxWidth'
+
+OPTIONS_COLOR_AUTO = 'color-auto'
+OPTIONS_COLOR_NO = 'color-no'
+OPTIONS_COLOR_YES = 'color-yes'
+
+OPTIONS_MAX_WIDTH_AUTO = 'max-width-auto'
 
 #-------------------------------------------------------------------------------
 # Other constants so we can catch typos by linting
@@ -97,6 +106,15 @@ TEXT_WHITE = 'white'
 #-------------------------------------------------------------------------------
 # Constants exposed for testing purposes
 #-------------------------------------------------------------------------------
+
+# This corresponds to the "--no-optional-locks" commandline option and is
+# treated differently than other options since it's only used in one
+# place (gitUtilGetOutput). We use a global so we don't have to pass
+# this around everywhere
+#
+# We also set the default here so testGitsummary will work
+GLOBAL_GIT_NO_OPTIONAL_LOCKS = False
+
 
 # Branch names are based on:
 #   https://nvie.com/posts/a-successful-git-branching-model/
@@ -178,10 +196,20 @@ def fullRepoOutput(options):
     #---------------------------------------------------------------------------
     if sys.stdout.isatty():
         (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
-        useColor = True
+
+        useColor = True and (options[KEY_OPTIONS_COLOR] != OPTIONS_COLOR_NO)
+        maxWidth = (
+            SCREEN_WIDTH
+                if options[KEY_OPTIONS_MAX_WIDTH] == OPTIONS_MAX_WIDTH_AUTO
+                else int(options[KEY_OPTIONS_MAX_WIDTH])
+        )
     else:
-        SCREEN_WIDTH = -1
-        useColor = False
+        maxWidth= (
+            -1
+                if options[KEY_OPTIONS_MAX_WIDTH] == OPTIONS_MAX_WIDTH_AUTO
+                else int(options[KEY_OPTIONS_MAX_WIDTH])
+        )
+        useColor = False or (options[KEY_OPTIONS_COLOR] == OPTIONS_COLOR_YES)
 
     #---------------------------------------------------------------------------
     # Assemble the raw output lines(no colors, padding, or truncation)
@@ -301,7 +329,7 @@ def fullRepoOutput(options):
     TRUNCATION_INDICATOR = '...'
 
     alignedStashLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         2,
         stashesMaxColumnWidths,
@@ -309,7 +337,7 @@ def fullRepoOutput(options):
     )
 
     alignedStageLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         2,
         stageMaxColumnWidths,
@@ -317,7 +345,7 @@ def fullRepoOutput(options):
     )
 
     alignedWorkDirLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         2,
         workDirMaxColumnWidths,
@@ -325,7 +353,7 @@ def fullRepoOutput(options):
     )
 
     alignedUnmergedLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         2,
         unmergedMaxColumnWidths,
@@ -333,7 +361,7 @@ def fullRepoOutput(options):
     )
 
     alignedUntrackedLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         1,
         untrackedMaxColumnWidths,
@@ -341,7 +369,7 @@ def fullRepoOutput(options):
     )
 
     alignedBranchLines = utilGetColumnAlignedLines(
-        SCREEN_WIDTH,
+        maxWidth,
         TRUNCATION_INDICATOR,
         1,
         branchesMaxColumnWidths,
@@ -399,13 +427,12 @@ def fullRepoOutput(options):
         differsFromRemote = re.search('[0-9]', line[2])
 
         formats = [TEXT_BRIGHT] if isCurrentBranch else []
-        if differsFromRemote:
-            formats += [TEXT_CYAN]
+        remoteFormats = formats + ([TEXT_CYAN] if differsFromRemote else [])
 
         styledBranchLines.append(
             getStyledText(formats, line[0]) + ' ' +
             getStyledText(formats, line[1]) + ' ' +
-            getStyledText(formats, line[2]) + ' ' +
+            getStyledText(remoteFormats, line[2]) + ' ' +
             getStyledText(formats, line[3]) + ' ' +
             getStyledText(formats, line[4])
         )
@@ -490,7 +517,11 @@ def shellPromptHelper(options):
     #---------------------------------------------------------------------------
     optionsAsSet = set(options[KEY_OPTIONS_SELECTED_OUTPUT])
 
+    # Get a description of HEAD if we're in detached head state
     currentBranch = gitGetCurrentBranch()
+    if currentBranch == '':
+        currentBranch = gitGetCommitDescription('HEAD')
+
     localBranches = gitGetLocalBranches()
 
     if OPTIONS_OUTPUT_STASHES in options[KEY_OPTIONS_SELECTED_OUTPUT]:
@@ -779,7 +810,7 @@ def gitGetCommitDescription(fullHash):
         String - The output from 'git describe --always'
     """
 
-    description = gitUtilGetOutput(['git', 'describe', '--always'])[0]
+    description = gitUtilGetOutput(['describe', '--always'])[0]
 
     return description
 
@@ -816,11 +847,11 @@ def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
     # (our ultimate goal) returns a non-zero exit code if either branch1 or
     # branch2 don't have any refs
     localBranchRefs = gitUtilGetOutput(
-        ['git', 'for-each-ref', HEAD_REF_PREFIX, '--format=%(refname)']
+        ['for-each-ref', HEAD_REF_PREFIX, '--format=%(refname)']
     )
 
     remoteBranchRefs = gitUtilGetOutput(
-        ['git', 'for-each-ref', REMOTE_REF_PREFIX, '--format=%(refname)']
+        ['for-each-ref', REMOTE_REF_PREFIX, '--format=%(refname)']
     )
 
     branch1Exists = (
@@ -836,13 +867,9 @@ def gitGetCommitsInFirstNotSecond(branch1, branch2, topologicalOrder):
     if not branch1Exists:
         commitList = []
     elif not branch2Exists:
-        commitList = gitUtilGetOutput(
-            ['git', 'rev-list', topoFlag, branch1]
-        )
+        commitList = gitUtilGetOutput(['rev-list', topoFlag, branch1])
     else:
-        commitList = gitUtilGetOutput(
-            ['git', 'rev-list', topoFlag, branch1, '^' + branch2]
-        )
+        commitList = gitUtilGetOutput(['rev-list', topoFlag, branch1, '^' + branch2])
     # Expected output:
     # [full hash1]
     # [full hash2]
@@ -860,7 +887,7 @@ def gitGetCurrentBranch():
                - '' if HEAD does not correspond to a branch
                  (i.e. detached HEAD state)
     """
-    output = gitUtilGetOutput(['git', 'status', '--branch', '--porcelain=2'])
+    output = gitUtilGetOutput(['status', '--branch', '--porcelain=2'])
     # Expected output: a bunch of lines starting with '#', where we only care
     # about:
     #   # branch.head BRANCH
@@ -926,7 +953,7 @@ def gitGetFileStatuses():
         KEY_FILE_STATUSES_WORK_DIR: [],
     }
 
-    output = gitUtilGetOutput(['git', 'status', '--porcelain=2'])
+    output = gitUtilGetOutput(['status', '--porcelain=2'])
 
     #---------------------------------------------------------------------------
     # Each line of output describes one file.
@@ -1060,7 +1087,7 @@ def gitGetLocalBranches():
     """
 
     branchRefs = gitUtilGetOutput(
-        ['git', 'for-each-ref', 'refs/heads', '--format=%(refname)']
+        ['for-each-ref', 'refs/heads', '--format=%(refname)']
     )
     # Expected output:
     # refs/head/BRANCHNAME1
@@ -1111,7 +1138,6 @@ def gitGetRemoteTrackingBranch(localBranch):
     # spaces
     refsOutput = gitUtilGetOutput(
         [
-            'git',
             'for-each-ref',
             '--format=%(refname:short)\t%(upstream:short)',
         ]
@@ -1128,7 +1154,7 @@ def gitGetRemoteTrackingBranch(localBranch):
                 remoteTrackingBranch = split[1]
     else:
         # No refs, so there's only one branch
-        statusOutput = gitUtilGetOutput(['git', 'status', '--branch', '--porcelain=2'])
+        statusOutput = gitUtilGetOutput(['status', '--branch', '--porcelain=2'])
         # Expected output: a bunch of lines starting with '#', where we only care
         # about:
         #   # branch.head BRANCH
@@ -1169,13 +1195,7 @@ def gitGetStashes():
     # We can get around that by listing all refs and searching for 'refs/stash'
     # so we know if any stashes exist, and thus whether it's safe to use
     # 'git reflog refs/stash'
-    refs = gitUtilGetOutput(
-        [
-            'git',
-            'for-each-ref',
-            '--format=%(refname)',
-        ]
-    )
+    refs = gitUtilGetOutput(['for-each-ref', '--format=%(refname)'])
 
     if not 'refs/stash' in refs:
         # No stash ref exists, so there can't be any stashes.
@@ -1185,9 +1205,7 @@ def gitGetStashes():
     # place -- list the stashes
     stashes = []
 
-    output = gitUtilGetOutput(
-        ['git', 'reflog', '--no-abbrev-commit', 'refs/stash']
-    )
+    output = gitUtilGetOutput(['reflog', '--no-abbrev-commit', 'refs/stash'])
     # Expected output:
     # [full hash] refs/stash@{0}: [description]
     # [full hash] refs/stash@{1}: [description]
@@ -1223,15 +1241,23 @@ def gitUtilGetOutput(command):
     If there's an error, print the command and its output, then call sys.exit(1).
 
     Args
-        List command - The git command to run, including the 'git' part
+        List command - The git command to run, *excluding* the 'git' part
+                       (so this function can add optional args like
+                       --no-optional-locks)
 
     Return
         List of String - Each element is one line of output from the executed
                          command
     """
+    global GLOBAL_GIT_NO_OPTIONAL_LOCKS
+
+    optionalLocksArg = ['--no-optional-locks' ] if GLOBAL_GIT_NO_OPTIONAL_LOCKS else []
+
+    fullCommand = ['git'] + optionalLocksArg + command
+
     try:
         output = subprocess.check_output(
-            command,
+            fullCommand,
             stderr = subprocess.STDOUT,
             universal_newlines = True
         )
@@ -1986,22 +2012,54 @@ def utilPrintHelp(commandName):
         String commandName - The name this script was invoked with
     """
     print('Usage:')
-    print('    ' + commandName + ' [--custom [sections]] | --help | --helpconfig | --version')
-    print('')
-    print('Print a summary of the current git repository\'s status:')
-    print('    - stashes, stage changes, working directory changes, unmerged changes,')
+    print('    ' + commandName + ' [OPTIONS]')
+    print('    ' + commandName + ' [shell-prompt-helper] [OPTIONS]')
+    print()
+    print('In the first form, print a summary of the current git repository\'s status:')
+    print('    - stashes, staged changes, working directory changes, unmerged changes,')
     print('      untracked files,')
     print('    - list of local branches, including the following for each:')
     print('          - number of commits ahead/behind its target branch')
     print('          - number of commits ahead/behind its remote branch')
     print('          - the name of its target branch')
     print()
-    print('Flags:')
-    print('    --custom [sections]')
-    print('        - Show only the specified sections of output, in the order specified')
-    print('        - Valid section names are:')
-    print('              stashes, stage, workdir, untracked, unmerged, branch-all,')
-    print('              branch-current')
+    print('In the second form, print a single line of space-separated values that can be')
+    print('easily parsed to provide a fancy shell prompt:')
+    print('    - number of:')
+    print('          stashes, staged changes, working directory changes, unmerged changes,')
+    print('          untracked files,')
+    print('          commits ahead of remote branch, commits behind remote branch,')
+    print('          commits ahead of target branch, commits behind target branch')
+    print('    - current branch name, target branch name')
+    print()
+    print('Also in the second form, values that have no meaning will be replaced with "_":')
+    print('    - number of commits ahead/behind remote if there is no remote branch')
+    print('    - number of commits ahead/behind target if there is no target branch')
+    print()
+    print('Options:')
+    print('    --custom SECTIONS')
+    print('        - Show only the specified SECTIONS of output, in the order specified')
+    print('        - Valid section names for the first form above are:')
+    print('              stashes, stage, workdir, unmerged, untracked,')
+    print('              branch-all, branch-current')
+    print('        - Valid section names for the second form above are:')
+    print('              stashes, stage, workdir, unmerged, untracked,')
+    print('              ahead-remote, behind-remote, ahead-target, behind-target,')
+    print('              branch-name, target-branch')
+    print('')
+    print('    --color')
+    print('        - Force the use of colored output even if stdout is not a tty')
+    print('')
+    print('    --no-color')
+    print('        - Do not show colored output')
+    print('')
+    print('    --no-optional-locks')
+    print('        - Use git\'s --no-optional-locks option. Useful if you want to run')
+    print('          gitsummary in the background or a loop')
+    print('')
+    print('    --max-width N')
+    print('        - Format output for a maximum width of N columns, regardless of')
+    print('          current terminal width')
     print('')
     print('    --help')
     print('        - Show this output')
@@ -2245,6 +2303,8 @@ def utilValidateKeyPresenceAndType(
 
 #-------------------------------------------------------------------------------
 def main():
+    global GLOBAL_GIT_NO_OPTIONAL_LOCKS
+
     # Default output, in order, to be used if user doesn't specify any
     if len(sys.argv) > 1 and sys.argv[1] == 'shell-prompt-helper':
         requestedCmd = shellPromptHelper
@@ -2268,6 +2328,8 @@ def main():
         requestedCmd = fullRepoOutput
         firstOptionIndex = 1
         defaultOptions = {
+            KEY_OPTIONS_COLOR: OPTIONS_COLOR_AUTO,
+            KEY_OPTIONS_MAX_WIDTH: OPTIONS_MAX_WIDTH_AUTO,
             KEY_OPTIONS_SELECTED_OUTPUT: [
                 OPTIONS_OUTPUT_STASHES,
                 OPTIONS_OUTPUT_STAGE,
@@ -2298,6 +2360,35 @@ def main():
                 else:
                     options[KEY_OPTIONS_SELECTED_OUTPUT].append(sys.argv[i])
                     i += 1
+
+        elif sys.argv[i] == '--color':
+            options[KEY_OPTIONS_COLOR] = OPTIONS_COLOR_YES
+            i += 1
+
+        elif sys.argv[i] == '--no-color':
+            options[KEY_OPTIONS_COLOR] = OPTIONS_COLOR_NO
+            i += 1
+
+        elif sys.argv[i] == '--no-optional-locks':
+            GLOBAL_GIT_NO_OPTIONAL_LOCKS = True
+            i += 1
+
+        elif sys.argv[i] == '--max-width':
+            i += 1
+            if (i < len(sys.argv)):
+                customWidth = sys.argv[i]
+                if not re.match('^[1-9][0-9]+', customWidth):
+                    print(
+                        '--max-width value of ' +
+                        '"' + customWidth + '"' +
+                        ' must be numeric and greater than 0')
+                    sys.exit(1)
+            else:
+                print('--max-width option is missing a width value')
+                sys.exit(1)
+
+            options[KEY_OPTIONS_MAX_WIDTH] = customWidth
+            i += 1
 
         elif sys.argv[i] == '--help':
             utilPrintHelp(sys.argv[0])
