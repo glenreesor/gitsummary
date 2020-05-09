@@ -87,6 +87,47 @@ gitsummary.py commandline options tests
                                                                 Stage
                                                                 Stashes
 
+3       --color                         all-sections
+                                                        Commandline:
+                                                            gst --color | cat
+
+                                                        Expected Result:
+                                                            - Output is colored (even though stdout isn't a terminal)
+
+4       --no-color                      all-sections
+                                                        Commandline:
+                                                            gst --no-color
+
+                                                        Expected Result:
+                                                            - Output is not colored
+
+5       Absence of --no-optional-locks  all-sections
+                                                        Add to gitUtilGetOutput():
+                                                            print(fullCommand)
+
+                                                        Commandline:
+                                                            gst
+
+                                                        Expected Result:
+                                                            - git commands do not have "--no-optional-locks"
+
+6       Presence of --no-optional-locks  all-sections
+                                                        Add to gitUtilGetOutput():
+                                                            print(fullCommand)
+
+                                                        Commandline:
+                                                            gst
+
+                                                        Expected Result:
+                                                            - git commands have "--no-optional-locks"
+
+7       --max-width                      all-sections
+                                                        Commandline:
+                                                            gst --max-width 40
+
+                                                        Expected Result:
+                                                            - Output is formatted to width smaller than window
+
 --------------------------------------------------------------------------------
 gitsummaryShellHelper.py tests
 --------------------------------------------------------------------------------
