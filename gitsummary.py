@@ -67,10 +67,6 @@ KEY_FILE_STATUSES_FILENAME = 'filename'
 KEY_FILE_STATUSES_NEW_FILENAME = 'newFilename'
 KEY_FILE_STATUSES_HEURISTIC_SCORE = 'heuristicScore'
 
-KEY_OPTIONS_COLOR = 'optionsColor'
-KEY_OPTIONS_SELECTED_OUTPUT = 'optionsSelectedOutput'
-KEY_OPTIONS_MAX_WIDTH = 'optionsMaxWidth'
-
 KEY_RETURN_STATUS = 'returnStatus'
 KEY_RETURN_MESSAGES = 'returnMessages'
 KEY_RETURN_VALUE = 'returnValue'
@@ -78,6 +74,11 @@ KEY_RETURN_VALUE = 'returnValue'
 KEY_STASH_FULL_HASH = 'fullHash'
 KEY_STASH_NAME = 'name'
 KEY_STASH_DESCRIPTION = 'description'
+
+# Related to commandline options
+KEY_OPTIONS_COLOR = 'optionsColor'
+KEY_OPTIONS_SELECTED_OUTPUT = 'optionsSelectedOutput'
+KEY_OPTIONS_MAX_WIDTH = 'optionsMaxWidth'
 
 OPTIONS_COLOR_AUTO = 'color-auto'
 OPTIONS_COLOR_NO = 'color-no'
@@ -105,6 +106,15 @@ TEXT_WHITE = 'white'
 #-------------------------------------------------------------------------------
 # Constants exposed for testing purposes
 #-------------------------------------------------------------------------------
+
+# This corresponds to the "--no-optional-locks" commandline option and is
+# treated differently than other options since it's only used in one
+# place (gitUtilGetOutput). We use a global so we don't have to pass
+# this around everywhere
+#
+# We also set the default here so testGitsummary will work
+GLOBAL_GIT_NO_OPTIONAL_LOCKS = False
+
 
 # Branch names are based on:
 #   https://nvie.com/posts/a-successful-git-branching-model/
@@ -1239,9 +1249,15 @@ def gitUtilGetOutput(command):
         List of String - Each element is one line of output from the executed
                          command
     """
+    global GLOBAL_GIT_NO_OPTIONAL_LOCKS
+
+    optionalLocksArg = ['--no-optional-locks' ] if GLOBAL_GIT_NO_OPTIONAL_LOCKS else []
+
+    fullCommand = ['git'] + optionalLocksArg + command
+
     try:
         output = subprocess.check_output(
-            ['git', '--no-optional-locks'] + command,
+            fullCommand,
             stderr = subprocess.STDOUT,
             universal_newlines = True
         )
@@ -2031,6 +2047,10 @@ def utilPrintHelp(commandName):
     print('              ahead-remote, behind-remote, ahead-target, behind-target,')
     print('              branch-name, target-branch')
     print('')
+    print('    --no-optional-locks')
+    print('        - Use git\'s --no-optional-locks option. Useful if you want to run')
+    print('          gitsummary in the background or a loop')
+    print('')
     print('    --help')
     print('        - Show this output')
     print('')
@@ -2273,6 +2293,8 @@ def utilValidateKeyPresenceAndType(
 
 #-------------------------------------------------------------------------------
 def main():
+    global GLOBAL_GIT_NO_OPTIONAL_LOCKS
+
     # Default output, in order, to be used if user doesn't specify any
     if len(sys.argv) > 1 and sys.argv[1] == 'shell-prompt-helper':
         requestedCmd = shellPromptHelper
@@ -2335,6 +2357,10 @@ def main():
 
         elif sys.argv[i] == '--no-color':
             options[KEY_OPTIONS_COLOR] = OPTIONS_COLOR_NO
+            i += 1
+
+        elif sys.argv[i] == '--no-optional-locks':
+            GLOBAL_GIT_NO_OPTIONAL_LOCKS = True
             i += 1
 
         elif sys.argv[i] == '--max-width':
