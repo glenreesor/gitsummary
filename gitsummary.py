@@ -791,20 +791,11 @@ def fsGetValidatedUserConfig(fullyQualifiedFilename):
     return returnVal
 
 #-------------------------------------------------------------------------------
-# Git Interface Layer
-#
-# These functions form the lower layer interface with git. They are the only
-# functions with knowledge of the format of git commands.
-#
-# All of these functions use git plumbing commands, so should be immune to
-# git changes.
-#
-# Limitations of gitGet* functions:
-#   - They will fail with exceptions if the current working directory is not
-#     tracked by git.
+# Git Caching Layer
+#   - Provides a mechanism for caching output from git commands
 #-------------------------------------------------------------------------------
 
-# This gets set later to be the return value of getCacheInterface
+# This gets set later to be the return value of getCacheInterface()
 cacheInterface = None
 
 def getCacheInterface():
@@ -913,6 +904,20 @@ def getCacheInterface():
     }
 
 #-------------------------------------------------------------------------------
+# Git Interface Layer
+#
+# These functions form the lower layer interface with git. They are the only
+# functions with knowledge of the format of git commands.
+#
+# All of these functions use git plumbing commands, so should be immune to
+# git changes.
+#
+# Limitations of gitGet* functions:
+#   - They will fail with exceptions if the current working directory is not
+#     tracked by git.
+#-------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------
 def gitGetCommitDescription(fullHash):
     """
     Get a description for the specified commit using 'git describe --always'.
@@ -931,7 +936,7 @@ def gitGetCommitDescription(fullHash):
         String - The output from 'git describe --always'
     """
 
-    description = gitUtilGetOutput(['describe', '--always'])[0]
+    description = gitUtilGetOutput(['describe', '--always', fullHash])[0]
 
     return description
 
