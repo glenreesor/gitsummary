@@ -903,32 +903,31 @@ def getCacheInterface():
                  '--porcelain=2',
             ])
 
-        # Expected output:
-        #   # branch.oid [hash]
-        #   # branch.head BRANCH
-        #   # branch.upstream REMOTE/BRANCH
-        #   1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
-        #   2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>[tab]<origPath>
-        #   u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
-        #   ? <path>
-        #
-        # What we store:
-        #   - second line --> current branch
-        #   - third line --> remote tracking branch
-        #   - fourth through last lines --> file statuses
-        cachedFileStatuses = []
-        cachedCurrentBranchFromGitStatus = ''
-        cachedRemoteBranchFromGitStatus = ''
+            # Expected output:
+            #   # branch.oid [hash]
+            #   # branch.head BRANCH
+            #   # branch.upstream REMOTE/BRANCH
+            #   1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
+            #   2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>[tab]<origPath>
+            #   u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
+            #   ? <path>
+            #
+            # What we store:
+            #   - second line --> current branch
+            #   - third line --> remote tracking branch
+            #   - fourth through last lines --> file statuses
+            cachedFileStatuses = []
+            cachedCurrentBranchFromGitStatus = ''
+            cachedRemoteBranchFromGitStatus = ''
 
-        for line in statusOutput:
-            fields = line.split(' ')
-            if line.startswith('# branch.head '):
-                cachedCurrentBranchFromGitStatus = fields[2]
-            elif line.startswith('# branch.upstream '):
-                cachedRemoteBranchFromGitStatus = fields[2]
-            elif fields[0] != '#':
-                cachedFileStatuses.append(line)
-
+            for line in statusOutput:
+                fields = line.split(' ')
+                if line.startswith('# branch.head '):
+                    cachedCurrentBranchFromGitStatus = fields[2]
+                elif line.startswith('# branch.upstream '):
+                    cachedRemoteBranchFromGitStatus = fields[2]
+                elif fields[0] != '#':
+                    cachedFileStatuses.append(line)
 
     def getCurrentBranchFromGitStatus():
         """
