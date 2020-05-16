@@ -812,23 +812,28 @@ def getCacheInterface():
             KEY_CACHE_GET_REMOTES         : getRemotes()
             KEY_CACHE_STASH_EXISTS        : stashExists()
     """
-    # KEY constants just for this closure
-    KEY_HEADS_TO_REMOTES = 'headsToRemotes'
-    KEY_REMOTES = 'remotes'
-    KEY_STASH_EXISTS = 'stashExists'
+    # Holders of the cached data from 'git for-each-ref'
+    cachedHeadsToRemotes = None
+    cachedRemotes = None
+    cachedStashExists = None
 
-    # Holder of the cached data
-    cachedRefsData = None
-
-    def ensureRefsDataPresent():
+    def ensureGitForEachRefDataPresent():
         """
         Store required git refs data if we don't already have it. Otherwise do
         nothing.
+
+        This function will populate the following:
+            - cachedHeadsToRemotes
+            - cachedRemotes
+            - cachedStashExists
         """
         global CACHE_GIT_RESULTS
-        nonlocal cachedRefsData
+        nonlocal cachedHeadsToRemotes
+        nonlocal cachedRemotes
+        nonlocal cachedStashExists
 
-        if cachedRefsData == None or not CACHE_GIT_RESULTS:
+        # Three caches get populated at once, so only have to check one of them
+        if cachedHeadsToRemotes == None or not CACHE_GIT_RESULTS:
             refsOutput = gitUtilGetOutput([
                 'for-each-ref',
                  '--format=%(refname)\t%(upstream:short)',
@@ -845,25 +850,23 @@ def getCacheInterface():
             # etc
             # stash\t
 
-            cachedRefsData = {
-                KEY_HEADS_TO_REMOTES: {},
-                KEY_REMOTES: [],
-                KEY_STASH_EXISTS: False,
-            }
+            cachedHeadsToRemotes = {}
+            cachedRemotes = []
+            cachedStashExists = False
 
             for line in refsOutput:
                 fields = line.split('\t')
 
                 if fields[0].startswith('refs/heads/'):
                     head = fields[0].replace('refs/heads/', '')
-                    cachedRefsData[KEY_HEADS_TO_REMOTES][head] = fields[1]
+                    cachedHeadsToRemotes[head] = fields[1]
 
                 elif fields[0].startswith('refs/remotes/'):
                     remote = fields[0].replace('refs/remotes/', '')
-                    cachedRefsData[KEY_REMOTES].append(remote)
+                    cachedRemotes.append(remote)
 
                 else:
-                    cachedRefsData[KEY_STASH_EXISTS] = True
+                    cachedStashExists = True
 
     def getHeadsToRemotes():
         """
@@ -872,9 +875,9 @@ def getCacheInterface():
         Return
             Dictionary - Where keys are heads and values are corresponding remotes
         """
-        ensureRefsDataPresent()
+        ensureGitForEachRefDataPresent()
 
-        return cachedRefsData[KEY_HEADS_TO_REMOTES]
+        return cachedHeadsToRemotes
 
     def getRemotes():
         """
@@ -883,9 +886,9 @@ def getCacheInterface():
         Return
             List - Where values are remotes
         """
-        ensureRefsDataPresent()
+        ensureGitForEachRefDataPresent()
 
-        return cachedRefsData['remotes']
+        return cachedRemotes
 
     def stashExists():
         """
@@ -894,9 +897,9 @@ def getCacheInterface():
         Return
             Boolean - Whether any stashes exist
         """
-        ensureRefsDataPresent()
+        ensureGitForEachRefDataPresent()
 
-        return cachedRefsData['stashExists']
+        return cachedStashExists
 
     return {
         KEY_CACHE_GET_HEADS_TO_REMOTES: getHeadsToRemotes,
