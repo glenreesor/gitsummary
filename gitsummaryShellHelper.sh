@@ -300,12 +300,16 @@ function doit()
     #         requested output)
     #   - If we don't have a branch name:
     #       - Just truncate the entire line
+    #
+    # Note: We don't adjust any lengths if we're using test values, since test
+    #       values result in output that is too long, so we won't get to see
+    #       them
     #-----------------------------------------------------------------------
 
     showBranchNameOnly=false
     modifiedBranchName=""
 
-    if [ $outputLength -gt $maxLength ]; then
+    if ! $useTestValues && [ $outputLength -gt $maxLength ]; then
         numToRemove=$(($outputLength - $maxLength + 3))   # "3" is for "..."
 
         if [ "$outputBranchIndex" != "-1" ]; then
