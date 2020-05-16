@@ -56,7 +56,10 @@ OPTIONS_OUTPUT_BEHIND_TARGET = 'behind-target'
 #-------------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
 #-------------------------------------------------------------------------------
+KEY_CACHE_GET_CURRENT_BRANCH_FROM_GIT_STATUS = 'cacheGetCurrentBranchFromGitStatus'
+KEY_CACHE_GET_FILE_STATUSES = 'cacheGetFileStatuses'
 KEY_CACHE_GET_HEADS_TO_REMOTES = 'cacheGetHeadsToRemotes'
+KEY_CACHE_GET_REMOTE_BRANCH_FROM_GIT_STATUS = 'cacheGetRemoteBranchFromGitStatus'
 KEY_CACHE_GET_REMOTES = 'cacheGetRemotes'
 KEY_CACHE_STASH_EXISTS = 'cacheStashExists'
 
@@ -793,7 +796,8 @@ def fsGetValidatedUserConfig(fullyQualifiedFilename):
 
 #-------------------------------------------------------------------------------
 # Git Caching Layer
-#   - Provides a mechanism for caching output from git commands
+#   - Provides a mechanism for caching output from git commands since some of
+#     them get called multiple times, to retrieve different bits of info
 #-------------------------------------------------------------------------------
 
 # This gets set later to be the return value of getCacheInterface()
@@ -808,10 +812,18 @@ def getCacheInterface():
     Return
         Dictionary - A dictionary with the following keys (see corresponding
                      functions below for description):
-            KEY_CACHE_GET_HEADS_TO_REMOTES: getHeadsToRemotes()
-            KEY_CACHE_GET_REMOTES         : getRemotes()
-            KEY_CACHE_STASH_EXISTS        : stashExists()
+            KEY_CACHE_GET_CURRENT_BRANCH_FROM_GIT_STATUS   : getCurrentBranchFromGitStatus()
+            KEY_CACHE_GET_FILE_STATUSES                    : getFileStatuses()
+            KEY_CACHE_GET_HEADS_TO_REMOTES                 : getHeadsToRemotes()
+            KEY_CACHE_GET_REMOTE_BRANCH_FROM_GIT_STATUS    : getRemoteBranchFromGitStatus()
+            KEY_CACHE_GET_REMOTES                          : getRemotes()
+            KEY_CACHE_STASH_EXISTS                         : stashExists()
     """
+    # Holders of the cached data from 'git status --branch'
+    cachedCurrentBranchFromGitStatus = None
+    cachedFileStatuses = None
+    cachedRemoteBranchFromGitStatus = None
+
     # Holders of the cached data from 'git for-each-ref'
     cachedHeadsToRemotes = None
     cachedRemotes = None
@@ -819,8 +831,8 @@ def getCacheInterface():
 
     def ensureGitForEachRefDataPresent():
         """
-        Store required git refs data if we don't already have it. Otherwise do
-        nothing.
+        Store required data from 'git for-each-ref' if we don't already have it.
+        Otherwise do nothing.
 
         This function will populate the following:
             - cachedHeadsToRemotes
@@ -868,6 +880,78 @@ def getCacheInterface():
                 else:
                     cachedStashExists = True
 
+    def ensureGitStatusDataPresent():
+        """
+        Store required data from 'git status --branch' if we don't already have it.
+        Otherwise do nothing.
+
+        This function will populate the following:
+            - cachedCurrentBranchFromGitStatus
+            - cachedFileStatuses
+            - cachedRemoteBranchFromGitStatus
+        """
+        global CACHE_GIT_RESULTS
+        nonlocal cachedCurrentBranchFromGitStatus
+        nonlocal cachedFileStatuses
+        nonlocal cachedRemoteBranchFromGitStatus
+
+        # Three caches get populated at once, so only have to check one of them
+        if cachedFileStatuses == None or not CACHE_GIT_RESULTS:
+            statusOutput = gitUtilGetOutput([
+                'status',
+                 '--branch',
+                 '--porcelain=2',
+            ])
+
+        # Expected output:
+        #   # branch.oid [hash]
+        #   # branch.head BRANCH
+        #   # branch.upstream REMOTE/BRANCH
+        #   1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
+        #   2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>[tab]<origPath>
+        #   u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
+        #   ? <path>
+        #
+        # What we store:
+        #   - second line --> current branch
+        #   - third line --> remote tracking branch
+        #   - fourth through last lines --> file statuses
+        cachedFileStatuses = []
+        cachedCurrentBranchFromGitStatus = ''
+        cachedRemoteBranchFromGitStatus = ''
+
+        for line in statusOutput:
+            fields = line.split(' ')
+            if line.startswith('# branch.head '):
+                cachedCurrentBranchFromGitStatus = fields[2]
+            elif line.startswith('# branch.upstream '):
+                cachedRemoteBranchFromGitStatus = fields[2]
+            elif fields[0] != '#':
+                cachedFileStatuses.append(line)
+
+
+    def getCurrentBranchFromGitStatus():
+        """
+        Get the current branch from `git status --branch`
+
+        Return
+            string - The branch name
+        """
+        ensureGitStatusDataPresent()
+
+        return cachedCurrentBranchFromGitStatus
+
+    def getFileStatuses():
+        """
+        Get the list of file statuses, from `git status`
+
+        Return
+            List - Where each element is a line of output from `git status`
+        """
+        ensureGitStatusDataPresent()
+
+        return cachedFileStatuses
+
     def getHeadsToRemotes():
         """
         Get a dictionary containing all local heads
@@ -878,6 +962,17 @@ def getCacheInterface():
         ensureGitForEachRefDataPresent()
 
         return cachedHeadsToRemotes
+
+    def getRemoteBranchFromGitStatus():
+        """
+        Get the remote branch from `git status --branch`
+
+        Return
+            string - The remote branch name
+        """
+        ensureGitStatusDataPresent()
+
+        return cachedRemoteBranchFromGitStatus
 
     def getRemotes():
         """
@@ -902,9 +997,12 @@ def getCacheInterface():
         return cachedStashExists
 
     return {
-        KEY_CACHE_GET_HEADS_TO_REMOTES: getHeadsToRemotes,
-        KEY_CACHE_GET_REMOTES: getRemotes,
-        KEY_CACHE_STASH_EXISTS: stashExists,
+        KEY_CACHE_GET_CURRENT_BRANCH_FROM_GIT_STATUS: getCurrentBranchFromGitStatus,
+        KEY_CACHE_GET_FILE_STATUSES                 : getFileStatuses,
+        KEY_CACHE_GET_HEADS_TO_REMOTES              : getHeadsToRemotes,
+        KEY_CACHE_GET_REMOTE_BRANCH_FROM_GIT_STATUS : getRemoteBranchFromGitStatus,
+        KEY_CACHE_GET_REMOTES                       : getRemotes,
+        KEY_CACHE_STASH_EXISTS                      : stashExists,
     }
 
 #-------------------------------------------------------------------------------
@@ -1018,17 +1116,7 @@ def gitGetCurrentBranch():
     headsToRemotes = cacheInterface[KEY_CACHE_GET_HEADS_TO_REMOTES]()
 
     if len(headsToRemotes) == 0:
-        output = gitUtilGetOutput(['status', '--branch', '--porcelain=2'])
-
-        # Expected output: a bunch of lines starting with '#', where we only care
-        # about:
-        #   # branch.head BRANCH
-
-        currentBranch = ''
-        for line in output:
-            match = re.search('^# branch.head (.+)$', line)
-            if (match):
-                currentBranch = match.group(1)
+        currentBranch = cacheInterface[KEY_CACHE_GET_CURRENT_BRANCH_FROM_GIT_STATUS]()
     else:
         # There's at least one ref, so ...
         output = gitUtilGetOutput(['rev-parse', '--abbrev-ref', 'HEAD'])[0]
@@ -1092,7 +1180,8 @@ def gitGetFileStatuses():
         KEY_FILE_STATUSES_WORK_DIR: [],
     }
 
-    output = gitUtilGetOutput(['status', '--porcelain=2'])
+    global cacheInterface
+    gitStatusOutput = cacheInterface[KEY_CACHE_GET_FILE_STATUSES]()
 
     #---------------------------------------------------------------------------
     # Each line of output describes one file.
@@ -1118,7 +1207,7 @@ def gitGetFileStatuses():
     #               https://marc.info/?l=git&m=141730775928542&w=2
     #---------------------------------------------------------------------------
 
-    for outputLine in output:
+    for outputLine in gitStatusOutput:
         lineType = outputLine[0]
 
         if lineType in ['1', '2', 'u']:
@@ -1275,28 +1364,12 @@ def gitGetRemoteTrackingBranch(localBranch):
     if len(headsToRemotes) > 0:
         remoteTrackingBranch = headsToRemotes[localBranch]
     else:
-        # No refs, so there's only one branch
-        statusOutput = gitUtilGetOutput(['status', '--branch', '--porcelain=2'])
-        # Expected output: a bunch of lines starting with '#', where we only care
-        # about:
-        #   # branch.head BRANCH
-        #   # branch.upstream REMOTE/BRANCH
+        # No refs, so there's only one branch. Get it from `git status`
+        currentLocal = cacheInterface[KEY_CACHE_GET_CURRENT_BRANCH_FROM_GIT_STATUS]()
+        currentRemote = cacheInterface[KEY_CACHE_GET_REMOTE_BRANCH_FROM_GIT_STATUS]()
 
-        # First pull out the info we're interested in
-        branchValue = None
-        remoteValue = None
-
-        for line in statusOutput:
-            branchMatch = re.search('^# branch.head (.+)$', line)
-            if (branchMatch):
-                branchValue = branchMatch.group(1)
-            else:
-                remoteMatch = re.search('^# branch.upstream (.+)$', line)
-                if (remoteMatch):
-                    remoteValue = remoteMatch.group(1)
-
-        if localBranch == branchValue and remoteValue != None:
-            remoteTrackingBranch = remoteValue
+        if localBranch == currentLocal:
+            remoteTrackingBranch = currentRemote
 
     return remoteTrackingBranch
 
