@@ -47,7 +47,7 @@ def commonTestSetUp(self):
 
     # We have to turn the caching off since the cache only gets cleared when
     # gitsummary.py is initially parsed.
-    gs.CACHE_GIT_RESULTS = False
+    gs.USE_CACHED_GIT_OUTPUT = False
 
 def commonTestTearDown(self):
     os.chdir(self.setupInitialDir)
@@ -370,7 +370,7 @@ class Test_getCacheInterface(unittest.TestCase):
     #
     # This is where we're testing the actual caching by:
     #   - calling one of the functions (thus forcing population of the cache)
-    #   - setting the caching flag to True
+    #   - setting the flag that says to use cached git output
     #   - changing git state by running git commands
     #   - getting cached data -- it should be unchanged
     #---------------------------------------------------------------------------
@@ -409,7 +409,7 @@ class Test_getCacheInterface(unittest.TestCase):
         execute(['git', 'stash'])
 
         # Get data from cache. It should not reflect any of these git changes
-        gs.CACHE_GIT_RESULTS = True
+        gs.USE_CACHED_GIT_OUTPUT = True
 
         self.assertEqual(
            firstHeadsToRemotes,
@@ -465,7 +465,7 @@ class Test_getCacheInterface(unittest.TestCase):
         modifiedFile.close()
 
         # Get data from cache. It should not reflect any of these git changes
-        gs.CACHE_GIT_RESULTS = True
+        gs.USE_CACHED_GIT_OUTPUT = True
 
         self.assertEqual(
             firstCurrentBranch,

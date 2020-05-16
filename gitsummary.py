@@ -158,11 +158,11 @@ CONFIG_FILENAME = '.gitsummaryconfig'
 # Set the default here so testGitsummary will work
 GLOBAL_GIT_NO_OPTIONAL_LOCKS = False
 
-# Whether to cache the results of our git queries.
+# Whether to use our cache git output, or doing a git query each time.
 # This must be False for testing to work, since many tests execute Gitsummary
 # functions, then some git commands, then more Gitsummary functions. As a result,
 # the latter Gitsummary functions will have invalid cache data
-CACHE_GIT_RESULTS = False
+USE_CACHED_GIT_OUTPUT = False
 
 #-------------------------------------------------------------------------------
 def fullRepoOutput(options):
@@ -839,13 +839,13 @@ def getCacheInterface():
             - cachedRemotes
             - cachedStashExists
         """
-        global CACHE_GIT_RESULTS
+        global USE_CACHED_GIT_OUTPUT
         nonlocal cachedHeadsToRemotes
         nonlocal cachedRemotes
         nonlocal cachedStashExists
 
         # Three caches get populated at once, so only have to check one of them
-        if cachedHeadsToRemotes == None or not CACHE_GIT_RESULTS:
+        if cachedHeadsToRemotes == None or not USE_CACHED_GIT_OUTPUT:
             refsOutput = gitUtilGetOutput([
                 'for-each-ref',
                  '--format=%(refname)\t%(upstream:short)',
@@ -890,13 +890,13 @@ def getCacheInterface():
             - cachedFileStatuses
             - cachedRemoteBranchFromGitStatus
         """
-        global CACHE_GIT_RESULTS
+        global USE_CACHED_GIT_OUTPUT
         nonlocal cachedCurrentBranchFromGitStatus
         nonlocal cachedFileStatuses
         nonlocal cachedRemoteBranchFromGitStatus
 
         # Three caches get populated at once, so only have to check one of them
-        if cachedFileStatuses == None or not CACHE_GIT_RESULTS:
+        if cachedFileStatuses == None or not USE_CACHED_GIT_OUTPUT:
             statusOutput = gitUtilGetOutput([
                 'status',
                  '--branch',
@@ -2601,6 +2601,6 @@ cacheInterface = getCacheInterface()
 if __name__ == '__main__':
     # Set to True here so caching is used for normal operation, but not
     # when run by testGitsummary.py
-    CACHE_GIT_RESULTS = True
+    USE_CACHED_GIT_OUTPUT = True
 
     main()
