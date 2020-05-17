@@ -49,13 +49,14 @@ def main():
             print('Try again.')
 
     os.chdir(destFolder)
-    setupScenario('all-sections', createScenarioAllSections)
     setupScenario(
         'ahead-behind-remote-and-target',
         createScenarioAheadBehindRemoteAndTarget
     )
+    setupScenario('all-sections', createScenarioAllSections)
     setupScenario('demo', createScenarioDemo)
     setupScenario('detached-head', createScenarioDetachedHead)
+    setupScenario('long-branch-name', createScenarioLongBranchName)
 
 def setupScenario(scenarioFolder, scenarioSetupFn):
     """
@@ -405,6 +406,36 @@ def createScenarioDetachedHead():
     ).splitlines()[0]
     utilCreateAndCommitFile('file2')
     utilExecute(['git', 'checkout', previousCommitHash])
+
+def createScenarioLongBranchName():
+    """
+    In the current folder, create the environment for testing truncation
+    of the shell helper's output:
+        - Super long branch name
+        - Other stuff so we'll know if the shell helper is removing them
+            - A modified file
+            - A staged file
+            - An untracked file
+    """
+    MODIFIED_FILE = 'modifiedFile'
+    STAGED_FILE = 'stagedFile'
+    UNTRACKED_FILE = 'untrackedFile'
+
+    utilExecute(['git', 'init'])
+    utilCreateAndCommitFile(MODIFIED_FILE)
+
+    # We want 'dev' so shell helper will show it as a target
+    utilExecute(['git', 'checkout', '-b', 'dev'])
+
+    # Super long branch
+    utilExecute(['git', 'checkout', '-b', 'f/super-doooper-long-branch-name'])
+
+    # Other stuff as per above
+    utilModifyFile(MODIFIED_FILE)
+    utilCreateFile(UNTRACKED_FILE)
+    utilCreateFile(STAGED_FILE)
+    utilExecute(['git', 'add', STAGED_FILE])
+
 
 #-----------------------------------------------------------------------------
 # Helpers
