@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# A simple script to clear the screen, show gitsummary output, delay 1s, repeat.
+# Press q to quit.
+
+while true; do
+    output=$(gitsummary.py --color --no-optional-locks --max-width 80)
+    clear
+    echo "$output"
+    read -t 1 -n 1
+    if [ "$REPLY" == "q" ]; then
+        exit
+    fi
+done
