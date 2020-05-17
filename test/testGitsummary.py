@@ -45,6 +45,10 @@ def commonTestSetUp(self):
     self.tempDir = tempfile.mkdtemp(prefix='testGitsummary.')
     os.chdir(self.tempDir)
 
+    # We have to turn the caching off since the cache only gets cleared when
+    # gitsummary.py is initially parsed.
+    gs.USE_CACHED_GIT_OUTPUT = False
+
 def commonTestTearDown(self):
     os.chdir(self.setupInitialDir)
     shutil.rmtree(self.tempDir, onerror=rmtreeErrorHandler)
@@ -354,6 +358,129 @@ class Test_fsGetValidatedUserConfig(unittest.TestCase):
 
         self.assertFalse(returnVal[gs.KEY_RETURN_STATUS])
         self.assertTrue(len(returnVal[gs.KEY_RETURN_MESSAGES]) >0)
+
+#-------------------------------------------------------------------------------
+class Test_getCacheInterface(unittest.TestCase):
+    def setUp(self)   : commonTestSetUp(self)
+    def tearDown(self): commonTestTearDown(self)
+
+    #---------------------------------------------------------------------------
+    # The git functionality in the caching functions are effectively tested by
+    # all other tests in this file.
+    #
+    # This is where we're testing the actual caching by:
+    #   - calling one of the functions (thus forcing population of the cache)
+    #   - setting the flag that says to use cached git output
+    #   - changing git state by running git commands
+    #   - getting cached data -- it should be unchanged
+    #---------------------------------------------------------------------------
+    def testGitForEachRefCachingWorks(self):
+        # Cached things to test:
+        #   - Dictionary headsToRemotes
+        #   - List remotes
+        #   - Boolean stashExists
+        LOCAL = 'local'
+        REMOTE = 'remote'
+        NEW_BRANCH = 'newBranch'
+        STASH_FILE = 'stashFile'
+
+        createNonEmptyRemoteLocalPair(REMOTE, LOCAL)
+        os.chdir(LOCAL)
+
+        # Populate the cache and record values for later comparison
+        cacheInterface = gs.getCacheInterface()
+        firstHeadsToRemotes = cacheInterface[gs.KEY_CACHE_GET_HEADS_TO_REMOTES]()
+        firstRemotes = cacheInterface[gs.KEY_CACHE_GET_REMOTES]()
+        firstStashExists = cacheInterface[gs.KEY_CACHE_STASH_EXISTS]()
+
+        # Create a new head ref
+        execute(['git', 'checkout', '-b', NEW_BRANCH])
+        createAndCommitFile('newFile', '', 'a')
+
+        # Create a new remote ref
+        execute(['git', 'push', '--set-upstream', 'origin', NEW_BRANCH])
+
+        # Create a stash
+        createAndCommitFile(STASH_FILE)
+        modifiedFile = open(STASH_FILE, 'w')
+        modifiedFile.write('Well hello there.')
+        modifiedFile.close()
+
+        execute(['git', 'stash'])
+
+        # Get data from cache. It should not reflect any of these git changes
+        gs.USE_CACHED_GIT_OUTPUT = True
+
+        self.assertEqual(
+           firstHeadsToRemotes,
+           cacheInterface[gs.KEY_CACHE_GET_HEADS_TO_REMOTES]()
+       )
+
+        self.assertEqual(
+           firstRemotes,
+           cacheInterface[gs.KEY_CACHE_GET_REMOTES]()
+       )
+
+        self.assertEqual(
+            firstStashExists,
+            cacheInterface[gs.KEY_CACHE_STASH_EXISTS]()
+        )
+
+    def testGitStatusCachingWorks(self):
+        # Cached things to test:
+        #   - String currentBranch
+        #   - List fileStatuses
+        #   - String remoteBranch
+        LOCAL = 'local'
+        REMOTE = 'remote'
+        NEW_BRANCH = 'newBranch'
+        MODIFIED_FILE = 'modifiedFile'
+
+        createNonEmptyRemoteLocalPair(REMOTE, LOCAL)
+        os.chdir(LOCAL)
+
+        # Populate the cache and record values for later comparison
+        cacheInterface = gs.getCacheInterface()
+
+        firstCurrentBranch = cacheInterface[
+            gs.KEY_CACHE_GET_CURRENT_BRANCH_FROM_GIT_STATUS
+        ]()
+
+        firstRemoteBranch = cacheInterface[
+            gs.KEY_CACHE_GET_REMOTE_BRANCH_FROM_GIT_STATUS
+        ]()
+
+        firstFileStatuses = cacheInterface[gs.KEY_CACHE_GET_FILE_STATUSES]()
+
+
+        # Create a new branch and corresponding remote
+        execute(['git', 'checkout', '-b', NEW_BRANCH])
+        createAndCommitFile('newFile', '', 'a')
+        execute(['git', 'push', '--set-upstream', 'origin', NEW_BRANCH])
+
+        # Modify a file
+        createAndCommitFile(MODIFIED_FILE)
+        modifiedFile = open(MODIFIED_FILE, 'w')
+        modifiedFile.write('Well hello there.')
+        modifiedFile.close()
+
+        # Get data from cache. It should not reflect any of these git changes
+        gs.USE_CACHED_GIT_OUTPUT = True
+
+        self.assertEqual(
+            firstCurrentBranch,
+            cacheInterface[gs.KEY_CACHE_GET_CURRENT_BRANCH_FROM_GIT_STATUS]()
+        )
+
+        self.assertEqual(
+            firstRemoteBranch,
+            cacheInterface[gs.KEY_CACHE_GET_REMOTE_BRANCH_FROM_GIT_STATUS]()
+        )
+
+        self.assertEqual(
+            firstFileStatuses,
+            cacheInterface[gs.KEY_CACHE_GET_FILE_STATUSES]()
+        )
 
 #-----------------------------------------------------------------------------
 class Test_gitGetCommitDescription(unittest.TestCase):
