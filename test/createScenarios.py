@@ -29,11 +29,16 @@ import subprocess
 #------------------------------------------------------------------------------
 
 def main():
-    print('Enter subfolder in which to create different scenarios')
+    DEFAULT_FOLDER = '/tmp/gitsummary.scenarios'
+    print(
+        'Folder in which to create different scenarios [' + DEFAULT_FOLDER + ']'
+    )
 
     valid = False
     while not valid:
-        destFolder = input()
+        inputString = input()
+        destFolder = DEFAULT_FOLDER if inputString == '' else inputString
+
         try:
             os.mkdir(destFolder)
             valid = True
