@@ -58,9 +58,45 @@ separatorString=' ' ; separatorStyles=''
 # small performance improvements
 outputInOrder="numStashes branchName numStage numWorkDir numUnmerged numUntracked numAheadRemote numBehindRemote numAheadTarget numBehindTarget targetBranch"
 
+# Maximum length of output
+maxLength=75
+
 #-------------------------------------------------------------------------------
 # No changes should be required below here
 #-------------------------------------------------------------------------------
+
+# Global variables used by addToOutputPieces(), since returning multiple values
+# from bash functions is a pain.
+declare -A outputPieces
+outputCurrentIndex=0
+outputLength=0
+
+#-------------------------------------------------------------------------------
+# Add the specified string to global $outputPieces[]. If it doesn't contain
+# any escapes, then also add to global $outputLength.
+#
+# If strings contain escapes, it must not contain any characters that need to
+# be included in the length calculation.
+#
+# Args
+#   $1 - Boolean - Whether the string to be added contains escape characters.
+#                  If it contains escape characters, it's length won't be
+#                  added to $outputLength
+#   $2 - String  - The string to be added
+#-------------------------------------------------------------------------------
+function addToOutputPieces()
+{
+    local containsEscape="$1"
+    local string="$2"
+
+    outputPieces[$outputCurrentIndex]="$string"
+
+    if ! $containsEscape; then
+        outputLength=$((outputLength + ${#string}))
+    fi
+
+    outputCurrentIndex=$((outputCurrentIndex + 1))
+}
 
 #-------------------------------------------------------------------------------
 # Check the 'show' value for a non-numeric quantity. Exit if value is invalid.
@@ -113,6 +149,8 @@ function doit()
     declare -A MAP_TO_GITSUMMARY
     declare -A positions
     declare -A values
+
+    local outputBranchIndex
 
     ALL_NAMES="numStashes numStage numWorkDir numUnmerged numUntracked numAheadRemote numBehindRemote numAheadTarget numBehindTarget branchName targetBranch"
 
@@ -169,11 +207,21 @@ function doit()
         values[$name]=${gitsummaryOutput[${positions[$name]}]}
     done
 
-    sep="$(getEscapeSequence "$separatorStyles")${separatorString}${COLOR_NORMAL}"
+    #---------------------------------------------------------------------------
+    # Build the output string. In order to track the length and make it easy
+    # to modify output if it's too long, we add the output pieces to an array
+    # by calling addToOutputPieces().
+    #---------------------------------------------------------------------------
 
-    # Loop through all possible quantities and create the appropriate output
-    # (possibly empty if the corresponding 'show' value is 'no')
+    # The branch name will be shortened if the output line is too long, so
+    # keep track of where it ends up in our array of output pieces.
+    outputBranchIndex=-1
+
     for name in $outputInOrder; do
+
+        #-----------------------------------------------------------------------
+        # Determine what, if anything, needs to be included in the output
+        #-----------------------------------------------------------------------
 
         # Whether we want this quantity to show up in the output
         showThis=false
@@ -206,22 +254,105 @@ function doit()
             fi
         fi
 
-        # Print output as per showThis and showValue
+        #-----------------------------------------------------------------------
+        # Add the required bits to our output
+        #-----------------------------------------------------------------------
         if $showThis; then
-            if [ "$output" != "" ]; then
-                output="${output}${sep}"
+            if [ $outputCurrentIndex -ne 0 ]; then
+                # Separator
+                addToOutputPieces true "$(getEscapeSequence "$separatorStyles")"
+                addToOutputPieces false "$separatorString"
             fi
 
-            output="${output}$(getEscapeSequence "${styles[$name]}")${prefix[$name]}"
+            # Style
+            addToOutputPieces true "$(getEscapeSequence "${styles[$name]}")"
+
+            # Prefix
+            addToOutputPieces false "${prefix[$name]}"
 
             if $showValue; then
-                output="${output}${values[$name]}${suffix[$name]}"
+                if [ "$name" == "branchName" ]; then
+                    # Remember this index so we can shorten the branch name if
+                    # our line is too long
+                    outputBranchIndex=$outputCurrentIndex
+                fi
+
+                # Value
+                addToOutputPieces false "${values[$name]}"
+
+                # Suffix
+                addToOutputPieces false "${suffix[$name]}"
             fi
 
-            output="${output}${COLOR_NORMAL}"
+            # Reset style for next piece
+            addToOutputPieces true "${COLOR_NORMAL}"
         fi
     done
 
+    numOutputPieces=$outputCurrentIndex
+
+    #-----------------------------------------------------------------------
+    # Check the length and adjust if required
+    #   - If we have a branch name:
+    #       - Truncate it 
+    #       - If truncating it doesn't remove enough characters then just show
+    #         the (possibly truncated) branch name (instead of all the other
+    #         requested output)
+    #   - If we don't have a branch name:
+    #       - Just truncate the entire line
+    #
+    # Note: We don't adjust any lengths if we're using test values, since test
+    #       values result in output that is too long, so we won't get to see
+    #       them
+    #-----------------------------------------------------------------------
+
+    showBranchNameOnly=false
+    modifiedBranchName=""
+
+    if ! $useTestValues && [ $outputLength -gt $maxLength ]; then
+        numToRemove=$(($outputLength - $maxLength + 3))   # "3" is for "..."
+
+        if [ "$outputBranchIndex" != "-1" ]; then
+            branchName="${values[branchName]}"
+            branchNameLength=${#branchName}
+
+            if [ "$branchNameLength" -ge "$numToRemove" ]; then
+                # Branch name has enough characters to truncate, so do that
+                values[branchName]="${branchName:0:-$numToRemove}..."
+            else
+                # Branch name isn't long enough, so make the output just
+                # the branch name, truncated if required
+                values[branchName]="${branchName:0:$maxLength}"
+                showBranchNameOnly=true
+            fi
+        else
+            # No branchname, and line is too long. Can't imagine this ever
+            # happening. Showing *something*, and fake it out by saying it's a
+            # branch name
+            values[branchName]="prompt length error"
+            showBranchNameOnly=true
+        fi
+    fi
+
+    #-----------------------------------------------------------------------
+    # Create our output
+    #-----------------------------------------------------------------------
+    output=""
+
+    if $showBranchNameOnly; then
+        output="$(getEscapeSequence "${styles[branchName]}")${values[branchName]}${COLOR_NORMAL}"
+    else
+        currentIndex=0
+        while [ $currentIndex -lt $numOutputPieces ]; do
+            if [ "$currentIndex" == "$outputBranchIndex" ]; then
+                # Use #values[branchName] since it may have been truncated above
+                output="${output}${values[branchName]}"
+            else
+                output="${output}${outputPieces[$currentIndex]}"
+            fi
+            currentIndex=$((currentIndex + 1))
+        done
+    fi
     echo -e "$output"
 }
 
