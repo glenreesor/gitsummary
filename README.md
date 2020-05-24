@@ -1,34 +1,35 @@
 # gitsummary
 
-A better `git status`
+A better `git status`:
 - stashes
 - file statuses
 - branch list
-    - number of commits ahead/behind remote and merge target
+    - number of commits ahead/behind remote tracking branch
+    - number of commits ahead/behind merge target
 
 All nicely formatted with color.
 
 ## Example
-![][defaultOutput]
+![test](/doc/example.png)
 
 In addition to the usual stashes and file statuses, this output is showing the
 following branch information:
 
 - `master`
-    - In sync with its remote branch
+    - In sync with its remote tracking branch
     - Has no merge target
 - `develop`
-    - In sync with its remote branch
-    - 3 commits ahead of its merge target (`master`)
-- `hotfix-fix-something-bad`
-    - Has no remote branch
-    - 1 commit ahead of its merge target (`master`)
-- `make-awesome-new-thing`
-    - Has no remote branch
-    - 2 commits behind its merge target (`develop`)
-- `make-faster`
-    - 7 commits ahead of its remote
-    - 8 commits ahead of its merge target (`develop`)
+    - In sync with its remote tracking branch
+    - 5 commits ahead of its merge target (`master`)
+- `hotfix-stabilize-reactor-core`
+    - In sync with its remote tracking branch
+    - 2 commits ahead of its merge target (`master`)
+- `feature-ds2-defences-phase2`
+    - 3 commits ahead of its remote tracking branch
+    - 4 commits ahead of its merge target (`develop`)
+- `feature-endor-shield-generator`
+    - 2 commits behind its remote tracking branch
+    - 5 commits ahead and 3 commits behind its merge target (`develop`)
 
 ## What is a 'Merge Target'?
 A merge target is the branch that `gitsummary` is expecting a particular branch
@@ -144,7 +145,5 @@ The following is a sample configuration file that matches the built-in defaults:
 Gitsummary will look for `.gitsummaryconfig` in the current directory. If
 not found, it will look in successive parent folders all the way up to the root
 of the filesystem.
-
-[defaultOutput]: https://raw.githubusercontent.com/glenreesor/gitsummary/master/doc/output.default.png
 
 [gitsummaryScript]: https://raw.githubusercontent.com/glenreesor/gitsummary/master/gitsummary.py

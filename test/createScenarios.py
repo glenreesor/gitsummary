@@ -54,9 +54,9 @@ def main():
         createScenarioAheadBehindRemoteAndTarget
     )
     setupScenario('all-sections', createScenarioAllSections)
-    setupScenario('demo', createScenarioDemo)
     setupScenario('detached-head', createScenarioDetachedHead)
     setupScenario('long-branch-name', createScenarioLongBranchName)
+    setupScenario('example', createScenarioExample)
 
 def setupScenario(scenarioFolder, scenarioSetupFn):
     """
@@ -282,131 +282,6 @@ def createScenarioAllSections():
     for aFile in UNTRACKED_FILES:
         utilCreateFile(aFile)
 
-def createScenarioDemo():
-    """
-    In the current folder, create the environment for:
-        - Demo output showing gitsummary capabilities
-        - Branches
-            commit1   commit2   commit3   commit4   commit5    ... commitX
-            master
-                                          develop
-                      make-awesome-new-thing
-                                                               make-faster
-                      hotfix-fix-something-bad
-
-        - Stage files etc will be setup on make-faster, hence "X"
-          in "commitX" above, and below in remotes
-
-        - Remotes:
-            master                 : in sync
-            develop                : in sync
-            make-awesome-new-thing : no remote
-            make-faster            : +X
-
-        - Two entries in each section of gitsummary output
-    """
-
-    #-------------------------------------------------------------------------
-    # Create branches
-    #-------------------------------------------------------------------------
-    REMOTE = 'remote'
-    LOCAL = 'local'
-    WORK_FILE = 'branch-work-setup'
-
-    utilExecute(['git', 'init', '--bare', REMOTE])
-    utilExecute(['git', 'clone', REMOTE, LOCAL])
-    os.chdir(LOCAL)
-
-    utilCreateAndCommitFile(WORK_FILE, 'contents1', 'commit1')
-    utilExecute(['git', 'push'])
-
-    utilExecute(['git', 'checkout', '-b', 'develop', 'master'])
-    utilExecute(['git', 'push', '--set-upstream', 'origin', 'develop'])
-
-    utilExecute(['git', 'checkout', '-b', 'hotfix-fix-something-bad', 'master'])
-    utilModifyAndCommitFile(WORK_FILE, 'contents2', 'commit2')
-
-    utilExecute(['git', 'checkout', 'develop'])
-    utilModifyAndCommitFile(WORK_FILE, 'contents3', 'commit3')
-    utilExecute(['git', 'push'])
-
-    utilExecute(['git', 'checkout', '-b', 'make-awesome-new-thing', 'develop'])
-
-    utilExecute(['git', 'checkout', 'develop'])
-    utilModifyAndCommitFile(WORK_FILE, 'contents4', 'commit4')
-    utilModifyAndCommitFile(WORK_FILE, 'contents5', 'commit5')
-    utilExecute(['git', 'push'])
-
-    utilExecute(['git', 'checkout', '-b', 'make-faster', 'develop'])
-    utilModifyAndCommitFile(WORK_FILE, 'contents6', 'commit6')
-    utilExecute(['git', 'push', '--set-upstream', 'origin', 'make-faster'])
-    utilModifyAndCommitFile(WORK_FILE, 'contents6a', 'commit6a')
-    utilModifyAndCommitFile(WORK_FILE, 'contents6b', 'commit6b')
-
-    #-------------------------------------------------------------------------
-    # Create .gitsummaryconfig with gitsummary defaults.
-    # Do it here so we don't commit the "added" files below.
-    #-------------------------------------------------------------------------
-    gitsummaryConfigFile = open(gitsummary.CONFIG_FILENAME, 'w')
-    json.dump(gitsummary.CONFIG_DEFAULT, gitsummaryConfigFile)
-    gitsummaryConfigFile.close()
-
-    utilExecute(['git', 'add', gitsummary.CONFIG_FILENAME])
-    utilExecute(['git', 'commit', '-m', 'Add .gitsummaryconfig'])
-
-    #-------------------------------------------------------------------------
-    # Setup files to get two entries in each section of gitsummary output
-    #-------------------------------------------------------------------------
-    STAGE_FILE_1 = 'app.js'
-    STAGE_FILE_2 = '.eslintrc'
-    WORK_DIR_FILE_1 = 'index.html'
-    WORK_DIR_FILE_2 = 'app.css'
-    FILE_FOR_STASH = 'file-for-stash'
-    UNTRACKED_FILE_1 = 'todo.txt'
-    UNTRACKED_FILE_2 = 'test.output'
-
-    # Create the initial files, which will be used for the 'Modified' section
-    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
-        utilCreateAndCommitFile(aFile)
-
-    # Create the two stashes
-    utilCreateAndCommitFile(FILE_FOR_STASH, 'contents1', 'Fix something else')
-
-    utilModifyFile(FILE_FOR_STASH, 'contents2')
-    utilExecute(['git', 'stash'])
-
-    # Commit a change so the next stash is on a different commit
-    utilModifyAndCommitFile(FILE_FOR_STASH, 'contents3', 'Fix something')
-    utilModifyFile(FILE_FOR_STASH, 'contents4')
-    utilExecute(['git', 'stash'])
-
-    # Stage changes
-    for aFile in [STAGE_FILE_1, STAGE_FILE_2]:
-        utilCreateFile(aFile)
-        utilExecute(['git', 'add', aFile])
-
-    # Work Dir files
-    for aFile in [WORK_DIR_FILE_1, WORK_DIR_FILE_2]:
-        utilModifyFile(aFile, 'modified contents')
-
-    # Untracked files
-    for aFile in [UNTRACKED_FILE_1, UNTRACKED_FILE_2]:
-        utilCreateFile(aFile)
-
-def createScenarioDetachedHead():
-    """
-    In the current folder, create the environment for:
-        - Detached head state
-    """
-    utilExecute(['git', 'init'])
-    utilCreateAndCommitFile('file1')
-    previousCommitHash = subprocess.check_output(
-        ['git', 'rev-list', '--max-count=1', 'master'],
-        universal_newlines = True
-    ).splitlines()[0]
-    utilCreateAndCommitFile('file2')
-    utilExecute(['git', 'checkout', previousCommitHash])
-
 def createScenarioLongBranchName():
     """
     In the current folder, create the environment for testing truncation
@@ -435,6 +310,72 @@ def createScenarioLongBranchName():
     utilCreateFile(UNTRACKED_FILE)
     utilCreateFile(STAGED_FILE)
     utilExecute(['git', 'add', STAGED_FILE])
+
+def createScenarioExample():
+    """
+    In the current folder, create the environment for:
+        - Sample output showing gitsummary capabilities
+        - Branches are a pain, so this will just create the required files
+          (so we don't have to fiddle with as much formatting later)
+
+    """
+
+    BRANCHES=[
+        'develop',
+        'feature-ds2-defences-phase2',
+        'feature-endor-shield-generator'
+    ]
+    CURRENT_BRANCH='hotfix-stabilize-reactor-core'
+    STAGE_FILES=['controller-superlaser.f77', 'controller-turbolaser.f77']
+    STASH_FILE='stashFile'
+    WORK_DIR_FILE='controller-ion-cannon.f77'
+    UNTRACKED_FILES=['ds1-thermal-exhaust-port.cobol', 'npm.faq']
+
+    #-------------------------------------------------------------------------
+    # Init repository and create the extra branches
+    #-------------------------------------------------------------------------
+    utilExecute(['git', 'init'])
+    utilCreateAndCommitFile('bob')
+
+    for branch in BRANCHES:
+        utilExecute(['git', 'checkout', '-b', branch, 'master'])
+
+    #-------------------------------------------------------------------------
+    # Now all the files
+    #-------------------------------------------------------------------------
+    utilExecute(['git', 'checkout', '-b', 'hotfix-stabilize-reactor-core', 'master'])
+
+    # Stash
+    utilCreateAndCommitFile(STASH_FILE)
+    utilModifyFile(STASH_FILE)
+    utilExecute(['git', 'stash', 'push', '-m', 'First try'])
+
+    # Work Dir
+    utilCreateAndCommitFile(WORK_DIR_FILE)
+    utilModifyFile(WORK_DIR_FILE)
+
+    # Stage
+    for stageFile in STAGE_FILES:
+        utilCreateFile(stageFile)
+        utilExecute(['git', 'add', stageFile])
+
+    # Untracked
+    for untrackedFile in UNTRACKED_FILES:
+        utilCreateFile(untrackedFile)
+
+def createScenarioDetachedHead():
+    """
+    In the current folder, create the environment for:
+        - Detached head state
+    """
+    utilExecute(['git', 'init'])
+    utilCreateAndCommitFile('file1')
+    previousCommitHash = subprocess.check_output(
+        ['git', 'rev-list', '--max-count=1', 'master'],
+        universal_newlines = True
+    ).splitlines()[0]
+    utilCreateAndCommitFile('file2')
+    utilExecute(['git', 'checkout', previousCommitHash])
 
 
 #-----------------------------------------------------------------------------
