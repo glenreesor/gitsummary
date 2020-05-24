@@ -52,22 +52,56 @@ You can specify your own merge targets in a `.gitsummaryconfig` file
 ## Usage
 ```
 Usage:
-    ./gitsummary.py [--custom [sections]] | --help | --helpconfig | --version
+    ./gitsummary.py [OPTIONS]
+    ./gitsummary.py shell-prompt-helper [OPTIONS]
 
-Print a summary of the current git repository's status:
-    - stashes, stage changes, working directory changes, unmerged changes,
-      untracked files,
+In the first form, print a summary of the current git repository's status:
+    - stashes, staged changes, working directory changes, unmerged changes,
+      untracked files
     - list of local branches, including the following for each:
+          - number of commits ahead/behind its remote tracking branch
           - number of commits ahead/behind its target branch
-          - number of commits ahead/behind its remote branch
           - the name of its target branch
 
-Flags:
-    --custom [sections]
-        - Show only the specified sections of output, in the order specified
-        - Valid section names are:
-              stashes, stage, workdir, untracked, unmerged, branch-all,
-              branch-current
+In the second form, print a single line of space-separated values that can be
+easily parsed to provide a fancy shell prompt:
+    - number of:
+          - stashes, staged changes, working directory changes,
+            unmerged changes, untracked files,
+          - commits ahead of remote branch, commits behind remote tracking
+            branch,
+          - commits ahead of target branch, commits behind target branch
+    - current branch name, target branch name
+
+Also in the second form, values that have no meaning will be replaced with "_":
+    - number of commits ahead/behind remote if there is no remote tracking
+      branch
+    - number of commits ahead/behind target if there is no target branch
+
+Options:
+    --custom SECTIONS
+        - Show only the specified SECTIONS of output, in the order specified
+        - Valid section names for the first form above are:
+              stashes, stage, workdir, unmerged, untracked,
+              branch-all, branch-current
+        - Valid section names for the second form above are:
+              stashes, stage, workdir, unmerged, untracked,
+              ahead-remote, behind-remote, ahead-target, behind-target,
+              branch-name, target-branch
+
+    --color
+        - Force the use of colored output even if stdout is not a tty
+
+    --no-color
+        - Do not show colored output
+
+    --no-optional-locks
+        - Use git's --no-optional-locks option. Useful if you want to run
+          gitsummary in the background or a loop
+
+    --max-width N
+        - Format output for a maximum width of N columns, regardless of
+          current terminal width
 
     --help
         - Show this output
