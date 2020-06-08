@@ -10,7 +10,7 @@ A better `git status`:
 All nicely formatted with color.
 
 ## Example
-![test](/doc/example.png)
+![gitsummary example](doc/example.png)
 
 In addition to the usual stashes and file statuses, this output is showing the
 following branch information:
