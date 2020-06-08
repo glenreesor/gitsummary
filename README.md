@@ -129,7 +129,7 @@ Options:
 python3
 
 ## Installation
-Easy! Just copy [gitsummary.py][gitsummaryScript]
+Easy! Just copy [gitsummary.py](gitsummary.py)
 to a folder in your path, and you're set!
 
 ## Configuration File
@@ -191,5 +191,3 @@ The following is a sample configuration file that matches the built-in defaults:
 Gitsummary will look for `.gitsummaryconfig` in the current directory. If
 not found, it will look in successive parent folders all the way up to the root
 of the filesystem.
-
-[gitsummaryScript]: https://raw.githubusercontent.com/glenreesor/gitsummary/master/gitsummary.py
