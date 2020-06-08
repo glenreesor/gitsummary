@@ -31,6 +31,10 @@ following branch information:
     - 2 commits behind its remote tracking branch
     - 5 commits ahead and 3 commits behind its merge target (`develop`)
 
+See it in action using the `gmon` helper script:
+
+![gitsummary in action](doc/gmon-example.gif)
+
 ## What is a 'Merge Target'?
 A merge target is the branch that `gitsummary` is expecting a particular branch
 to be merged into.
@@ -48,6 +52,14 @@ Regular Expression  | Merge Target
 
 You can specify your own merge targets in a `.gitsummaryconfig` file
 (see below).
+
+## `gmon` -- A simple `gitsummary` looper
+`gmon` is the simple script used in the demo above. It:
+
+- clears the screen
+- runs `gitsummary`
+- sleeps 1 second
+- repeats
 
 ## Usage
 ```
