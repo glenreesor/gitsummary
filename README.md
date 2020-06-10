@@ -78,6 +78,8 @@ function fancyPrompt()
 PROMPT_COMMAND=fancyPrompt
 ```
 
+**Note:** This script requires bash v4+.
+
 You can see it in action here -- the same demo as above, but now using `gitsummaryShellHelper.sh` to create the shell prompt:
 
 ![gitsummaryShellHelper in action](doc/shellHelper-example.gif)

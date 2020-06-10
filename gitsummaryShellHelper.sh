@@ -1,6 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Output a single line showing complete status of current git repo
+
+# This script requires bash v4+.
 
 #-------------------------------------------------------------------------------
 # Things you may want to change
