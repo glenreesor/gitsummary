@@ -53,6 +53,35 @@ Regular Expression  | Merge Target
 You can specify your own merge targets in a `.gitsummaryconfig` file
 (see below).
 
+## Shell Prompt Helper
+`gitsummaryShellHelper.sh` is a simple script you can use to insert a summary of your git repo status into your shell prompt. It is fully customizeable using variables at the top of the script.
+
+You can choose any or all of the following, in any order, styled using any ANSI styles (foreground color, background color, bright, etc):
+
+- number of stashes
+- number of staged files
+- number of modified files in the work dir
+- number of unmerged files
+- number of untracked files
+- number of commits ahead / behind of the corresponding remote tracking branch
+- number of commits ahead / behind the target branch
+- branch name
+- target branch name
+
+A simple way to use it for a bash prompt is to add this to your `.bashrc`:
+
+```
+function fancyPrompt()
+{
+    export PS1="$(gitsummaryShellHelper.sh)$ "
+}
+PROMPT_COMMAND=fancyPrompt
+```
+
+You can see it in action here -- the same demo as above, but now using `gitsummaryShellHelper.sh` to create the shell prompt:
+
+![gitsummaryShellHelper in action](doc/shellHelper-example.gif)
+
 ## `gmon` -- A simple `gitsummary` looper
 `gmon` is the simple script used in the demo above. It:
 

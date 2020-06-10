@@ -2,6 +2,9 @@
 
 # Simple script to demonstrate `gmon` in action
 
+# Whether to use gitsummaryShellHelper.sh to create the fake shell prompt
+USE_SHELL_PROMPT_HELPER=true
+
 #-------------------------------------------------------------------------------
 # Do everything
 #
@@ -102,6 +105,8 @@ function doit()
     #--------------------------------------------------------------------------
     read
 
+    echo -n "$(getShellPrompt)"
+
     # Start gmon
     p  1 2 "# Better use gmon so I don't screw up again."
     p  1 0 "empireterm -baud 9600 -e gmon"
@@ -116,6 +121,7 @@ function doit()
     sleep 3
 
     p  0 2 "# Ooooh nice! He also got started on the shield generator :+1:"
+    p  0 2 "# Or as The Big Guy likes to say, the Shield Genahrayta ¯\_(ツ)_/¯"
     p  0 2 "# Better pull in his changes."
 
     pe 1 0 false "git pull"
@@ -125,8 +131,11 @@ function doit()
     # Grab reference file
     p  0 2 "# Don't want to repeat our mistakes from last time ..."
     pe 1 0 false "mkdir reference"
-    p  1 0  "cp ~tarkin/design/ds1-thermal-exhaust-port.cobol reference"
+
+    # Hack -- do this first so the prompt printed after `cp` below properly
+    # shows the new file
     touch reference/ds1-thermal-exhaust-port.cobol
+    p  1 0  "cp ~tarkin/design/ds1-thermal-exhaust-port.cobol reference"
     p  0 0 ''
     sleep 2
 
@@ -169,6 +178,18 @@ function doit()
 }
 
 #-------------------------------------------------------------------------------
+# Get a string to be used for the fake shell prompt.
+#-------------------------------------------------------------------------------
+function getShellPrompt()
+{
+    if $USE_SHELL_PROMPT_HELPER; then
+        echo "$(gitsummaryShellHelper.sh) $ "
+    else
+        echo "$ "
+    fi
+}
+
+#-------------------------------------------------------------------------------
 # Modify and commit the specified file.
 #
 # Args:
@@ -202,7 +223,7 @@ function p()
     typing "$text"
     sleep $postDelay
     echo
-    echo -n '$ '
+    echo -n "$(getShellPrompt)"
 }
 
 #-------------------------------------------------------------------------------
@@ -232,7 +253,7 @@ function pe()
         bash -c "$text"
     fi
     sleep $postDelay
-    echo -n '$ '
+    echo -n "$(getShellPrompt)"
 }
 
 #-------------------------------------------------------------------------------
