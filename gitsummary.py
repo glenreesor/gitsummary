@@ -240,7 +240,7 @@ def fullRepoOutput(options):
     if sys.stdout.isatty():
         (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
 
-        useColor = True and (options[KEY_OPTIONS_COLOR] != OPTIONS_COLOR_NO)
+        useColor = (options[KEY_OPTIONS_COLOR] != OPTIONS_COLOR_NO)
         maxWidth = (
             SCREEN_WIDTH
                 if options[KEY_OPTIONS_MAX_WIDTH] == OPTIONS_MAX_WIDTH_AUTO
@@ -252,7 +252,7 @@ def fullRepoOutput(options):
                 if options[KEY_OPTIONS_MAX_WIDTH] == OPTIONS_MAX_WIDTH_AUTO
                 else int(options[KEY_OPTIONS_MAX_WIDTH])
         )
-        useColor = False or (options[KEY_OPTIONS_COLOR] == OPTIONS_COLOR_YES)
+        useColor = (options[KEY_OPTIONS_COLOR] == OPTIONS_COLOR_YES)
 
     #---------------------------------------------------------------------------
     # Assemble the raw output lines(no colors, padding, or truncation)
