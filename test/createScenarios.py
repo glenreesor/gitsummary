@@ -56,6 +56,7 @@ def main():
     setupScenario('all-sections', createScenarioAllSections)
     setupScenario('detached-head', createScenarioDetachedHead)
     setupScenario('example', createScenarioExample)
+    setupScenario('git-init-state', createScenarioGitInitState)
     setupScenario('long-branch-name', createScenarioLongBranchName)
 
 def setupScenario(scenarioFolder, scenarioSetupFn):
@@ -348,6 +349,13 @@ def createScenarioExample():
     # Untracked
     for untrackedFile in UNTRACKED_FILES:
         utilCreateFile(untrackedFile)
+
+def createScenarioGitInitState():
+    """
+    In the current folder, create the environment immediately after 'git init'.
+    We need this for testing the shell helper
+    """
+    utilExecute(['git', 'init'])
 
 def createScenarioLongBranchName():
     """

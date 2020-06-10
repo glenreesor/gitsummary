@@ -193,3 +193,10 @@ gitsummaryShellHelper.py tests
 
                                                         Expected Result: Only branch name shown, and it's truncated
                                                             f/super-do
+
+8       gitsummaryShellHelper          git-init-state
+        (With non-test data #3)                         Commandline
+                                                           gssht
+
+                                                        Expected Result:
+                                                            master

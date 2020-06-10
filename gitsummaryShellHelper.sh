@@ -431,10 +431,17 @@ function main()
     fi
 
     # Early exit if we're not in a git-tracked folder
+    # Don't use `git status` because it can be expensive
     if ! $useTestValues; then
         git rev-list HEAD --max-count=1 > /dev/null 2>&1
         if [ "$?" != "0" ]; then
-            exit
+            # There are no refs, but this could also correspond to the state
+            # immediately after `git init`. So check for that by using
+            # `git status` (which isn't expensive in this scenario)
+            git status > /dev/null 2>&1
+            if [ "$?" != "0" ]; then
+                exit
+            fi
         fi
     fi
 
