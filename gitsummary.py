@@ -53,6 +53,33 @@ OPTIONS_OUTPUT_AHEAD_TARGET = 'ahead-target'
 OPTIONS_OUTPUT_BEHIND_REMOTE = 'behind-remote'
 OPTIONS_OUTPUT_BEHIND_TARGET = 'behind-target'
 
+# Lists of above options for error checking of commandline options
+OPTIONS_OUTPUT_FULL_REPO = [
+    OPTIONS_OUTPUT_STAGE,
+    OPTIONS_OUTPUT_STASHES,
+    OPTIONS_OUTPUT_UNMERGED,
+    OPTIONS_OUTPUT_UNTRACKED,
+    OPTIONS_OUTPUT_WORK_DIR,
+
+    OPTIONS_OUTPUT_BRANCH_ALL,
+    OPTIONS_OUTPUT_BRANCH_CURRENT,
+]
+
+OPTIONS_OUTPUT_SHELL_PROMPT_HELPER = [
+    OPTIONS_OUTPUT_STAGE,
+    OPTIONS_OUTPUT_STASHES,
+    OPTIONS_OUTPUT_UNMERGED,
+    OPTIONS_OUTPUT_UNTRACKED,
+    OPTIONS_OUTPUT_WORK_DIR,
+
+    OPTIONS_OUTPUT_BRANCH_NAME,
+    OPTIONS_OUTPUT_TARGET_BRANCH,
+    OPTIONS_OUTPUT_AHEAD_REMOTE,
+    OPTIONS_OUTPUT_AHEAD_TARGET,
+    OPTIONS_OUTPUT_BEHIND_REMOTE,
+    OPTIONS_OUTPUT_BEHIND_TARGET,
+]
+
 #-------------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
 #-------------------------------------------------------------------------------
@@ -2512,6 +2539,7 @@ def main():
                 OPTIONS_OUTPUT_TARGET_BRANCH,
             ],
         }
+        validOptions = OPTIONS_OUTPUT_SHELL_PROMPT_HELPER
     else:
         requestedCmd = fullRepoOutput
         firstOptionIndex = 1
@@ -2527,6 +2555,7 @@ def main():
                 OPTIONS_OUTPUT_BRANCH_ALL,
             ],
         }
+        validOptions = OPTIONS_OUTPUT_FULL_REPO
 
     options = defaultOptions.copy()
 
@@ -2542,7 +2571,7 @@ def main():
                 arg = sys.argv[i]
                 if arg.startswith('--'):
                     customDone = True
-                elif arg not in defaultOptions[KEY_OPTIONS_SELECTED_OUTPUT]:
+                elif arg not in validOptions:
                     print('Unknown --custom option: ' + arg)
                     sys.exit(1)
                 else:
