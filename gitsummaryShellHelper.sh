@@ -111,7 +111,7 @@ function check_showNonNumeric()
     local value="$2"
 
     if [ "$value" != "yes" ] && [ "$value" != "no" ]; then
-        echo "Invalid value for $name: '$value'"
+        echo "Invalid value for show['$name']: '$value'"
         echo "It must be one of: yes, no"
         exit 1
     fi
@@ -130,7 +130,7 @@ function check_showNumeric()
     local value="$2"
 
     if [ "$value" != "num" ] && [ "$value" != "boolean" ] && [ "$value" != "no" ]; then
-        echo "Invalid value for $name: '$value'"
+        echo "Invalid value for show['$name']: '$value'"
         echo "It must be one of: num, boolean, no"
         exit 1
     fi
