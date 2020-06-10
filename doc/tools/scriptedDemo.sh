@@ -134,8 +134,9 @@ function doit()
 
     # Hack -- do this first so the prompt printed after `cp` below properly
     # shows the new file
+    sleep 1
     touch reference/ds1-thermal-exhaust-port.cobol
-    p  1 0  "cp ~tarkin/design/ds1-thermal-exhaust-port.cobol reference"
+    p  0 0  "cp ~tarkin/design/ds1-thermal-exhaust-port.cobol reference"
     p  0 0 ''
     sleep 2
 
