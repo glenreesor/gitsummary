@@ -24,7 +24,8 @@ Test    Description                     Scenario        Commandline and Expected
                                                             gst
 
                                                         Expected Result:
-                                                            - Current branch indicator beside a short commit hash
+                                                            - Branch list includes master and a short commit hash
+                                                            - Current branch indicator is beside the short commit hash
 
 3       Sections listed and colorized   all-sections
                                                         Commandline:
