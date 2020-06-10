@@ -38,7 +38,7 @@ BEGIN {
     STYLES[6] = "bg-black bright fg-yellow"
     STYLES[7] = "bg-black bright fg-white"
     STYLES[8] = "bg-white fg-black"
-    STYLES[9] = "bg-white fg-green"
+    STYLES[9] = "bg-white fg-magenta"
     STYLES[10] = "bg-white fg-red"
     STYLES[11] = "bg-white fg-blue"
 
