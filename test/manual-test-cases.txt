@@ -171,14 +171,14 @@ gitsummaryShellHelper.py tests
                                                            gssht
 
                                                         Expected Result:
-                                                            ◆ dev ⦁3 ⛌4 ‼5 ... +10 (master)
+                                                            ◆ develop ⦁3 ⛌4 ‼5 ... +10 (master)
 
 6       gitsummaryShellHelper          ahead-behind-remote-and-target
         (With non-test data #2)                         Commandline (from 'local' folder')
                                                            gssht
 
                                                         Expected Result:
-                                                            dev ... +1 -2 +3 -4 (master)
+                                                            develop ... +1 -2 +3 -4 (master)
                                                             
 7       gitsummaryShellHelper          long-branch-name Change maxLength to 35
         (Truncation tests)                              Commandline

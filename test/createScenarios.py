@@ -90,22 +90,22 @@ def createScenarioAheadBehindRemoteAndTarget():
 
     We want unique numbers for testing the shell helper option.
 
-              rm1 --- rm2 (Remote Master)
+              rm1 --- rm2 (Remote master)
              /
-            /- m1 --- m2 --- m3 --- m4 (Master)
+            /- m1 --- m2 --- m3 --- m4 (master)
            /
-    common1                    rd1 --- rd2 (Remote Dev)
+    common1                    rd1 --- rd2 (Remote develop)
            \                  /
             common2 -- common3
                               \
-                               d1 (Dev)
+                               d1 (develop)
 
     This will result in:
          master:
             - ahead of its remote by 4
             - behind its remote by 2
 
-         dev:
+         develop:
             - ahead of its remote by 1
             - behind its remote by 2
             - ahead of its target by 3
@@ -128,7 +128,7 @@ def createScenarioAheadBehindRemoteAndTarget():
     #-------------------------------------------------------------------------
     # REMOTE Step 1:
     #   - Create master: 'common1'
-    #   - Create dev: 'common2', 'common3'
+    #   - Create develop: 'common2', 'common3'
     #-------------------------------------------------------------------------
     utilExecute(['git', 'init', '--bare', REMOTE])
 
@@ -138,11 +138,11 @@ def createScenarioAheadBehindRemoteAndTarget():
     utilCreateAndCommitFile(MY_FILE, 'common1', 'common1')
     utilExecute(['git', 'push'])
 
-    utilExecute(['git', 'checkout', '-b', 'dev'])
+    utilExecute(['git', 'checkout', '-b', 'develop'])
     utilModifyAndCommitFile(MY_FILE, 'common2', 'common2')
     utilModifyAndCommitFile(MY_FILE, 'common3', 'common3')
 
-    utilExecute(['git', 'push', '--set-upstream', 'origin', 'dev'])
+    utilExecute(['git', 'push', '--set-upstream', 'origin', 'develop'])
 
     #-------------------------------------------------------------------------
     # LOCAL Step 1:
@@ -156,7 +156,7 @@ def createScenarioAheadBehindRemoteAndTarget():
     # REMOTE Step 2:
     #   - Create the commits that will not be pulled by LOCAL:
     #       - master: rm1, rm2
-    #       - dev: rd1, rd2
+    #       - develop: rd1, rd2
     #-------------------------------------------------------------------------
     os.chdir(parent)
     os.chdir(LOCAL_HELPER)
@@ -166,7 +166,7 @@ def createScenarioAheadBehindRemoteAndTarget():
     utilModifyAndCommitFile(MY_FILE, 'rm2', 'rm2')
     utilExecute(['git', 'push'])
 
-    utilExecute(['git', 'checkout', 'dev'])
+    utilExecute(['git', 'checkout', 'develop'])
     utilModifyAndCommitFile(MY_FILE, 'rd1', 'rd1')
     utilModifyAndCommitFile(MY_FILE, 'rd2', 'rd2')
     utilExecute(['git', 'push'])
@@ -175,7 +175,7 @@ def createScenarioAheadBehindRemoteAndTarget():
     # LOCAL Step 2:
     #   - Create remaining commits:
     #       - master: m1, m2, m3, m4
-    #       - dev: d1
+    #       - develop: d1
     #   - fetch from remote so we're aware of being ahead/behind
     #
     #-------------------------------------------------------------------------
@@ -188,7 +188,7 @@ def createScenarioAheadBehindRemoteAndTarget():
     utilModifyAndCommitFile(MY_FILE, 'm3', 'm3')
     utilModifyAndCommitFile(MY_FILE, 'm4', 'm4')
 
-    utilExecute(['git', 'checkout', 'dev'])
+    utilExecute(['git', 'checkout', 'develop'])
     utilModifyAndCommitFile(MY_FILE, 'd1', 'd1')
 
     utilExecute(['git', 'fetch'])
@@ -198,7 +198,7 @@ def createScenarioAheadBehindRemoteAndTarget():
     #-------------------------------------------------------------------------
     utilCreateFile(
         'Expected Numbers.txt',
-        'Dev\n    Remote: +1   -2\n    Target: +3   -4\n'
+        'develop\n    Remote: +1   -2\n    Target: +3   -4\n'
     )
 
 def createScenarioAllSections():
@@ -233,9 +233,10 @@ def createScenarioAllSections():
         utilCreateAndCommitFile(aFile, 'Commit comment')
 
     #---------------------------------------------------------------------------
-    # Switch to new 'dev', where we're going to setup all required files and commits
+    # Switch to new 'develop', where we're going to setup all required files and
+    # commits
     #---------------------------------------------------------------------------
-    utilExecute(['git', 'checkout', '-b', 'dev', 'master'])
+    utilExecute(['git', 'checkout', '-b', 'develop', 'master'])
 
     #---------------------------------------------------------------------------
     # Step 1: Things that require commits or stashing
@@ -299,8 +300,8 @@ def createScenarioLongBranchName():
     utilExecute(['git', 'init'])
     utilCreateAndCommitFile(MODIFIED_FILE)
 
-    # We want 'dev' so shell helper will show it as a target
-    utilExecute(['git', 'checkout', '-b', 'dev'])
+    # We want 'develop' so shell helper will show it as a target
+    utilExecute(['git', 'checkout', '-b', 'develop'])
 
     # Super long branch
     utilExecute(['git', 'checkout', '-b', 'f/super-doooper-long-branch-name'])
