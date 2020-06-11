@@ -1,3 +1,33 @@
+2020-06-10 - Version 3.3.0
+    - Functional Changes
+        - New colors: no repeats and readable for both white and black
+          backgrouns
+        - Don't generate colored output if terminal is not a tty  
+        - Screen width is now considered the maximum width, not the required
+          width
+        - When in detached head state, branch name is output from
+          `git describe` rather than just "DETACHED HEAD"   
+
+    - New Features
+        - New commandline options:
+            --color
+            --no-color
+            --max-width
+            --no-optional-locks
+        - gmon script to run gitsummary.py in a loop
+        - gitsummaryShellHelper.sh -- a tool for getting git information for
+          your shell prompt
+
+    - Other Changes
+        - Redundant calls to git have been removed, resulting in a significant
+          performance increase for large repositories
+    
+    - Known Issues
+        - Python doesn't think mintty is a tty thus:
+            - gitsummary produces no color (use --color to force color)
+            - gitsummary doesn't truncate any output lines (use --max-width N to
+              specify the width to use)
+    
 2019-05-05 - Version 3.2.0
     - Change terminology to be more consistent with git:
         - 'Modified' heading is now 'Work Dir'

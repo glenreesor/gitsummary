@@ -23,7 +23,7 @@ import subprocess
 import sys
 
 #-------------------------------------------------------------------------------
-VERSION = '3.2.0'
+VERSION = '3.3.0'
 
 #-------------------------------------------------------------------------------
 # Constants that have user exposure (so don't change the values)
