@@ -1,7 +1,7 @@
-2020-06-10 - Version 3.3.0
+2020-06-11 - Version 3.3.0
     - Functional Changes
         - New colors: no repeats and readable for both white and black
-          backgrouns
+          backgrounds
         - Don't generate colored output if terminal is not a tty  
         - Screen width is now considered the maximum width, not the required
           width
@@ -24,9 +24,9 @@
     
     - Known Issues
         - Python doesn't think mintty is a tty thus:
-            - gitsummary produces no color (use --color to force color)
-            - gitsummary doesn't truncate any output lines (use --max-width N to
-              specify the width to use)
+            - gitsummary produces no color (you can use --color to force color)
+            - gitsummary doesn't truncate any output lines (you can use
+              --max-width N to specify the width to use)
     
 2019-05-05 - Version 3.2.0
     - Change terminology to be more consistent with git:

@@ -31,7 +31,8 @@ following branch information:
     - 2 commits behind its remote tracking branch
     - 5 commits ahead and 3 commits behind its merge target (`develop`)
 
-See it in action using the `gmon` helper script:
+You can run `gitsummary.py` once or use the `gmon` helper script to run it
+continually:
 
 ![gitsummary in action](doc/gmon-example.gif)
 
