@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2016-2019 Glen Reesor
+# Copyright 2016-2020 Glen Reesor
 #
 # This file is part of gitsummary.
 #
