@@ -1,3 +1,19 @@
+# Copyright 2020 Glen Reesor
+#
+# This file is part of gitsummary.
+#
+# Gitsummary is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 # ------------------------------------------------------------------------------
 # Use this awk script to modify the configurable things in
 # gitsummaryShellHelper.sh, thus making it easier to test
@@ -38,7 +54,7 @@ BEGIN {
     STYLES[6] = "bg-black bright fg-yellow"
     STYLES[7] = "bg-black bright fg-white"
     STYLES[8] = "bg-white fg-black"
-    STYLES[9] = "bg-white fg-green"
+    STYLES[9] = "bg-white fg-magenta"
     STYLES[10] = "bg-white fg-red"
     STYLES[11] = "bg-white fg-blue"
 

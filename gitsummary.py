@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2016-2019 Glen Reesor
+# Copyright 2016-2020 Glen Reesor
 #
 # This file is part of gitsummary.
 #
@@ -23,7 +23,7 @@ import subprocess
 import sys
 
 #-------------------------------------------------------------------------------
-VERSION = '3.2.0'
+VERSION = '3.3.0'
 
 #-------------------------------------------------------------------------------
 # Constants that have user exposure (so don't change the values)
@@ -52,6 +52,33 @@ OPTIONS_OUTPUT_AHEAD_REMOTE = 'ahead-remote'
 OPTIONS_OUTPUT_AHEAD_TARGET = 'ahead-target'
 OPTIONS_OUTPUT_BEHIND_REMOTE = 'behind-remote'
 OPTIONS_OUTPUT_BEHIND_TARGET = 'behind-target'
+
+# Lists of above options for error checking of commandline options
+OPTIONS_OUTPUT_FULL_REPO = [
+    OPTIONS_OUTPUT_STAGE,
+    OPTIONS_OUTPUT_STASHES,
+    OPTIONS_OUTPUT_UNMERGED,
+    OPTIONS_OUTPUT_UNTRACKED,
+    OPTIONS_OUTPUT_WORK_DIR,
+
+    OPTIONS_OUTPUT_BRANCH_ALL,
+    OPTIONS_OUTPUT_BRANCH_CURRENT,
+]
+
+OPTIONS_OUTPUT_SHELL_PROMPT_HELPER = [
+    OPTIONS_OUTPUT_STAGE,
+    OPTIONS_OUTPUT_STASHES,
+    OPTIONS_OUTPUT_UNMERGED,
+    OPTIONS_OUTPUT_UNTRACKED,
+    OPTIONS_OUTPUT_WORK_DIR,
+
+    OPTIONS_OUTPUT_BRANCH_NAME,
+    OPTIONS_OUTPUT_TARGET_BRANCH,
+    OPTIONS_OUTPUT_AHEAD_REMOTE,
+    OPTIONS_OUTPUT_AHEAD_TARGET,
+    OPTIONS_OUTPUT_BEHIND_REMOTE,
+    OPTIONS_OUTPUT_BEHIND_TARGET,
+]
 
 #-------------------------------------------------------------------------------
 # Keys to dictionaries so errors will be caught by linter rather than at runtime
@@ -213,19 +240,19 @@ def fullRepoOutput(options):
     if sys.stdout.isatty():
         (SCREEN_WIDTH, SCREEN_HEIGHT) = os.get_terminal_size()
 
-        useColor = True and (options[KEY_OPTIONS_COLOR] != OPTIONS_COLOR_NO)
+        useColor = (options[KEY_OPTIONS_COLOR] != OPTIONS_COLOR_NO)
         maxWidth = (
             SCREEN_WIDTH
                 if options[KEY_OPTIONS_MAX_WIDTH] == OPTIONS_MAX_WIDTH_AUTO
                 else int(options[KEY_OPTIONS_MAX_WIDTH])
         )
     else:
-        maxWidth= (
+        maxWidth = (
             -1
                 if options[KEY_OPTIONS_MAX_WIDTH] == OPTIONS_MAX_WIDTH_AUTO
                 else int(options[KEY_OPTIONS_MAX_WIDTH])
         )
-        useColor = False or (options[KEY_OPTIONS_COLOR] == OPTIONS_COLOR_YES)
+        useColor = (options[KEY_OPTIONS_COLOR] == OPTIONS_COLOR_YES)
 
     #---------------------------------------------------------------------------
     # Assemble the raw output lines(no colors, padding, or truncation)
@@ -2512,6 +2539,7 @@ def main():
                 OPTIONS_OUTPUT_TARGET_BRANCH,
             ],
         }
+        validOptions = OPTIONS_OUTPUT_SHELL_PROMPT_HELPER
     else:
         requestedCmd = fullRepoOutput
         firstOptionIndex = 1
@@ -2527,6 +2555,7 @@ def main():
                 OPTIONS_OUTPUT_BRANCH_ALL,
             ],
         }
+        validOptions = OPTIONS_OUTPUT_FULL_REPO
 
     options = defaultOptions.copy()
 
@@ -2542,7 +2571,7 @@ def main():
                 arg = sys.argv[i]
                 if arg.startswith('--'):
                     customDone = True
-                elif arg not in defaultOptions[KEY_OPTIONS_SELECTED_OUTPUT]:
+                elif arg not in validOptions:
                     print('Unknown --custom option: ' + arg)
                     sys.exit(1)
                 else:

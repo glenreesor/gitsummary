@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # A simple script to clear the screen, show gitsummary output, delay 1s, repeat.
 # Press q to quit.

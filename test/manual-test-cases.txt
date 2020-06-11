@@ -24,19 +24,20 @@ Test    Description                     Scenario        Commandline and Expected
                                                             gst
 
                                                         Expected Result:
-                                                            - Current branch indicator beside a short commit hash
+                                                            - Branch list includes master and a short commit hash
+                                                            - Current branch indicator is beside the short commit hash
 
 3       Sections listed and colorized   all-sections
                                                         Commandline:
                                                             gst
 
                                                         Expected Result:
-                                                            - each section listed, has two entries, and colorized properly:
-                                                                Stashes
-                                                                Stage
-                                                                Work Dir
-                                                                Unmerged
-                                                                Untracked
+                                                            - each section is present, with the following number of entries, and colorized properly:
+                                                                Stashes      (2)
+                                                                Stage        (3)
+                                                                Work Dir     (4)
+                                                                Unmerged     (5)
+                                                                Untracked    (6)
                                                                 All branches
 
 4       Works if stdout isn't a tty     all-sections
@@ -53,7 +54,7 @@ Test    Description                     Scenario        Commandline and Expected
                                                         Commandline:
                                                             gst
 
-                                                        Expected Result:
+                                                        Expected Result (with a narrow terminal):
                                                             - No lines wrap
                                                             - Branch name(s) truncated so no wrap
                                                             - Doesn't apply to gitbash terminal
@@ -116,7 +117,7 @@ gitsummary.py commandline options tests
                                                             print(fullCommand)
 
                                                         Commandline:
-                                                            gst
+                                                            gst --no-optional-locks
 
                                                         Expected Result:
                                                             - git commands have "--no-optional-locks"
@@ -185,7 +186,7 @@ gitsummaryShellHelper.py tests
                                                            gssht
 
                                                         Expected Result: Branch name truncated:
-                                                            f/super-doooper-long-b... ⦁1 ⛌1 ...
+                                                            f/super-dooo... ⦁1 ⛌1 ... (develop)
 
                                                         Change maxLength to 10
                                                         Commandline
@@ -193,3 +194,10 @@ gitsummaryShellHelper.py tests
 
                                                         Expected Result: Only branch name shown, and it's truncated
                                                             f/super-do
+
+8       gitsummaryShellHelper          git-init-state
+        (With non-test data #3)                         Commandline
+                                                           gssht
+
+                                                        Expected Result:
+                                                            master

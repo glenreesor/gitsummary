@@ -1,6 +1,24 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+# Copyright 2020 Glen Reesor
+#
+# This file is part of gitsummary.
+#
+# Gitsummary is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Output a single line showing complete status of current git repo
+
+# This script requires bash v4+.
 
 #-------------------------------------------------------------------------------
 # Things you may want to change
@@ -111,7 +129,7 @@ function check_showNonNumeric()
     local value="$2"
 
     if [ "$value" != "yes" ] && [ "$value" != "no" ]; then
-        echo "Invalid value for $name: '$value'"
+        echo "Invalid value for show['$name']: '$value'"
         echo "It must be one of: yes, no"
         exit 1
     fi
@@ -130,7 +148,7 @@ function check_showNumeric()
     local value="$2"
 
     if [ "$value" != "num" ] && [ "$value" != "boolean" ] && [ "$value" != "no" ]; then
-        echo "Invalid value for $name: '$value'"
+        echo "Invalid value for show['$name']: '$value'"
         echo "It must be one of: num, boolean, no"
         exit 1
     fi
@@ -431,10 +449,17 @@ function main()
     fi
 
     # Early exit if we're not in a git-tracked folder
+    # Don't use `git status` because it can be expensive
     if ! $useTestValues; then
         git rev-list HEAD --max-count=1 > /dev/null 2>&1
         if [ "$?" != "0" ]; then
-            exit
+            # There are no refs, but this could also correspond to the state
+            # immediately after `git init`. So check for that by using
+            # `git status` (which isn't expensive in this scenario)
+            git status > /dev/null 2>&1
+            if [ "$?" != "0" ]; then
+                exit
+            fi
         fi
     fi
 

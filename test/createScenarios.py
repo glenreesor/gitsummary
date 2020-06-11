@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018, 2019 Glen Reesor
+# Copyright 2018-2020 Glen Reesor
 #
 # This file is part of gitsummary.
 #
@@ -55,8 +55,9 @@ def main():
     )
     setupScenario('all-sections', createScenarioAllSections)
     setupScenario('detached-head', createScenarioDetachedHead)
-    setupScenario('long-branch-name', createScenarioLongBranchName)
     setupScenario('example', createScenarioExample)
+    setupScenario('git-init-state', createScenarioGitInitState)
+    setupScenario('long-branch-name', createScenarioLongBranchName)
 
 def setupScenario(scenarioFolder, scenarioSetupFn):
     """
@@ -283,34 +284,19 @@ def createScenarioAllSections():
     for aFile in UNTRACKED_FILES:
         utilCreateFile(aFile)
 
-def createScenarioLongBranchName():
+def createScenarioDetachedHead():
     """
-    In the current folder, create the environment for testing truncation
-    of the shell helper's output:
-        - Super long branch name
-        - Other stuff so we'll know if the shell helper is removing them
-            - A modified file
-            - A staged file
-            - An untracked file
+    In the current folder, create the environment for:
+        - Detached head state
     """
-    MODIFIED_FILE = 'modifiedFile'
-    STAGED_FILE = 'stagedFile'
-    UNTRACKED_FILE = 'untrackedFile'
-
     utilExecute(['git', 'init'])
-    utilCreateAndCommitFile(MODIFIED_FILE)
-
-    # We want 'develop' so shell helper will show it as a target
-    utilExecute(['git', 'checkout', '-b', 'develop'])
-
-    # Super long branch
-    utilExecute(['git', 'checkout', '-b', 'f/super-doooper-long-branch-name'])
-
-    # Other stuff as per above
-    utilModifyFile(MODIFIED_FILE)
-    utilCreateFile(UNTRACKED_FILE)
-    utilCreateFile(STAGED_FILE)
-    utilExecute(['git', 'add', STAGED_FILE])
+    utilCreateAndCommitFile('file1')
+    previousCommitHash = subprocess.check_output(
+        ['git', 'rev-list', '--max-count=1', 'master'],
+        universal_newlines = True
+    ).splitlines()[0]
+    utilCreateAndCommitFile('file2')
+    utilExecute(['git', 'checkout', previousCommitHash])
 
 def createScenarioExample():
     """
@@ -364,20 +350,41 @@ def createScenarioExample():
     for untrackedFile in UNTRACKED_FILES:
         utilCreateFile(untrackedFile)
 
-def createScenarioDetachedHead():
+def createScenarioGitInitState():
     """
-    In the current folder, create the environment for:
-        - Detached head state
+    In the current folder, create the environment immediately after 'git init'.
+    We need this for testing the shell helper
     """
     utilExecute(['git', 'init'])
-    utilCreateAndCommitFile('file1')
-    previousCommitHash = subprocess.check_output(
-        ['git', 'rev-list', '--max-count=1', 'master'],
-        universal_newlines = True
-    ).splitlines()[0]
-    utilCreateAndCommitFile('file2')
-    utilExecute(['git', 'checkout', previousCommitHash])
 
+def createScenarioLongBranchName():
+    """
+    In the current folder, create the environment for testing truncation
+    of the shell helper's output:
+        - Super long branch name
+        - Other stuff so we'll know if the shell helper is removing them
+            - A modified file
+            - A staged file
+            - An untracked file
+    """
+    MODIFIED_FILE = 'modifiedFile'
+    STAGED_FILE = 'stagedFile'
+    UNTRACKED_FILE = 'untrackedFile'
+
+    utilExecute(['git', 'init'])
+    utilCreateAndCommitFile(MODIFIED_FILE)
+
+    # We want 'develop' so shell helper will show it as a target
+    utilExecute(['git', 'checkout', '-b', 'develop'])
+
+    # Super long branch
+    utilExecute(['git', 'checkout', '-b', 'f/super-doooper-long-branch-name'])
+
+    # Other stuff as per above
+    utilModifyFile(MODIFIED_FILE)
+    utilCreateFile(UNTRACKED_FILE)
+    utilCreateFile(STAGED_FILE)
+    utilExecute(['git', 'add', STAGED_FILE])
 
 #-----------------------------------------------------------------------------
 # Helpers
