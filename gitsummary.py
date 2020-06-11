@@ -247,7 +247,7 @@ def fullRepoOutput(options):
                 else int(options[KEY_OPTIONS_MAX_WIDTH])
         )
     else:
-        maxWidth= (
+        maxWidth = (
             -1
                 if options[KEY_OPTIONS_MAX_WIDTH] == OPTIONS_MAX_WIDTH_AUTO
                 else int(options[KEY_OPTIONS_MAX_WIDTH])
