@@ -1,6 +1,6 @@
 {
     "branchOrder": [
-        "^master$",
+        "^main$",
         "^dev$",
         "^b\/",
         "^f\/",
@@ -10,12 +10,12 @@
     "defaultTarget": "",
     "branches": [
         {
-            "name": "^master$",
+            "name": "^main$",
             "target": ""
         },
         {
             "name": "^dev$",
-            "target": "master"
+            "target": "main"
         },
         {
             "name": "^f\/.+",
@@ -27,11 +27,11 @@
         },
         {
             "name": "^hf\/.+",
-            "target": "master"
+            "target": "main"
         },
         {
             "name": "^release-.+",
-            "target": "master"
+            "target": "main"
         }
     ]
 }
